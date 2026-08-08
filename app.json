@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "BGTS-OS",
+    "slug": "bgts-os",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#0a1f38",
+    "splash": {
+      "backgroundColor": "#0a1f38",
+      "resizeMode": "contain"
+    },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.bgts.os" },
+    "android": { "package": "com.bgts.os", "adaptiveIcon": { "backgroundColor": "#0a1f38" } },
+    "platforms": ["ios", "android"]
+  }
+}
