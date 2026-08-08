@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Btn, DatePicker, alert } from '../ui';
+import { C, S, Card, Btn, DatePicker, PickerField, alert } from '../ui';
 import { printHtml } from '../fileIO';
 import {
   uid, inr, todayISO, byId, blankLR, computeLR, clientName, vendorName,
@@ -43,16 +43,25 @@ function Chips({ l, v, set, opts }) {
     </View>
   );
 }
-function Party({ label, p, setP, clients, color }) {
+function Party({ label, p, setP, clients }) {
+  /* "Quick Fill" — pick any client from the full master list to auto-populate this
+     party's Name/City/Contact/GST, instead of a handful of chips that only ever showed
+     the first 4 clients and truncated their names (unusable once the client master has
+     more than a few real companies in it). Mirrors the HTML build's <select> dropdown. */
+  const fillFrom = (cid) => {
+    const c = clients.find(x => x.id === cid);
+    if (c) setP({ name: c.name, city: c.addr || '', contact: c.phone || '', pan: p.pan || '', gst: c.gstin || '' });
+  };
   return (
     <Card title={label}>
-      <View style={S.wrapRow}>
-        {clients.slice(0, 4).map(c => (
-          <TouchableOpacity key={c.id} onPress={() => setP({ name: c.name, city: c.addr || '', contact: c.phone || '', pan: p.pan || '', gst: c.gstin || '' })}
-            style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: color, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 6 }}>
-            <Text style={{ fontSize: 10.5, color: C.txt }}>↳ {c.name.slice(0, 18)}</Text>
-          </TouchableOpacity>
-        ))}
+      <Text style={{ fontSize: 10, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 4 }}>Quick Fill</Text>
+      <View style={{ marginBottom: 10 }}>
+        <PickerField
+          value=""
+          placeholder="— fill from client master —"
+          options={clients.map(c => ({ v: c.id, l: c.name }))}
+          onChange={fillFrom}
+        />
       </View>
       <Fld l={label + ' Name *'} v={p.name} set={t => setP({ ...p, name: t })} />
       <View style={[S.row, { justifyContent: 'space-between' }]}>

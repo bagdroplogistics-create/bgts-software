@@ -224,6 +224,52 @@ export function AlertHost() {
   );
 }
 
+/* ---------- reusable searchable dropdown picker ----------
+   Same box-that-opens-a-searchable-modal-list pattern already used inside ModalForm for
+   long select fields, pulled out standalone so any screen can drop in a full "pick one
+   from N options" control instead of a handful of truncated inline chips (chips silently
+   stop scaling once there are more than a few real records — e.g. an 11-client master). */
+export function PickerField({ value, options, onChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const opts = options || [];
+  const selected = opts.find(o => String(o.v) === String(value));
+  const filtered = opts.filter(o => String(o.l).toLowerCase().includes(q.toLowerCase()));
+  return (
+    <View>
+      <TouchableOpacity onPress={() => { setQ(''); setOpen(true); }} style={{
+        borderWidth: 1, borderColor: C.line2, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 9,
+        backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
+      }}>
+        <Text numberOfLines={1} style={{ fontSize: 13, color: selected ? C.txt : C.line2, flex: 1 }}>
+          {selected ? selected.l : (placeholder || '— select —')}
+        </Text>
+        <Text style={{ color: C.mut, marginLeft: 6, fontSize: 11 }}>▾</Text>
+      </TouchableOpacity>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(10,31,56,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <TouchableOpacity accessible={false} activeOpacity={1} onPress={() => setOpen(false)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+          <View style={{ backgroundColor: '#fff', borderRadius: 12, width: '100%', maxWidth: 420, maxHeight: '70%', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10 }}>
+            <View style={{ padding: 12, paddingBottom: 6 }}>
+              <TextInput value={q} onChangeText={setQ} placeholder="Search…" placeholderTextColor={C.line2} autoFocus
+                style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: C.txt, backgroundColor: '#fff' }} />
+            </View>
+            <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+              {filtered.map(o => (
+                <TouchableOpacity key={String(o.v)} onPress={() => { onChange(o.v); setOpen(false); }}
+                  style={{ paddingVertical: 11, paddingHorizontal: 16 }}>
+                  <Text style={{ fontSize: 13.5, color: C.txt }}>{o.l}</Text>
+                </TouchableOpacity>
+              ))}
+              {!filtered.length ? <Text style={{ padding: 16, fontSize: 12.5, color: C.mut, textAlign: 'center' }}>No matches.</Text> : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 export function confirmDo(msg, onYes) {
   alert('Confirm', msg, [
     { text: 'Cancel', style: 'cancel' },
