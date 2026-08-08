@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert } from 'reac
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
-import { C, S, Card, Btn } from '../ui';
+import { C, S, Card, Btn, DatePicker } from '../ui';
 import {
   uid, inr, todayISO, byId, blankLR, computeLR, clientName, vendorName,
   truckToVehicleId, lrHireBalance, convertInquiryToLRDraft, lrHtml,
@@ -12,13 +12,18 @@ import {
 
 /* ---- small local form primitives ---- */
 function Fld({ l, v, set, num, multi, half }) {
+  const isDate = !multi && l.indexOf('Date') >= 0;
   return (
     <View style={{ marginBottom: 10, width: half ? '48.5%' : '100%' }}>
       <Text style={{ fontSize: 10, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 4 }}>{l}</Text>
-      <TextInput value={v == null ? '' : String(v)} onChangeText={set}
-        keyboardType={num ? 'numeric' : 'default'} multiline={!!multi}
-        placeholder={l.indexOf('Date') >= 0 ? 'YYYY-MM-DD' : ''} placeholderTextColor={C.line2}
-        style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7, fontSize: 13, color: C.txt, backgroundColor: '#fff', minHeight: multi ? 56 : undefined }} />
+      {isDate ? (
+        <DatePicker value={v == null ? '' : String(v)} onChange={set} />
+      ) : (
+        <TextInput value={v == null ? '' : String(v)} onChangeText={set}
+          keyboardType={num ? 'numeric' : 'default'} multiline={!!multi}
+          placeholderTextColor={C.line2}
+          style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7, fontSize: 13, color: C.txt, backgroundColor: '#fff', minHeight: multi ? 56 : undefined }} />
+      )}
     </View>
   );
 }

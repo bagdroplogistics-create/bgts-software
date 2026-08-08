@@ -188,6 +188,109 @@ export function confirmDo(msg, onYes) {
   ]);
 }
 
+/* ---------- calendar date picker ----------
+   Replaces free-typed 'YYYY-MM-DD' text entry everywhere a date field appears.
+   value/onChange work in the same 'YYYY-MM-DD' string format used throughout the app
+   (fmtDate, daysSince, etc. all expect this), so it drops in wherever a date TextInput was. */
+const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function isoDate(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
+
+export function DatePicker({ value, onChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const parsed = value ? new Date(value + 'T00:00:00') : null;
+  const valid = !!(parsed && !isNaN(parsed.getTime()));
+  const now = new Date();
+  const [viewY, setViewY] = useState(valid ? parsed.getFullYear() : now.getFullYear());
+  const [viewM, setViewM] = useState(valid ? parsed.getMonth() : now.getMonth());
+
+  const openPicker = () => {
+    const base = valid ? parsed : new Date();
+    setViewY(base.getFullYear()); setViewM(base.getMonth());
+    setOpen(true);
+  };
+
+  const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+  const firstWeekday = new Date(viewY, viewM, 1).getDay();
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const today = new Date();
+  const todayIso = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const pick = (d) => { onChange(isoDate(viewY, viewM, d)); setOpen(false); };
+  const prevMonth = () => { if (viewM === 0) { setViewM(11); setViewY(viewY - 1); } else setViewM(viewM - 1); };
+  const nextMonth = () => { if (viewM === 11) { setViewM(0); setViewY(viewY + 1); } else setViewM(viewM + 1); };
+
+  return (
+    <View>
+      <TouchableOpacity onPress={openPicker} style={{
+        borderWidth: 1, borderColor: C.line2, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 9,
+        backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
+      }}>
+        <Text style={{ fontSize: 13, color: valid ? C.txt : C.line2 }}>
+          {valid ? fmtDate(value) : (placeholder || 'YYYY-MM-DD')}
+        </Text>
+        <Text style={{ fontSize: 13 }}>📅</Text>
+      </TouchableOpacity>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(10,31,56,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <TouchableOpacity accessible={false} activeOpacity={1} onPress={() => setOpen(false)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+          <View style={{ backgroundColor: '#fff', borderRadius: 12, width: '100%', maxWidth: 320, padding: 16, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <TouchableOpacity onPress={() => setViewY(viewY - 1)} style={{ padding: 6 }}>
+                <Text style={{ fontSize: 13, color: C.navy2, fontWeight: '700' }}>«</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={prevMonth} style={{ padding: 6 }}>
+                <Text style={{ fontSize: 16, color: C.navy2, fontWeight: '700' }}>‹</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 13.5, fontWeight: '800', color: C.navy }}>{MONTH_NAMES[viewM]} {viewY}</Text>
+              <TouchableOpacity onPress={nextMonth} style={{ padding: 6 }}>
+                <Text style={{ fontSize: 16, color: C.navy2, fontWeight: '700' }}>›</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setViewY(viewY + 1)} style={{ padding: 6 }}>
+                <Text style={{ fontSize: 13, color: C.navy2, fontWeight: '700' }}>»</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', marginTop: 8 }}>
+              {WEEKDAYS.map(w => (
+                <View key={w} style={{ width: '14.28%', alignItems: 'center', paddingVertical: 4 }}>
+                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: C.mut }}>{w}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {cells.map((d, i) => {
+                const iso = d ? isoDate(viewY, viewM, d) : null;
+                const isSel = !!(iso && value === iso);
+                const isToday = iso === todayIso;
+                return (
+                  <View key={i} style={{ width: '14.28%', aspectRatio: 1, padding: 2 }}>
+                    {d ? (
+                      <TouchableOpacity onPress={() => pick(d)} style={{
+                        flex: 1, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: isSel ? C.navy2 : 'transparent',
+                        borderWidth: isToday && !isSel ? 1 : 0, borderColor: C.amber
+                      }}>
+                        <Text style={{ fontSize: 12.5, color: isSel ? '#fff' : C.txt, fontWeight: isSel ? '700' : '400' }}>{d}</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, borderTopWidth: 1, borderTopColor: C.line, paddingTop: 10 }}>
+              <Btn small tone="ghost" label="Clear" onPress={() => { onChange(''); setOpen(false); }} />
+              <Btn small tone="ghost" label="Today" onPress={() => { onChange(todayIso); setOpen(false); }} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 /* ---------- generic modal form ----------
    form = { title, fields:[{key,label,type:'text'|'number'|'date'|'select'|'multiline',options:[{v,l}],required,hint,value}], onSubmit(values) }
 */
@@ -265,11 +368,12 @@ export function ModalForm({ form, onClose }) {
                           <Text style={{ color: C.mut, marginLeft: 6, fontSize: 11 }}>▾</Text>
                         </TouchableOpacity>
                       )
+                    ) : f.type === 'date' ? (
+                      <DatePicker value={vals[f.key]} onChange={v => set(f.key, v)} />
                     ) : (
                       <TextInput
                         value={vals[f.key] || ''}
                         onChangeText={t => set(f.key, t)}
-                        placeholder={f.type === 'date' ? 'YYYY-MM-DD' : ''}
                         placeholderTextColor={C.line2}
                         keyboardType={f.type === 'number' ? 'numeric' : 'default'}
                         multiline={f.type === 'multiline'}
