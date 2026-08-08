@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
 import { C, S, Card, Btn, DatePicker } from '../ui';
+import { printHtml } from '../fileIO';
 import {
   uid, inr, todayISO, byId, blankLR, computeLR, clientName, vendorName,
   truckToVehicleId, lrHireBalance, convertInquiryToLRDraft, lrHtml,
@@ -175,8 +174,7 @@ export default function LRFormScreen({ navigation, route }) {
       savedRec = rec;
     });
     if (andPrint && savedRec) {
-      Print.printToFileAsync({ html: lrHtml(db, savedRec) })
-        .then(({ uri }) => Sharing.isAvailableAsync().then(ok => { if (ok) Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: savedRec.lrNo }); }))
+      printHtml(lrHtml(db, savedRec), savedRec.lrNo)
         .catch(e => Alert.alert('PDF error', String(e.message || e)));
     }
     navigation.goBack();

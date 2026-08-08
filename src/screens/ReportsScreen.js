@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, Table } from '../ui';
+import { downloadFile } from '../fileIO';
 import {
   inr, sum, csvString, clientName, vehicleReg, vendorName, allRenewalItems,
   invPaid, invOutstanding, daysSince
@@ -42,11 +41,7 @@ export default function ReportsScreen() {
 
   const shareCSV = async (name, rows) => {
     try {
-      const uri = FileSystem.cacheDirectory + name;
-      await FileSystem.writeAsStringAsync(uri, csvString(rows));
-      const ok = await Sharing.isAvailableAsync();
-      if (ok) await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: name });
-      else Alert.alert('Saved', 'CSV written to:\n' + uri);
+      await downloadFile(name, csvString(rows), 'text/csv');
     } catch (e) { Alert.alert('Export error', String(e.message || e)); }
   };
 

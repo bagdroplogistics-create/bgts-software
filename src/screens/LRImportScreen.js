@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, Table } from '../ui';
+import { downloadFile, readPickedFile } from '../fileIO';
 import {
   inr, fmtDate, csvString, parseCSV, buildLRImportPlan, applyLRImportAoa,
   LR_IMPORT_HEADERS, todayISO
@@ -23,11 +22,7 @@ export default function LRImportScreen({ navigation }) {
         ['', 'ORIGINAL', todayISO(), 'Owned', 'GJ19X6890', 'Vadodara', 'Mumbai', 'VADODARA', 'USHTA (Sample Client)', '24AAAAA0000A1Z5', 'Receiver Co Ltd', '', 'Consignor', 'TO BE BILLED', 'Industrial castings', '10', '14', '14', '', '', '18500', '', '', '', '0', '0', '0', '', '', '', ''],
         ['', 'ORIGINAL', todayISO(), 'Hired', 'GJ01AB1234', 'Vadodara', 'Ahmedabad', 'VADODARA', 'USHTA (Sample Client)', '', 'Receiver Co Ltd', '', 'Consignor', 'TO BE BILLED', 'Packaged goods', '20', '8', '8', '', '', '7200', '', '', '', '0', '0', '0', 'Sample Transport Vendor', '5600', '2000', '']
       ];
-      const uri = FileSystem.cacheDirectory + 'BGTS_LR_Import_Template.csv';
-      await FileSystem.writeAsStringAsync(uri, csvString(rows));
-      const ok = await Sharing.isAvailableAsync();
-      if (ok) await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'LR Import Template' });
-      else Alert.alert('Saved', uri);
+      await downloadFile('BGTS_LR_Import_Template.csv', csvString(rows), 'text/csv');
     } catch (e) { Alert.alert('Error', String(e.message || e)); }
   };
 
@@ -37,7 +32,7 @@ export default function LRImportScreen({ navigation }) {
       if (res.canceled || !res.assets || !res.assets.length) return;
       const a = res.assets[0];
       if (/\.xlsx?$/i.test(a.name || '')) { Alert.alert('Excel on mobile', 'On the phone, use CSV (save your Excel sheet as CSV first). Excel files import directly on the desktop web app.'); return; }
-      const text = await FileSystem.readAsStringAsync(a.uri);
+      const text = await readPickedFile(a);
       setAoa(parseCSV(text));
     } catch (e) { Alert.alert('Could not read file', String(e.message || e)); }
   };

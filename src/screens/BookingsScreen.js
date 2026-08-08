@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Linking, Alert } from 'react-native';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, statusTone, Table } from '../ui';
+import { printHtml } from '../fileIO';
 import {
   uid, inr, todayISO, fmtDate, byId, removeById, clientName, vehicleReg,
   findContractRate, waLink, waBookingMsg, lrHtml
@@ -105,9 +104,7 @@ export default function BookingsScreen({ navigation }) {
     const l = db.lrs.find(x => x.bookingId === b.id);
     if (!l) { Alert.alert('Generate the LR first.'); return; }
     try {
-      const { uri } = await Print.printToFileAsync({ html: lrHtml(db, l) });
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: l.lrNo });
-      else Alert.alert('Saved', 'PDF created at:\n' + uri);
+      await printHtml(lrHtml(db, l), l.lrNo);
     } catch (e) { Alert.alert('PDF error', String(e.message || e)); }
   };
 

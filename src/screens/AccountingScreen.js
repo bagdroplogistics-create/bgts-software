@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Linking, Alert } from 'react-native';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
+import { downloadFile, printHtml } from '../fileIO';
 import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
 import {
   uid, inr, sum, fmtDate, todayISO, addDaysISO, daysSince, byId, removeById,
@@ -79,10 +77,7 @@ export default function AccountingScreen({ navigation }) {
     try {
       const rows = [['Invoice', 'Date', 'Client', 'Taxable', 'GST %', 'Total', 'Paid', 'Outstanding', 'Due Date', 'Age Days']];
       db.invoices.forEach(inv => rows.push([inv.invNo, inv.date, clientName(db, inv.clientId), inv.amount, inv.gstPct, inv.total, invPaid(db, inv), invOutstanding(db, inv), inv.dueDate, daysSince(inv.date)]));
-      const uri = FileSystem.cacheDirectory + 'BGTS_Receivables.csv';
-      await FileSystem.writeAsStringAsync(uri, csvString(rows));
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'BGTS_Receivables.csv' });
-      else Alert.alert('Saved', uri);
+      await downloadFile('BGTS_Receivables.csv', csvString(rows), 'text/csv');
     } catch (e) { Alert.alert('Error', String(e.message || e)); }
   };
 
@@ -90,18 +85,13 @@ export default function AccountingScreen({ navigation }) {
     try {
       const rows = [['Date', 'Account', 'Amount', 'Paid Through', 'Vendor', 'Ref', 'Notes']];
       db.acctExp.forEach(e => rows.push([e.date, e.account, e.amount, e.paidThrough, e.vendor, e.ref, e.notes]));
-      const uri = FileSystem.cacheDirectory + 'BGTS_Business_Expenses.csv';
-      await FileSystem.writeAsStringAsync(uri, csvString(rows));
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'BGTS_Business_Expenses.csv' });
-      else Alert.alert('Saved', uri);
+      await downloadFile('BGTS_Business_Expenses.csv', csvString(rows), 'text/csv');
     } catch (e) { Alert.alert('Error', String(e.message || e)); }
   };
 
   const printReceipt = async (p) => {
     try {
-      const { uri } = await Print.printToFileAsync({ html: receiptHtml(db, p) });
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: p.mrNo });
-      else Alert.alert('Saved', 'PDF created at:\n' + uri);
+      await printHtml(receiptHtml(db, p), p.mrNo);
     } catch (e) { Alert.alert('Error', String(e.message || e)); }
   };
 

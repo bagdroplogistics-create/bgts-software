@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, Table } from '../ui';
+import { downloadFile, readPickedFile, printHtml } from '../fileIO';
 import {
   inr, fmtDate, byId, parseCSV, importBankAoa, bankSuggest, matchBankTxn,
   invOutstanding, clientName, receiptHtml, csvString, todayISO
@@ -29,7 +27,7 @@ export default function BankingScreen() {
       if (res.canceled || !res.assets || !res.assets.length) return;
       const a = res.assets[0];
       if (/\.xlsx?$/i.test(a.name || '')) { Alert.alert('Excel on mobile', 'Save the statement as CSV first (Excel imports directly on the desktop web app).'); return; }
-      runImport(parseCSV(await FileSystem.readAsStringAsync(a.uri)));
+      runImport(parseCSV(await readPickedFile(a)));
     } catch (e) { Alert.alert('Error', String(e.message || e)); }
   };
 
@@ -51,18 +49,14 @@ export default function BankingScreen() {
   };
   const shareReceipt = async (p) => {
     try {
-      const { uri } = await Print.printToFileAsync({ html: receiptHtml(db, p) });
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: p.mrNo });
+      await printHtml(receiptHtml(db, p), p.mrNo);
     } catch (e) { Alert.alert('Error', String(e.message || e)); }
   };
 
   const shareTemplate = async () => {
     try {
       const rows = [['date', 'narration', 'ref', 'debit', 'credit'], [todayISO(), 'NEFT-USHTA SAMPLE PAYMENT', 'UTR12345', '', '18500']];
-      const uri = FileSystem.cacheDirectory + 'Bank_Statement_Template.csv';
-      await FileSystem.writeAsStringAsync(uri, csvString(rows));
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'Bank_Statement_Template.csv' });
-      else Alert.alert('Saved', uri);
+      await downloadFile('Bank_Statement_Template.csv', csvString(rows), 'text/csv');
     } catch (e) { Alert.alert('Error', String(e.message || e)); }
   };
 

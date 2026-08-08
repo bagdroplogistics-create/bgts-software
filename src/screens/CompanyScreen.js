@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Linking, Alert } from 'react-native';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
 import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, Table } from '../ui';
 import { uid, inr, fmtDate, todayISO, daysSince, byId, sum, pad, invPaid, invOutstanding, waLink, receiptHtml } from '../logic';
+import { printHtml } from '../fileIO';
 
 const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -49,9 +48,7 @@ export default function CompanyScreen({ route, navigation }) {
 
   const printReceipt = async (p) => {
     try {
-      const { uri } = await Print.printToFileAsync({ html: receiptHtml(db, p) });
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: p.mrNo });
-      else Alert.alert('Saved', 'PDF created at:\n' + uri);
+      await printHtml(receiptHtml(db, p), p.mrNo);
     } catch (e) { Alert.alert('Error', String(e.message || e)); }
   };
 

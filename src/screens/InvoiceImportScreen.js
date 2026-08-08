@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, Table } from '../ui';
+import { readPickedFile } from '../fileIO';
 import {
   inr, fmtDate, parseCSV, buildInvImportPlan, applyInvImportAoa, clientName,
   isBillingRegister, parseBillingRegister, registerToInvoiceAoa
@@ -31,7 +31,7 @@ export default function InvoiceImportScreen({ navigation }) {
       const res = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', 'text/plain', 'application/vnd.ms-excel', '*/*'], copyToCacheDirectory: true });
       if (res.canceled || !res.assets || !res.assets.length) return;
       const a = res.assets[0];
-      const txt = await FileSystem.readAsStringAsync(a.uri).catch(() => '');
+      const txt = await readPickedFile(a).catch(() => '');
       if (isBillingRegister(txt)) { ingestText(txt); return; }
       if (/\.xlsx?$/i.test(a.name || '')) { Alert.alert('Excel on mobile', 'This Excel is not a BILLING_REGISTER export — save it as CSV first (binary Excel imports on the desktop web app).'); return; }
       ingestText(txt);

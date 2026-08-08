@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
+import { downloadFile, printHtml } from '../fileIO';
 import {
   uid, inr, fmtDate, todayISO, byId, removeById, lrHtml, vendorName, csvString,
   lrHireBalance, lrTripExpTotal, truckToVehicleId, TRIP_EXP_CATS
@@ -19,19 +17,13 @@ export default function LRScreen({ navigation }) {
     try {
       const rows = [['LR No', 'Type', 'Date', 'Truck', 'From', 'To', 'Booking Branch', 'Consignor', 'Consignee', 'Billing Party', 'Pay Terms', 'E-Way Bill', 'A Weight', 'C Weight', 'Sub Total', 'IGST', 'CGST', 'SGST', 'Gross', 'POD']];
       db.lrs.forEach(l => rows.push([l.lrNo, l.lrType, l.date, l.truckNo, l.fromPlace, l.toPlace, l.bookingBranch, (l.consignor || {}).name, (l.consignee || {}).name, l.billingParty, l.payTerms, l.ewayBillNo, l.aWeight, l.cWeight, l.subTotal, l.igstAmt, l.cgstAmt, l.sgstAmt, l.gross, l.pod ? 'Yes' : 'No']));
-      const uri = FileSystem.cacheDirectory + 'BGTS_LR_Register.csv';
-      await FileSystem.writeAsStringAsync(uri, csvString(rows));
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'BGTS_LR_Register.csv' });
-      else Alert.alert('Saved', uri);
+      await downloadFile('BGTS_LR_Register.csv', csvString(rows), 'text/csv');
     } catch (e) { Alert.alert('Error', String(e.message || e)); }
   };
 
   const sharePdf = async (l) => {
     try {
-      const { uri } = await Print.printToFileAsync({ html: lrHtml(db, l) });
-      const ok = await Sharing.isAvailableAsync();
-      if (ok) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: l.lrNo });
-      else Alert.alert('Saved', 'PDF created at:\n' + uri);
+      await printHtml(lrHtml(db, l), l.lrNo);
     } catch (e) {
       Alert.alert('PDF error', String(e.message || e));
     }

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { useStore } from '../store';
 import { C, S, Card, Btn, confirmDo } from '../ui';
 import { blankDB, migrate, todayISO } from '../logic';
+import { downloadFile, readPickedFile } from '../fileIO';
 
 const FIELDS = [['name', 'Company Name'], ['gstin', 'GSTIN'], ['addr', 'Address'], ['phone', 'Phone'], ['email', 'Email'], ['lrPrefix', 'LR Number Prefix']];
 
@@ -20,21 +20,30 @@ export default function SettingsScreen() {
 
   const exportBackup = async () => {
     try {
-      const uri = FileSystem.cacheDirectory + 'BGTS_OS_Backup_' + todayISO() + '.json';
-      await FileSystem.writeAsStringAsync(uri, JSON.stringify(db, null, 2));
-      const ok = await Sharing.isAvailableAsync();
-      if (ok) await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'BGTS-OS Backup' });
-      else Alert.alert('Saved', 'Backup written to:\n' + uri);
+      const r = await downloadFile('BGTS_OS_Backup_' + todayISO() + '.json', JSON.stringify(db, null, 2), 'application/json');
+      if (!r.web && !r.shared) Alert.alert('Saved', 'Backup written to:\n' + r.uri);
     } catch (e) { Alert.alert('Backup error', String(e.message || e)); }
   };
 
-  const restore = () => {
+  const applyRestore = (raw, sourceLabel) => {
     try {
-      const d = JSON.parse(paste);
+      const d = JSON.parse(raw);
       if (!d || !d.company || !Array.isArray(d.bookings)) { Alert.alert('Invalid', 'Not a valid BGTS-OS backup.'); return; }
       const md = migrate(d);   /* older backups get v2 keys (lrs, lhcs, advances, acctExp) */
-      confirmDo('Replace ALL current data with the pasted backup?', () => { replace(md); setCo({ ...md.company }); setPaste(''); Alert.alert('Done', 'Backup restored.'); });
+      confirmDo('Replace ALL current data with ' + sourceLabel + '?', () => { replace(md); setCo({ ...md.company }); setPaste(''); Alert.alert('Done', 'Backup restored.'); });
     } catch (e) { Alert.alert('Invalid JSON', String(e.message || e)); }
+  };
+
+  const restore = () => applyRestore(paste, 'the pasted backup');
+
+  const pickBackupFile = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', '*/*'], copyToCacheDirectory: true });
+      if (res.canceled || !res.assets || !res.assets.length) return;
+      const a = res.assets[0];
+      const text = await readPickedFile(a);
+      applyRestore(text, 'the file "' + (a.name || 'backup.json') + '"');
+    } catch (e) { Alert.alert('Could not read file', String(e.message || e)); }
   };
 
   const wipe = () => confirmDo('Erase ALL data on this device? Export a backup first.', () =>
@@ -62,11 +71,13 @@ export default function SettingsScreen() {
           <Btn label="⬇ Export Backup (JSON)" onPress={exportBackup} />
           <Btn label="Erase ALL Data" tone="red" onPress={wipe} />
         </View>
-        <Text style={{ fontSize: 10.5, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginTop: 14, marginBottom: 4 }}>Restore: paste backup JSON</Text>
+        <Text style={{ fontSize: 10.5, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginTop: 14, marginBottom: 4 }}>Restore from a backup file</Text>
+        <Btn label="⬆ Choose Backup File (.json)" tone="amber" onPress={pickBackupFile} />
+        <Text style={{ fontSize: 10.5, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginTop: 14, marginBottom: 4 }}>Or paste backup JSON (small backups only)</Text>
         <TextInput value={paste} onChangeText={setPaste} multiline placeholder='{"company":{...}}' placeholderTextColor={C.line2}
           style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, padding: 10, fontSize: 11, color: C.txt, backgroundColor: '#fff', minHeight: 80 }} />
         <View style={{ marginTop: 8 }}>
-          <Btn label="⬆ Restore Backup" onPress={restore} />
+          <Btn label="⬆ Restore Pasted Backup" onPress={restore} />
         </View>
       </Card>
 
