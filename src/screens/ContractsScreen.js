@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
 import { uid, inr, fmtDate, daysTo, clientName, byId, removeById } from '../logic';
 
 export default function ContractsScreen() {
@@ -19,7 +19,7 @@ export default function ContractsScreen() {
   ];
 
   const addContract = () => {
-    if (!db.clients.length) { Alert.alert('No clients', 'Add the client in Masters first.'); return; }
+    if (!db.clients.length) { alert('No clients', 'Add the client in Masters first.'); return; }
     setForm({
       title: 'New Contract / Tender', fields: contractFields(null),
       onSubmit: (v) => update(d => d.contracts.push({ id: uid('ct'), type: v.type, clientId: v.clientId, ref: v.ref, validFrom: v.validFrom, validTo: v.validTo, emd: v.emd, bgExpiry: v.bgExpiry, rates: [] }))

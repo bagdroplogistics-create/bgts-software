@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, Table, alert } from '../ui';
 import { downloadFile, readPickedFile } from '../fileIO';
 import {
   inr, fmtDate, csvString, parseCSV, buildLRImportPlan, applyLRImportAoa,
-  LR_IMPORT_HEADERS, todayISO
+  LR_IMPORT_HEADERS, todayISO, isBookingRegister, registerToLRAoa
 } from '../logic';
 
 export default function LRImportScreen({ navigation }) {
@@ -23,23 +23,33 @@ export default function LRImportScreen({ navigation }) {
         ['', 'ORIGINAL', todayISO(), 'Hired', 'GJ01AB1234', 'Vadodara', 'Ahmedabad', 'VADODARA', 'USHTA (Sample Client)', '', 'Receiver Co Ltd', '', 'Consignor', 'TO BE BILLED', 'Packaged goods', '20', '8', '8', '', '', '7200', '', '', '', '0', '0', '0', 'Sample Transport Vendor', '5600', '2000', '']
       ];
       await downloadFile('BGTS_LR_Import_Template.csv', csvString(rows), 'text/csv');
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
+  };
+
+  /* Detects a real BOOKING_REGISTER.xls export (an HTML table saved with a .xls
+     extension — same format the company's billing software produces for BILLING_REGISTER,
+     which Invoice Import already reads directly) and converts it straight into the same
+     AOA shape a CSV upload produces. Anything else falls back to plain CSV parsing. */
+  const ingestText = (txt) => {
+    if (isBookingRegister(txt)) { setAoa(registerToLRAoa(txt)); return; }
+    setAoa(parseCSV(txt));
   };
 
   const pickFile = async () => {
     try {
-      const res = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'], copyToCacheDirectory: true });
+      const res = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', 'text/plain', 'application/vnd.ms-excel', '*/*'], copyToCacheDirectory: true });
       if (res.canceled || !res.assets || !res.assets.length) return;
       const a = res.assets[0];
-      if (/\.xlsx?$/i.test(a.name || '')) { Alert.alert('Excel on mobile', 'On the phone, use CSV (save your Excel sheet as CSV first). Excel files import directly on the desktop web app.'); return; }
       const text = await readPickedFile(a);
-      setAoa(parseCSV(text));
-    } catch (e) { Alert.alert('Could not read file', String(e.message || e)); }
+      if (isBookingRegister(text)) { ingestText(text); return; }
+      if (/\.xlsx?$/i.test(a.name || '')) { alert('Unrecognized Excel file', 'This isn\'t a BOOKING_REGISTER export we recognize, and binary .xlsx files aren\'t supported yet. Save it as CSV first — use the Download Template button for the exact column names.'); return; }
+      ingestText(text);
+    } catch (e) { alert('Could not read file', String(e.message || e)); }
   };
 
   const parsePasted = () => {
-    if (!String(paste).trim()) { Alert.alert('Nothing to parse', 'Paste CSV text first (including the header row).'); return; }
-    setAoa(parseCSV(paste));
+    if (!String(paste).trim()) { alert('Nothing to parse', 'Paste CSV text first (including the header row).'); return; }
+    ingestText(paste);
   };
 
   const doImport = () => {
@@ -47,7 +57,7 @@ export default function LRImportScreen({ navigation }) {
     update(d => { result = applyLRImportAoa(d, aoa); });
     setAoa(null); setPaste('');
     setTimeout(() => {
-      Alert.alert('Import complete', (result ? result.created : 0) + ' LR(s) created' + (result && result.skipped ? ', ' + result.skipped + ' row(s) skipped (errors)' : '') + '.');
+      alert('Import complete', (result ? result.created : 0) + ' LR(s) created' + (result && result.skipped ? ', ' + result.skipped + ' row(s) skipped (errors)' : '') + '.');
       navigation.goBack();
     }, 100);
   };
@@ -57,13 +67,13 @@ export default function LRImportScreen({ navigation }) {
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad} keyboardShouldPersistTaps="handled">
-      <Card title="Import LRs from CSV">
+      <Card title="Import LRs from CSV / Excel">
         <Text style={{ fontSize: 12, color: C.mut, marginBottom: 10 }}>
-          Row 1 = headers, one LR per row — use the template for column names (order doesn't matter, unknown columns ignored). Ownership: Owned or Hired; hired rows need hire_vendor, and hire_advance posts to Accounting. Blank lr_no auto-numbers. Dates: YYYY-MM-DD or DD-MM-YYYY. Excel files: use the desktop web app, or save as CSV.
+          Row 1 = headers, one LR per row — use the template for column names (order doesn't matter, unknown columns ignored). Ownership: Owned or Hired; hired rows need hire_vendor, and hire_advance posts to Accounting. Blank lr_no auto-numbers. Dates: YYYY-MM-DD or DD-MM-YYYY. A BOOKING_REGISTER .xls export from the billing software is detected automatically; other binary .xlsx files should be saved as CSV first.
         </Text>
         <View style={S.wrapRow}>
           <Btn label="⬇ Share Template CSV" onPress={shareTemplate} />
-          <Btn label="⬆ Pick CSV File" tone="amber" onPress={pickFile} />
+          <Btn label="⬆ Pick CSV / Excel File" tone="amber" onPress={pickFile} />
         </View>
         <Text style={{ fontSize: 10.5, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginTop: 14, marginBottom: 4 }}>
           Or paste CSV text (from Excel / WhatsApp / email)

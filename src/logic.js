@@ -494,6 +494,58 @@ export function applyLRImportAoa(db, aoa){
   return { created, skipped: plan.items.length - created };
 }
 
+/* ---------- BOOKING_REGISTER (.xls export) → LR bulk import ----------
+   The company's billing software exports BOOKING_REGISTER as an HTML table saved with
+   a .xls extension (same malformed-markup quirk as BILLING_REGISTER: each cell is a
+   self-closing <td/> immediately followed by its text and a real closing </td>). One
+   row per LR/trip, with its own column names (LR NO., DATE, CONSIGNOR, TRUCK NO, LR
+   AMOUNT, BROKER, BILL NO...). isBookingRegister/registerToLRAoa convert a real export
+   straight into the exact AOA shape buildLRImportPlan already expects (lr_no, date,
+   ownership, truck_no...), so it drops into the same import pipeline as a CSV upload —
+   no manual re-typing of 270+ rows into the CSV template needed. */
+export function isBookingRegister(text){
+  text = String(text || '');
+  return /<html/i.test(text.slice(0, 500)) && /LR\s*NO\.?\s*<\/td>/i.test(text) && /BILL\s*STATUS/i.test(text) && /<tr[^>]*>/i.test(text);
+}
+function htmlTableRows(text){
+  const rows = [];
+  const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi; let trM;
+  while ((trM = trRe.exec(text))){
+    const cells = []; const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi; let tdM;
+    while ((tdM = tdRe.exec(trM[1]))){
+      cells.push(tdM[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim());
+    }
+    if (cells.length) rows.push(cells);
+  }
+  return rows;
+}
+export function registerToLRAoa(text){
+  const rows = htmlTableRows(text);
+  const out = [['lr_no', 'date', 'ownership', 'truck_no', 'from_place', 'to_place', 'consignor_name', 'consignee_name', 'private_mark', 'freight', 'hire_vendor', 'hire_advance', 'invoice_no', 'invoice_date', 'invoice_amount', 'remark']];
+  if (!rows.length) return out;
+  const hdr = rows[0].map(h => String(h || '').toUpperCase().trim());
+  const idx = name => hdr.indexOf(name);
+  const iLr = idx('LR NO.'), iDate = idx('DATE'), iCr = idx('CONSIGNOR'), iCe = idx('CONSIGNEE'),
+    iFrom = idx('FROM'), iTo = idx('TO'), iTruck = idx('TRUCK NO'), iRemark = idx('REMARK'),
+    iMark = idx('PRIVATE MARK'), iAmt = idx('LR AMOUNT'), iBroker = idx('BROKER'), iAdv = idx('ADVANCE'),
+    iBillNo = idx('BILL NO'), iBillDate = idx('BILL DATE'), iBillAmt = idx('BILL AMOUNT');
+  const g = (c, i) => (i >= 0 && c[i] != null) ? c[i] : '';
+  for (let r = 1; r < rows.length; r++){
+    const c = rows[r];
+    const lrNo = g(c, iLr), date = g(c, iDate);
+    if (!lrNo || !date) continue; /* skips the trailing grand-total row and any blank rows */
+    const broker = g(c, iBroker);
+    out.push([
+      lrNo, date, broker ? 'Hired' : 'Owned', g(c, iTruck),
+      g(c, iFrom), g(c, iTo), g(c, iCr), g(c, iCe),
+      g(c, iMark), g(c, iAmt) || '0',
+      broker, g(c, iAdv),
+      g(c, iBillNo), g(c, iBillDate), g(c, iBillAmt),
+      g(c, iRemark)
+    ]);
+  }
+  return out;
+}
 
 /* ---------- invoice backup archive (from BILLING_REGISTER excel) ---------- */
 /* ---------- invoice backup archive + billing-register parser ---------- */

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Btn, DatePicker } from '../ui';
+import { C, S, Card, Btn, DatePicker, alert } from '../ui';
 import { printHtml } from '../fileIO';
 import {
   uid, inr, todayISO, byId, blankLR, computeLR, clientName, vendorName,
@@ -122,9 +122,9 @@ export default function LRFormScreen({ navigation, route }) {
 
   const save = (andPrint) => {
     const req = [[f.truckNo, 'Truck No'], [f.lrNo, 'LR No'], [f.date, 'Date'], [f.fromPlace, 'From Place'], [f.toPlace, 'To Place'], [f.consignor.name, 'Consignor Name'], [f.consignee.name, 'Consignee Name']];
-    for (const [v, l] of req) { if (!String(v || '').trim()) { Alert.alert('Missing field', l + ' is required.'); return; } }
-    if (f.ownership === 'Hired' && !f.hire.vendorId) { Alert.alert('Missing field', 'Select the Hire Vendor for a Hired-vehicle LR (Masters → Vendors).'); return; }
-    if (db.lrs.some(l => l.lrNo === f.lrNo && l.id !== f.id)) { Alert.alert('Duplicate', 'LR No ' + f.lrNo + ' already exists.'); return; }
+    for (const [v, l] of req) { if (!String(v || '').trim()) { alert('Missing field', l + ' is required.'); return; } }
+    if (f.ownership === 'Hired' && !f.hire.vendorId) { alert('Missing field', 'Select the Hire Vendor for a Hired-vehicle LR (Masters → Vendors).'); return; }
+    if (db.lrs.some(l => l.lrNo === f.lrNo && l.id !== f.id)) { alert('Duplicate', 'LR No ' + f.lrNo + ' already exists.'); return; }
     let savedRec = null;
     update(d => {
       const rec = JSON.parse(JSON.stringify(f));
@@ -175,7 +175,7 @@ export default function LRFormScreen({ navigation, route }) {
     });
     if (andPrint && savedRec) {
       printHtml(lrHtml(db, savedRec), savedRec.lrNo)
-        .catch(e => Alert.alert('PDF error', String(e.message || e)));
+        .catch(e => alert('PDF error', String(e.message || e)));
     }
     navigation.goBack();
   };

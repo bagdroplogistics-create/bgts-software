@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
 import { uid, inr, fmtDate, todayISO, daysSince, byId, removeById, driverName, sum } from '../logic';
 
 export default function AdvancesScreen() {
@@ -11,7 +11,7 @@ export default function AdvancesScreen() {
   const openTotal = sum(db.advances, a => (Number(a.amount) || 0) - (Number(a.settledAmount) || 0));
 
   const addAdvance = () => {
-    if (!db.drivers.length) { Alert.alert('No drivers', 'Add drivers in Masters first.'); return; }
+    if (!db.drivers.length) { alert('No drivers', 'Add drivers in Masters first.'); return; }
     setForm({
       title: 'New Driver Advance',
       fields: [

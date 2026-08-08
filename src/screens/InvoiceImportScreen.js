@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, Table, alert } from '../ui';
 import { readPickedFile } from '../fileIO';
 import {
   inr, fmtDate, parseCSV, buildInvImportPlan, applyInvImportAoa, clientName,
@@ -33,9 +33,9 @@ export default function InvoiceImportScreen({ navigation }) {
       const a = res.assets[0];
       const txt = await readPickedFile(a).catch(() => '');
       if (isBillingRegister(txt)) { ingestText(txt); return; }
-      if (/\.xlsx?$/i.test(a.name || '')) { Alert.alert('Excel on mobile', 'This Excel is not a BILLING_REGISTER export — save it as CSV first (binary Excel imports on the desktop web app).'); return; }
+      if (/\.xlsx?$/i.test(a.name || '')) { alert('Excel on mobile', 'This Excel is not a BILLING_REGISTER export — save it as CSV first (binary Excel imports on the desktop web app).'); return; }
       ingestText(txt);
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
   const doImport = () => {
     let res = null;
@@ -46,7 +46,7 @@ export default function InvoiceImportScreen({ navigation }) {
     });
     setAoa(null); setPaste(''); setRegBills(null);
     setTimeout(() => {
-      Alert.alert('Invoice import', (res ? res.created : 0) + ' created' + (res && res.skipped ? ', ' + res.skipped + ' skipped' : '') + '.');
+      alert('Invoice import', (res ? res.created : 0) + ' created' + (res && res.skipped ? ', ' + res.skipped + ' skipped' : '') + '.');
       navigation.goBack();
     }, 100);
   };
@@ -65,7 +65,7 @@ export default function InvoiceImportScreen({ navigation }) {
           placeholder={'invoice_no,date,client_name,taxable_amount,gst_pct\n,2026-08-07,USHTA (Sample Client),18500,0'}
           style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, padding: 10, fontSize: 11, color: C.txt, backgroundColor: '#fff', minHeight: 80 }} />
         <View style={{ marginTop: 8 }}>
-          <Btn label="Parse Pasted Text" onPress={() => { if (!paste.trim()) { Alert.alert('Nothing to parse'); return; } ingestText(paste); }} />
+          <Btn label="Parse Pasted Text" onPress={() => { if (!paste.trim()) { alert('Nothing to parse'); return; } ingestText(paste); }} />
         </View>
       </Card>
 

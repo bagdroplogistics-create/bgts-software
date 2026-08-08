@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Linking, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, Linking } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, statusTone, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, statusTone, Table, alert } from '../ui';
 import { printHtml } from '../fileIO';
 import {
   uid, inr, todayISO, fmtDate, byId, removeById, clientName, vehicleReg,
@@ -39,7 +39,7 @@ export default function BookingsScreen({ navigation }) {
     const src = cr.type + ' ' + cr.ref;
     if (entered === 0) { done(cr.rate, src); return; }
     if (entered < cr.rate) {
-      Alert.alert(
+      alert(
         'RATE GUARD ⚑',
         'Contract rate for this lane is ' + inr(cr.rate) + ' (' + cr.ref + ').\nYou entered ' + inr(entered) + ' — BELOW contract.',
         [
@@ -53,7 +53,7 @@ export default function BookingsScreen({ navigation }) {
   };
 
   const newBooking = () => {
-    if (!db.clients.length) { Alert.alert('No clients', 'Add at least one client in Masters first.'); return; }
+    if (!db.clients.length) { alert('No clients', 'Add at least one client in Masters first.'); return; }
     setForm({
       title: 'New Booking', fields: bookingFields(null),
       onSubmit: (v) => rateGuard(v, (freight, src) => update(d => {
@@ -102,16 +102,16 @@ export default function BookingsScreen({ navigation }) {
 
   const printLR = async (b) => {
     const l = db.lrs.find(x => x.bookingId === b.id);
-    if (!l) { Alert.alert('Generate the LR first.'); return; }
+    if (!l) { alert('Generate the LR first.'); return; }
     try {
       await printHtml(lrHtml(db, l), l.lrNo);
-    } catch (e) { Alert.alert('PDF error', String(e.message || e)); }
+    } catch (e) { alert('PDF error', String(e.message || e)); }
   };
 
   const openWA = (b) => {
     const c = byId(db.clients, b.clientId);
-    if (!c || !c.phone) { Alert.alert('No phone', 'Add a WhatsApp number for this client in Masters.'); return; }
-    Linking.openURL(waLink(c.phone, waBookingMsg(db, b))).catch(() => Alert.alert('Error', 'Could not open WhatsApp.'));
+    if (!c || !c.phone) { alert('No phone', 'Add a WhatsApp number for this client in Masters.'); return; }
+    Linking.openURL(waLink(c.phone, waBookingMsg(db, b))).catch(() => alert('Error', 'Could not open WhatsApp.'));
   };
 
   const bookingRow = (b) => ({

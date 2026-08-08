@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, View, Text, Pressable, useWindowDimensions, ScrollView } from 'react-native';
 import { StoreProvider } from './src/store';
-import { C, Logo } from './src/ui';
+import { C, Logo, AlertHost } from './src/ui';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import BookingsScreen from './src/screens/BookingsScreen';
@@ -108,7 +108,7 @@ const TITLES = {
   Backup: 'Invoice Backup / Register',
   Company: 'Company Dashboard',
   LRForm: 'Add / Edit LR',
-  LRImport: 'Import LRs (CSV)',
+  LRImport: 'Import LRs (CSV / Excel)',
   InvoiceImport: 'Import Invoices (CSV)'
 };
 
@@ -242,7 +242,7 @@ function WebShell({ navigationRef, routeName }) {
           <Stack.Screen name="Bookings" component={BookingsScreen} />
           <Stack.Screen name="LR" component={LRScreen} options={{ title: 'LR / Consignment Notes' }} />
           <Stack.Screen name="LRForm" component={LRFormScreen} options={{ title: 'Add / Edit LR' }} />
-          <Stack.Screen name="LRImport" component={LRImportScreen} options={{ title: 'Import LRs (CSV)' }} />
+          <Stack.Screen name="LRImport" component={LRImportScreen} options={{ title: 'Import LRs (CSV / Excel)' }} />
           <Stack.Screen name="Inquiries" component={InquiriesScreen} />
           <Stack.Screen name="Banking" component={BankingScreen} options={{ title: 'Banking / Reconciliation' }} />
           <Stack.Screen name="InvoiceImport" component={InvoiceImportScreen} options={{ title: 'Import Invoices (CSV)' }} />
@@ -277,7 +277,7 @@ function MobileShell() {
       <Stack.Screen name="Bookings" component={BookingsScreen} />
       <Stack.Screen name="LR" component={LRScreen} options={{ title: 'LR / Consignment Notes' }} />
       <Stack.Screen name="LRForm" component={LRFormScreen} options={{ title: 'Add / Edit LR' }} />
-      <Stack.Screen name="LRImport" component={LRImportScreen} options={{ title: 'Import LRs (CSV)' }} />
+      <Stack.Screen name="LRImport" component={LRImportScreen} options={{ title: 'Import LRs (CSV / Excel)' }} />
       <Stack.Screen name="Inquiries" component={InquiriesScreen} />
       <Stack.Screen name="Banking" component={BankingScreen} options={{ title: 'Banking / Reconciliation' }} />
       <Stack.Screen name="InvoiceImport" component={InvoiceImportScreen} options={{ title: 'Import Invoices (CSV)' }} />
@@ -315,6 +315,11 @@ export default function App() {
             useNavigation()/useNavigationState(), since they render outside the
             Stack.Navigator subtree and those hooks require being inside a Navigator. */}
         <WebShell navigationRef={navigationRef} routeName={routeName} />
+        {/* Mounted once at the app root: every alert()/confirmDo() call anywhere in the
+            app renders through this single host. Required because RN Web's Alert.alert
+            is a no-op — without this, error/success messages and Yes/Cancel confirms
+            (delete, wipe data, restore backup, etc.) silently do nothing on web. */}
+        <AlertHost />
       </NavigationContainer>
     </StoreProvider>
   );

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
 import {
   uid, inr, fmtDate, todayISO, byId, removeById, vendorName,
   tdsAmount, lhcPaid, lhcBalance, lhcStatus
@@ -34,7 +34,7 @@ export default function LHCScreen() {
   ];
 
   const addLHC = () => {
-    if (!db.vendors.length) { Alert.alert('No vendors', 'Add the truck vendor in Masters first.'); return; }
+    if (!db.vendors.length) { alert('No vendors', 'Add the truck vendor in Masters first.'); return; }
     setForm({
       title: 'New LHC (Lorry Hire Contract)', fields: lhcFields(null),
       onSubmit: (v) => update(d => {

@@ -55,3 +55,23 @@ export async function printHtml(html, dialogTitle) {
   if (shareable) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle });
   return { ok: true, uri, shared: shareable };
 }
+
+/* Share/save an already-local file (e.g. a POD photo captured via expo-image-picker).
+   Web: there's no native share sheet, so this re-fetches the uri (works for blob:/data:
+   URIs the picker hands back) and triggers a normal browser download instead.
+   Native: opens the share sheet as before. */
+export async function shareFile(uri, filename, mimeType) {
+  if (Platform.OS === 'web') {
+    const res = await fetch(uri);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename || 'file';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return { ok: true, web: true };
+  }
+  const shareable = await Sharing.isAvailableAsync();
+  if (shareable) await Sharing.shareAsync(uri, { mimeType: mimeType || 'image/jpeg', dialogTitle: filename });
+  return { ok: true, shared: shareable };
+}

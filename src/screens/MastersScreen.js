@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
 import { uid, fmtDate, daysTo, driverName, byId, removeById } from '../logic';
 
 const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['routes', 'Routes'], ['branches', 'Branches']];
@@ -211,9 +211,9 @@ export default function MastersScreen() {
                 entity: bb.entityName || 'company default',
                 gstin: bb.gstin || '—',
                 lrPrefix: bb.lrPrefix || '—',
-                actions: rowActions(() => editBranch(bb), i === 0 ? () => Alert.alert('Protected', 'The main branch cannot be deleted.') : () => {
+                actions: rowActions(() => editBranch(bb), i === 0 ? () => alert('Protected', 'The main branch cannot be deleted.') : () => {
                   const used = db.lrs.some(l => l.branchId === bb.id) || db.bookings.some(b => b.branchId === bb.id);
-                  if (used) { Alert.alert('In use', 'This branch has bookings/LRs tagged to it — reassign them first.'); return; }
+                  if (used) { alert('In use', 'This branch has bookings/LRs tagged to it — reassign them first.'); return; }
                   confirmDo('Delete branch ' + bb.name + '?', () => update(d => removeById(d.branches, bb.id)));
                 })
               }))}

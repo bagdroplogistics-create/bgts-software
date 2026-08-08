@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Linking, Alert } from 'react-native';
+import { View, Text, ScrollView, Linking } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, Table } from '../ui';
+import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, Table, alert } from '../ui';
 import { uid, inr, fmtDate, todayISO, daysSince, byId, sum, pad, invPaid, invOutstanding, waLink, receiptHtml } from '../logic';
 import { printHtml } from '../fileIO';
 
@@ -49,7 +49,7 @@ export default function CompanyScreen({ route, navigation }) {
   const printReceipt = async (p) => {
     try {
       await printHtml(receiptHtml(db, p), p.mrNo);
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   const editMaster = () => setForm({
@@ -66,9 +66,9 @@ export default function CompanyScreen({ route, navigation }) {
   });
 
   const waSummary = () => {
-    if (!c.phone) { Alert.alert('No phone', 'Add a WhatsApp number in the client master.'); return; }
+    if (!c.phone) { alert('No phone', 'Add a WhatsApp number in the client master.'); return; }
     const msg = 'Dear Sir/Madam, please find your account summary with Baroda Goods Transport Service: billed ' + inr(billed) + ', received ' + inr(collected) + ', outstanding ' + inr(out) + '. Kindly arrange payment of dues at the earliest. — BGTS';
-    Linking.openURL(waLink(c.phone, msg)).catch(() => Alert.alert('Error', 'Could not open WhatsApp.'));
+    Linking.openURL(waLink(c.phone, msg)).catch(() => alert('Error', 'Could not open WhatsApp.'));
   };
 
   const recordPayment = (inv) => setForm({
@@ -86,7 +86,7 @@ export default function CompanyScreen({ route, navigation }) {
     })
   });
   const waRemind = (inv, o) => {
-    if (!c.phone) { Alert.alert('No phone', 'Add a WhatsApp number in the client master.'); return; }
+    if (!c.phone) { alert('No phone', 'Add a WhatsApp number in the client master.'); return; }
     Linking.openURL(waLink(c.phone, 'BGTS Payment Reminder — Bill ' + inv.invNo + ' dated ' + fmtDate(inv.date) + ', balance ' + inr(o) + '. Kindly arrange payment. — Baroda Goods Transport Service Pvt. Ltd.')).catch(() => {});
   };
 

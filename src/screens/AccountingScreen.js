@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Linking, Alert } from 'react-native';
+import { View, Text, ScrollView, Linking } from 'react-native';
 import { useStore } from '../store';
 import { downloadFile, printHtml } from '../fileIO';
-import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
+import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
 import {
   uid, inr, sum, fmtDate, todayISO, addDaysISO, daysSince, byId, removeById,
   clientName, invPaid, invOutstanding, waLink, mailLink, EXP_HEADS, PAY_THROUGH,
@@ -61,16 +61,16 @@ export default function AccountingScreen({ navigation }) {
 
   const waRemind = (inv, out) => {
     const c = byId(db.clients, inv.clientId);
-    if (!c || !c.phone) { Alert.alert('No phone', 'Add a WhatsApp number for this client in Masters.'); return; }
+    if (!c || !c.phone) { alert('No phone', 'Add a WhatsApp number for this client in Masters.'); return; }
     const msg = 'BGTS Payment Reminder — Invoice ' + inv.invNo + ' dated ' + fmtDate(inv.date) + '. Outstanding: ' + inr(out) + '. Kindly arrange payment at the earliest. — Baroda Goods Transport Service Pvt. Ltd.';
-    Linking.openURL(waLink(c.phone, msg)).catch(() => Alert.alert('Error', 'Could not open WhatsApp.'));
+    Linking.openURL(waLink(c.phone, msg)).catch(() => alert('Error', 'Could not open WhatsApp.'));
   };
 
   const emailRemind = (inv, out) => {
     const c = byId(db.clients, inv.clientId);
-    if (!c || !c.email) { Alert.alert('No email', 'Add an email address for this client in Masters.'); return; }
+    if (!c || !c.email) { alert('No email', 'Add an email address for this client in Masters.'); return; }
     const body = 'Dear Sir/Madam,\n\nThis is a gentle reminder that Invoice ' + inv.invNo + ' dated ' + fmtDate(inv.date) + ' has an outstanding amount of ' + inr(out) + '.\n\nKindly arrange payment at the earliest.\n\nRegards,\nBaroda Goods Transport Service Pvt. Ltd.';
-    Linking.openURL(mailLink(c.email, 'Payment Reminder — ' + inv.invNo, body)).catch(() => Alert.alert('Error', 'Could not open mail app.'));
+    Linking.openURL(mailLink(c.email, 'Payment Reminder — ' + inv.invNo, body)).catch(() => alert('Error', 'Could not open mail app.'));
   };
 
   const exportInvCsv = async () => {
@@ -78,7 +78,7 @@ export default function AccountingScreen({ navigation }) {
       const rows = [['Invoice', 'Date', 'Client', 'Taxable', 'GST %', 'Total', 'Paid', 'Outstanding', 'Due Date', 'Age Days']];
       db.invoices.forEach(inv => rows.push([inv.invNo, inv.date, clientName(db, inv.clientId), inv.amount, inv.gstPct, inv.total, invPaid(db, inv), invOutstanding(db, inv), inv.dueDate, daysSince(inv.date)]));
       await downloadFile('BGTS_Receivables.csv', csvString(rows), 'text/csv');
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   const exportExpCsv = async () => {
@@ -86,18 +86,18 @@ export default function AccountingScreen({ navigation }) {
       const rows = [['Date', 'Account', 'Amount', 'Paid Through', 'Vendor', 'Ref', 'Notes']];
       db.acctExp.forEach(e => rows.push([e.date, e.account, e.amount, e.paidThrough, e.vendor, e.ref, e.notes]));
       await downloadFile('BGTS_Business_Expenses.csv', csvString(rows), 'text/csv');
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   const printReceipt = async (p) => {
     try {
       await printHtml(receiptHtml(db, p), p.mrNo);
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   const recordPaymentPick = () => {
     const open = db.invoices.filter(i => invOutstanding(db, i) > 0);
-    if (!open.length) { Alert.alert('No open invoices.'); return; }
+    if (!open.length) { alert('No open invoices.'); return; }
     setForm({
       title: 'Record Payment',
       fields: [

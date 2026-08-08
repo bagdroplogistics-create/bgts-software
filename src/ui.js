@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, Alert, useWindowDimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { fmtDate } from './logic';
 
 export const C = {
@@ -181,8 +181,51 @@ export function RenewalsTable({ items }) {
   );
 }
 
+/* ---------- cross-platform Alert replacement ----------
+   react-native-web's Alert.alert (the version this app is built against) is a complete
+   no-op on web: no window.alert, no console.warn, no callback ever fires. Every error/
+   success message AND every confirm(Cancel/Yes) dialog in this app was built on RN's
+   Alert.alert, so on the web build every one of those looked like "the button does
+   nothing" — worse, confirmDo's "Yes" callback never fired, so deletes/wipes/restores
+   could never actually complete on web even though the app appeared to run fine.
+   This Modal-based replacement behaves identically on native and web. Wired in once
+   as <AlertHost/> at the app root (App.js); alert()/confirmDo() work from anywhere. */
+let _showAlert = null;
+export function alert(title, message, buttons) {
+  const list = (buttons && buttons.length) ? buttons : [{ text: 'OK' }];
+  if (_showAlert) _showAlert({ title, message, buttons: list });
+}
+export function AlertHost() {
+  const [state, setState] = useState(null);
+  useEffect(() => { _showAlert = (s) => setState(s); return () => { _showAlert = null; }; }, []);
+  if (!state) return null;
+  const close = () => setState(null);
+  const press = (b) => { close(); if (b.onPress) b.onPress(); };
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={close}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(10,31,56,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <View style={{ backgroundColor: '#fff', borderRadius: 12, width: '100%', maxWidth: 380, padding: 20, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10 }}>
+          {state.title ? <Text style={{ fontSize: 15.5, fontWeight: '800', color: C.navy, marginBottom: 8 }}>{state.title}</Text> : null}
+          {state.message ? <Text style={{ fontSize: 13, color: C.txt, lineHeight: 19 }}>{state.message}</Text> : null}
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+            {state.buttons.map((b, i) => (
+              <TouchableOpacity key={i} onPress={() => press(b)} style={{
+                paddingHorizontal: 14, paddingVertical: 9, borderRadius: 7,
+                backgroundColor: b.style === 'destructive' ? C.red : b.style === 'cancel' ? 'transparent' : C.navy2,
+                borderWidth: b.style === 'cancel' ? 1 : 0, borderColor: C.line2
+              }}>
+                <Text style={{ color: b.style === 'cancel' ? C.navy2 : '#fff', fontWeight: '700', fontSize: 13 }}>{b.text}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export function confirmDo(msg, onYes) {
-  Alert.alert('Confirm', msg, [
+  alert('Confirm', msg, [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Yes', style: 'destructive', onPress: onYes }
   ]);
@@ -318,7 +361,7 @@ export function ModalForm({ form, onClose }) {
   const openPicker = (k) => { setPickerSearch(''); setPickerKey(k); };
   const submit = () => {
     for (const f of form.fields) {
-      if (f.required && !String(vals[f.key] || '').trim()) { Alert.alert('Missing field', f.label + ' is required.'); return; }
+      if (f.required && !String(vals[f.key] || '').trim()) { alert('Missing field', f.label + ' is required.'); return; }
     }
     const out = { ...vals };
     onClose();

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
 import { downloadFile, printHtml } from '../fileIO';
 import {
   uid, inr, fmtDate, todayISO, byId, removeById, lrHtml, vendorName, csvString,
@@ -18,14 +18,14 @@ export default function LRScreen({ navigation }) {
       const rows = [['LR No', 'Type', 'Date', 'Truck', 'From', 'To', 'Booking Branch', 'Consignor', 'Consignee', 'Billing Party', 'Pay Terms', 'E-Way Bill', 'A Weight', 'C Weight', 'Sub Total', 'IGST', 'CGST', 'SGST', 'Gross', 'POD']];
       db.lrs.forEach(l => rows.push([l.lrNo, l.lrType, l.date, l.truckNo, l.fromPlace, l.toPlace, l.bookingBranch, (l.consignor || {}).name, (l.consignee || {}).name, l.billingParty, l.payTerms, l.ewayBillNo, l.aWeight, l.cWeight, l.subTotal, l.igstAmt, l.cgstAmt, l.sgstAmt, l.gross, l.pod ? 'Yes' : 'No']));
       await downloadFile('BGTS_LR_Register.csv', csvString(rows), 'text/csv');
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   const sharePdf = async (l) => {
     try {
       await printHtml(lrHtml(db, l), l.lrNo);
     } catch (e) {
-      Alert.alert('PDF error', String(e.message || e));
+      alert('PDF error', String(e.message || e));
     }
   };
 
@@ -68,7 +68,7 @@ export default function LRScreen({ navigation }) {
 
   const addTripExp = (l) => {
     let vid = l.vehicleId || truckToVehicleId(db, l.truckNo);
-    if (!vid) { Alert.alert('No vehicle link', 'Truck ' + l.truckNo + ' does not match an OWNED vehicle in Masters. Add/correct the vehicle first so trip expenses hit vehicle-wise P&L.'); return; }
+    if (!vid) { alert('No vehicle link', 'Truck ' + l.truckNo + ' does not match an OWNED vehicle in Masters. Add/correct the vehicle first so trip expenses hit vehicle-wise P&L.'); return; }
     setForm({
       title: 'Trip Expense — ' + l.lrNo + ' (' + l.truckNo + ')',
       fields: [

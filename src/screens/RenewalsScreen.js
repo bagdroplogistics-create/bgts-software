@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, RenewalsTable } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, RenewalsTable, alert } from '../ui';
 import { uid, fmtDate, vehicleReg, byId, removeById, allRenewalItems } from '../logic';
 
 const DOC_TYPES = ['Insurance', 'Permit (National)', 'Permit (State)', 'Fitness', 'PUC', 'Road Tax', 'RC', 'Goods Carriage Permit', 'Other'];
@@ -19,7 +19,7 @@ export default function RenewalsScreen() {
   ];
 
   const addDoc = () => {
-    if (!db.vehicles.length) { Alert.alert('No vehicles', 'Add a vehicle in Masters first.'); return; }
+    if (!db.vehicles.length) { alert('No vehicles', 'Add a vehicle in Masters first.'); return; }
     setForm({
       title: 'Track Vehicle Document', fields: docFields(null),
       onSubmit: (v) => update(d => d.renewals.push({ id: uid('rn'), vehicleId: v.vehicleId, docType: v.docType, ref: v.ref, expiry: v.expiry }))

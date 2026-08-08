@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useStore } from '../store';
-import { C, S, Card, Btn, confirmDo } from '../ui';
+import { C, S, Card, Btn, confirmDo, alert } from '../ui';
 import { blankDB, migrate, todayISO } from '../logic';
 import { downloadFile, readPickedFile } from '../fileIO';
 
@@ -15,23 +15,23 @@ export default function SettingsScreen() {
 
   const saveCompany = () => {
     update(d => { FIELDS.forEach(f => { d.company[f[0]] = co[f[0]] || ''; }); });
-    Alert.alert('Saved', 'Company profile updated. New LRs use these details.');
+    alert('Saved', 'Company profile updated. New LRs use these details.');
   };
 
   const exportBackup = async () => {
     try {
       const r = await downloadFile('BGTS_OS_Backup_' + todayISO() + '.json', JSON.stringify(db, null, 2), 'application/json');
-      if (!r.web && !r.shared) Alert.alert('Saved', 'Backup written to:\n' + r.uri);
-    } catch (e) { Alert.alert('Backup error', String(e.message || e)); }
+      if (!r.web && !r.shared) alert('Saved', 'Backup written to:\n' + r.uri);
+    } catch (e) { alert('Backup error', String(e.message || e)); }
   };
 
   const applyRestore = (raw, sourceLabel) => {
     try {
       const d = JSON.parse(raw);
-      if (!d || !d.company || !Array.isArray(d.bookings)) { Alert.alert('Invalid', 'Not a valid BGTS-OS backup.'); return; }
+      if (!d || !d.company || !Array.isArray(d.bookings)) { alert('Invalid', 'Not a valid BGTS-OS backup.'); return; }
       const md = migrate(d);   /* older backups get v2 keys (lrs, lhcs, advances, acctExp) */
-      confirmDo('Replace ALL current data with ' + sourceLabel + '?', () => { replace(md); setCo({ ...md.company }); setPaste(''); Alert.alert('Done', 'Backup restored.'); });
-    } catch (e) { Alert.alert('Invalid JSON', String(e.message || e)); }
+      confirmDo('Replace ALL current data with ' + sourceLabel + '?', () => { replace(md); setCo({ ...md.company }); setPaste(''); alert('Done', 'Backup restored.'); });
+    } catch (e) { alert('Invalid JSON', String(e.message || e)); }
   };
 
   const restore = () => applyRestore(paste, 'the pasted backup');
@@ -43,7 +43,7 @@ export default function SettingsScreen() {
       const a = res.assets[0];
       const text = await readPickedFile(a);
       applyRestore(text, 'the file "' + (a.name || 'backup.json') + '"');
-    } catch (e) { Alert.alert('Could not read file', String(e.message || e)); }
+    } catch (e) { alert('Could not read file', String(e.message || e)); }
   };
 
   const wipe = () => confirmDo('Erase ALL data on this device? Export a backup first.', () =>

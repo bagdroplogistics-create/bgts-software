@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Image, Alert } from 'react-native';
+import { View, Text, ScrollView, Image, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, Table, alert } from '../ui';
 import { inr, fmtDate, todayISO, byId } from '../logic';
+import { shareFile } from '../fileIO';
 
 export default function PODScreen() {
   const { db, update } = useStore();
@@ -18,16 +18,24 @@ export default function PODScreen() {
     try {
       let res;
       if (fromCamera) {
-        const perm = await ImagePicker.requestCameraPermissionsAsync();
-        if (!perm.granted) { Alert.alert('Camera permission needed', 'Allow camera access to photograph the signed POD.'); return; }
+        if (Platform.OS !== 'web') {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) { alert('Camera permission needed', 'Allow camera access to photograph the signed POD.'); return; }
+        }
         res = await ImagePicker.launchCameraAsync({ quality: 0.5, allowsEditing: false });
       } else {
         res = await ImagePicker.launchImageLibraryAsync({ quality: 0.5, mediaTypes: ImagePicker.MediaTypeOptions.Images });
       }
       if (res.canceled || !res.assets || !res.assets.length) return;
       const asset = res.assets[0];
-      const dest = FileSystem.documentDirectory + 'pod_' + lr.id + '.jpg';
-      await FileSystem.copyAsync({ from: asset.uri, to: dest });
+      /* FileSystem.documentDirectory/copyAsync are native-only (documentDirectory is null
+         on web) — on web the picker's own uri (a blob: URL) is already directly usable in
+         <Image>/for download, so just keep it as-is instead of copying it anywhere. Note
+         this means a web-captured POD photo only survives for the current browser session
+         (it isn't written to disk), unlike the native build which copies it into permanent
+         app storage — a real limitation of the browser sandbox, not a bug to "fix" further. */
+      const dest = Platform.OS === 'web' ? asset.uri : FileSystem.documentDirectory + 'pod_' + lr.id + '.jpg';
+      if (Platform.OS !== 'web') await FileSystem.copyAsync({ from: asset.uri, to: dest });
       setForm({
         title: 'POD Received — ' + lr.lrNo,
         fields: [
@@ -42,7 +50,7 @@ export default function PODScreen() {
           if (x.bookingId) { const b = byId(d.bookings, x.bookingId); if (b) { b.podReceived = true; if (b.status === 'In Transit') b.status = 'Delivered'; } }
         })
       });
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   const markNoFile = (lr) => setForm({
@@ -60,8 +68,8 @@ export default function PODScreen() {
 
   const sharePod = async (lr) => {
     try {
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(lr.podFileUri, { dialogTitle: 'POD ' + lr.lrNo });
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+      await shareFile(lr.podFileUri, 'POD_' + lr.lrNo + '.jpg', 'image/jpeg');
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   return (

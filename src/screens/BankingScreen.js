@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, Table, alert } from '../ui';
 import { downloadFile, readPickedFile, printHtml } from '../fileIO';
 import {
   inr, fmtDate, byId, parseCSV, importBankAoa, bankSuggest, matchBankTxn,
@@ -18,7 +18,7 @@ export default function BankingScreen() {
     let res = null;
     update(d => { res = importBankAoa(d, aoa); });
     setPaste('');
-    setTimeout(() => Alert.alert('Bank import',
+    setTimeout(() => alert('Bank import',
       (res ? res.added : 0) + ' credit(s) added' + (res && res.dupes ? ', ' + res.dupes + ' duplicate(s) skipped' : '') + (res && res.debits ? ', ' + res.debits + ' debit(s) ignored' : '') + '.'), 100);
   };
   const pickFile = async () => {
@@ -26,14 +26,14 @@ export default function BankingScreen() {
       const res = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'], copyToCacheDirectory: true });
       if (res.canceled || !res.assets || !res.assets.length) return;
       const a = res.assets[0];
-      if (/\.xlsx?$/i.test(a.name || '')) { Alert.alert('Excel on mobile', 'Save the statement as CSV first (Excel imports directly on the desktop web app).'); return; }
+      if (/\.xlsx?$/i.test(a.name || '')) { alert('Excel on mobile', 'Save the statement as CSV first (Excel imports directly on the desktop web app).'); return; }
       runImport(parseCSV(await readPickedFile(a)));
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   const doMatch = (t) => {
     const sugg = bankSuggest(db, t);
-    if (!sugg.length) { Alert.alert('No open invoices', 'There are no invoices with outstanding balance to match against.'); return; }
+    if (!sugg.length) { alert('No open invoices', 'There are no invoices with outstanding balance to match against.'); return; }
     setForm({
       title: 'Match ' + inr(t.amount) + ' — ' + (t.narration || t.ref || 'bank credit').slice(0, 40),
       fields: [{
@@ -50,14 +50,14 @@ export default function BankingScreen() {
   const shareReceipt = async (p) => {
     try {
       await printHtml(receiptHtml(db, p), p.mrNo);
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   const shareTemplate = async () => {
     try {
       const rows = [['date', 'narration', 'ref', 'debit', 'credit'], [todayISO(), 'NEFT-USHTA SAMPLE PAYMENT', 'UTR12345', '', '18500']];
       await downloadFile('Bank_Statement_Template.csv', csvString(rows), 'text/csv');
-    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+    } catch (e) { alert('Error', String(e.message || e)); }
   };
 
   const un = db.bankTxns.filter(t => t.status === 'UNMATCHED').slice().reverse();
@@ -78,7 +78,7 @@ export default function BankingScreen() {
           placeholder={'date,narration,ref,debit,credit\n06-08-2026,NEFT USHTA PAYMENT,UTR123,,18500'}
           style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, padding: 10, fontSize: 11, color: C.txt, backgroundColor: '#fff', minHeight: 70 }} />
         <View style={{ marginTop: 8 }}>
-          <Btn label="Parse Pasted Statement" onPress={() => { if (!paste.trim()) { Alert.alert('Nothing to parse'); return; } runImport(parseCSV(paste)); }} />
+          <Btn label="Parse Pasted Statement" onPress={() => { if (!paste.trim()) { alert('Nothing to parse'); return; } runImport(parseCSV(paste)); }} />
         </View>
       </Card>
 

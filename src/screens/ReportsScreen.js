@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, Table, alert } from '../ui';
 import { downloadFile } from '../fileIO';
 import {
   inr, sum, csvString, clientName, vehicleReg, vendorName, allRenewalItems,
@@ -42,7 +42,7 @@ export default function ReportsScreen() {
   const shareCSV = async (name, rows) => {
     try {
       await downloadFile(name, csvString(rows), 'text/csv');
-    } catch (e) { Alert.alert('Export error', String(e.message || e)); }
+    } catch (e) { alert('Export error', String(e.message || e)); }
   };
 
   const reports = [

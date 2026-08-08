@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
 import { uid, inr, sum, fmtDate, todayISO, vehicleReg, removeById } from '../logic';
 
 export default function FleetScreen() {
@@ -10,7 +10,7 @@ export default function FleetScreen() {
   const owned = db.vehicles.filter(v => v.owned);
 
   const addExpense = () => {
-    if (!owned.length) { Alert.alert('No vehicles', 'Add an owned vehicle in Masters first.'); return; }
+    if (!owned.length) { alert('No vehicles', 'Add an owned vehicle in Masters first.'); return; }
     setForm({
       title: 'Add Fleet Expense',
       fields: [
