@@ -4,7 +4,7 @@ import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo } from '../ui';
 import { uid, fmtDate, daysTo, driverName, byId, removeById } from '../logic';
 
-const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['routes', 'Routes']];
+const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['routes', 'Routes'], ['branches', 'Branches']];
 
 export default function MastersScreen() {
   const { db, update } = useStore();
@@ -45,6 +45,14 @@ export default function MastersScreen() {
     { key: 'destination', label: 'Destination', required: true },
     { key: 'km', label: 'Distance (km)', type: 'number' }
   ];
+  const branchFields = (b) => [
+    { key: 'name', label: 'Branch Name', required: true, value: b && b.name, hint: 'e.g. VADODARA, SURAT, BDTS-VADODARA' },
+    { key: 'entityName', label: 'Entity / Legal Name (optional)', value: b && b.entityName, hint: 'Prints on this branch’s LRs; blank = main company' },
+    { key: 'gstin', label: 'GSTIN (optional)', value: b && b.gstin },
+    { key: 'addr', label: 'Address', value: b && b.addr },
+    { key: 'lrPrefix', label: 'LR Prefix (optional)', value: b && b.lrPrefix },
+    { key: 'phone', label: 'Phone', value: b && b.phone }
+  ];
 
   /* ----- add/edit dispatch ----- */
   const add = () => {
@@ -52,8 +60,10 @@ export default function MastersScreen() {
     else if (tab === 'vehicles') setForm({ title: 'Add Vehicle', fields: vehicleFields(null), onSubmit: v => update(d => d.vehicles.push({ id: uid('v'), regNo: v.regNo, make: v.make, type: v.type, owned: v.owned === 'yes', gvw: v.gvw, driverId: v.driverId })) });
     else if (tab === 'drivers') setForm({ title: 'Add Driver', fields: driverFields(null), onSubmit: v => update(d => d.drivers.push({ ...v, id: uid('d') })) });
     else if (tab === 'vendors') setForm({ title: 'Add Vendor', fields: vendorFields(null), onSubmit: v => update(d => d.vendors.push({ ...v, id: uid('ve') })) });
+    else if (tab === 'branches') setForm({ title: 'Add Branch / Entity', fields: branchFields(null), onSubmit: v => update(d => d.branches.push({ ...v, id: uid('br'), name: String(v.name).toUpperCase() })) });
     else setForm({ title: 'Add Route', fields: routeFields(), onSubmit: v => update(d => d.routes.push({ ...v, id: uid('r') })) });
   };
+  const editBranch = (bb) => setForm({ title: 'Edit ' + bb.name, fields: branchFields(bb), onSubmit: v => update(d => { const x = byId(d.branches, bb.id); if (x) { Object.keys(v).forEach(k => { x[k] = v[k]; }); x.name = String(x.name).toUpperCase(); } }) });
   const editClient = (c) => setForm({ title: 'Edit Client', fields: clientFields(c), onSubmit: v => update(d => { const x = byId(d.clients, c.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVehicle = (vv) => setForm({ title: 'Edit Vehicle', fields: vehicleFields(vv), onSubmit: v => update(d => { const x = byId(d.vehicles, vv.id); if (x) { x.regNo = v.regNo; x.make = v.make; x.type = v.type; x.owned = v.owned === 'yes'; x.gvw = v.gvw; x.driverId = v.driverId; } }) });
   const editDriver = (dd) => setForm({ title: 'Edit Driver', fields: driverFields(dd), onSubmit: v => update(d => { const x = byId(d.drivers, dd.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
@@ -112,6 +122,16 @@ export default function MastersScreen() {
             <Row key={r.id} title={r.origin + ' → ' + r.destination} sub={(r.km || '—') + ' km'}
               onDel={() => confirmDo('Delete route?', () => update(d => removeById(d.routes, r.id)))} />
           )))}
+          {tab === 'branches' && (db.branches || []).map((bb, i) => (
+            <Row key={bb.id} title={bb.name} sub={(bb.entityName || 'company default') + (bb.gstin ? ' · ' + bb.gstin : '') + (bb.lrPrefix ? ' · ' + bb.lrPrefix : '')}
+              badge={i === 0 ? <Badge text="MAIN" tone="navy" /> : null}
+              onEdit={() => editBranch(bb)}
+              onDel={i === 0 ? () => Alert.alert('Protected', 'The main branch cannot be deleted.') : () => {
+                const used = db.lrs.some(l => l.branchId === bb.id) || db.bookings.some(b => b.branchId === bb.id);
+                if (used) { Alert.alert('In use', 'This branch has bookings/LRs tagged to it — reassign them first.'); return; }
+                confirmDo('Delete branch ' + bb.name + '?', () => update(d => removeById(d.branches, bb.id)));
+              }} />
+          ))}
         </Card>
       </ScrollView>
       <ModalForm form={form} onClose={() => setForm(null)} />

@@ -6,7 +6,7 @@ import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty } from '../ui';
 import {
   inr, sum, csvString, clientName, vehicleReg, vendorName, allRenewalItems,
-  invPaid, invOutstanding, daysSince
+  invPaid, invOutstanding, daysSince, lhcPaid, lhcBalance
 } from '../logic';
 
 export default function ReportsScreen() {
@@ -26,9 +26,12 @@ export default function ReportsScreen() {
     ['Trip Register', 'All bookings with status, vehicle, freight', () => shareCSV('BGTS_Trip_Register.csv',
       [['Bk No', 'Date', 'Client', 'Mode', 'Origin', 'Destination', 'Vehicle Type', 'Assign', 'Vehicle', 'Weight MT', 'Freight', 'Hire Cost', 'Status', 'LR No', 'POD']]
         .concat(db.bookings.map(b => [b.bkNo, b.date, clientName(db, b.clientId), b.mode, b.origin, b.destination, b.vehicleType, b.assignType, (b.assignType === 'Owned' ? vehicleReg(db, b.vehicleId) : b.hiredVehicleNo), b.weightMT, b.freight, b.hireCost, b.status, b.lrNo, b.podReceived ? 'Yes' : 'No'])))],
-    ['LR Register', 'All consignment notes with POD status', () => shareCSV('BGTS_LR_Register.csv',
-      [['LR No', 'Date', 'Client', 'Origin', 'Destination', 'Vehicle', 'E-Way Bill', 'Weight MT', 'Freight', 'POD', 'Status']]
-        .concat(db.bookings.filter(b => b.lrNo).map(b => [b.lrNo, b.date, clientName(db, b.clientId), b.origin, b.destination, (b.assignType === 'Owned' ? vehicleReg(db, b.vehicleId) : b.hiredVehicleNo), b.ewayBill, b.weightMT, b.freight, b.podReceived ? 'Yes' : 'No', b.status])))],
+    ['LR Register', 'All consignment notes (incl. standalone LRs)', () => shareCSV('BGTS_LR_Register.csv',
+      [['LR No', 'Type', 'Date', 'Truck', 'From', 'To', 'Consignor', 'Consignee', 'Pay Terms', 'E-Way Bill', 'A Wt', 'C Wt', 'Sub Total', 'IGST', 'CGST', 'SGST', 'Gross', 'POD']]
+        .concat(db.lrs.map(l => [l.lrNo, l.lrType, l.date, l.truckNo, l.fromPlace, l.toPlace, (l.consignor || {}).name, (l.consignee || {}).name, l.payTerms, l.ewayBillNo, l.aWeight, l.cWeight, l.subTotal, l.igstAmt, l.cgstAmt, l.sgstAmt, l.gross, l.pod ? 'Yes' : 'No'])))],
+    ['LHC Register', 'Truck hire contracts with TDS and balances', () => shareCSV('BGTS_LHC_Register.csv',
+      [['LHC No', 'Date', 'Vendor', 'Truck', 'From', 'To', 'LRs', 'Lorry Hire', 'Advance', 'Deductions', 'TDS %', 'TDS Amt', 'Paid', 'Balance']]
+        .concat(db.lhcs.map(l => [l.lhcNo, l.date, vendorName(db, l.vendorId), l.truckNo, l.fromPlace, l.toPlace, l.lrNos, l.lorryHire, l.advance, l.deductions, l.tdsPct, l.tdsAmt, lhcPaid(l), lhcBalance(l)])))],
     ['Receivables Ageing', 'Invoice-wise outstanding with buckets', () => shareCSV('BGTS_Receivables.csv',
       [['Invoice', 'Date', 'Client', 'Taxable', 'GST %', 'Total', 'Paid', 'Outstanding', 'Due Date', 'Age Days']]
         .concat(db.invoices.map(i => [i.invNo, i.date, clientName(db, i.clientId), i.amount, i.gstPct, i.total, invPaid(db, i), invOutstanding(db, i), i.dueDate, daysSince(i.date)])))],

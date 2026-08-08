@@ -22,6 +22,24 @@ export const S = StyleSheet.create({
   empty: { padding: 20, textAlign: 'center', color: C.mut, fontSize: 13 }
 });
 
+/* BGTS logo mark — pure Views/Text, no SVG dependency */
+export function Logo({ size }) {
+  const s = size || 44;
+  return (
+    <View style={{
+      width: s, height: s, borderRadius: s * 0.22, backgroundColor: C.navy,
+      borderWidth: 1.5, borderColor: C.amber, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
+    }}>
+      <Text style={{ color: '#fff', fontWeight: '800', fontSize: s * 0.26, letterSpacing: 1 }}>BGTS</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: s * 0.04 }}>
+        <View style={{ width: s * 0.30, height: s * 0.14, backgroundColor: C.amber, borderRadius: 2 }} />
+        <View style={{ width: s * 0.14, height: s * 0.10, backgroundColor: C.amber, borderRadius: 2, marginLeft: 1 }} />
+      </View>
+      <View style={{ position: 'absolute', bottom: s * 0.08, width: s * 0.7, height: 2, backgroundColor: C.amber, borderRadius: 1 }} />
+    </View>
+  );
+}
+
 export function Card({ title, right, children }) {
   return (
     <View style={S.card}>

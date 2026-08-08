@@ -9,6 +9,14 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import BookingsScreen from './src/screens/BookingsScreen';
 import LRScreen from './src/screens/LRScreen';
 import LRFormScreen from './src/screens/LRFormScreen';
+import LRImportScreen from './src/screens/LRImportScreen';
+import InquiriesScreen from './src/screens/InquiriesScreen';
+import BankingScreen from './src/screens/BankingScreen';
+import InvoiceImportScreen from './src/screens/InvoiceImportScreen';
+import AccDashScreen from './src/screens/AccDashScreen';
+import PODScreen from './src/screens/PODScreen';
+import BackupScreen from './src/screens/BackupScreen';
+import CompanyScreen from './src/screens/CompanyScreen';
 import LHCScreen from './src/screens/LHCScreen';
 import AdvancesScreen from './src/screens/AdvancesScreen';
 import FleetScreen from './src/screens/FleetScreen';
@@ -43,6 +51,14 @@ export default function App() {
           <Stack.Screen name="Bookings" component={BookingsScreen} />
           <Stack.Screen name="LR" component={LRScreen} options={{ title: 'LR / Consignment Notes' }} />
           <Stack.Screen name="LRForm" component={LRFormScreen} options={{ title: 'Add / Edit LR' }} />
+          <Stack.Screen name="LRImport" component={LRImportScreen} options={{ title: 'Import LRs (CSV)' }} />
+          <Stack.Screen name="Inquiries" component={InquiriesScreen} />
+          <Stack.Screen name="Banking" component={BankingScreen} options={{ title: 'Banking / Reconciliation' }} />
+          <Stack.Screen name="InvoiceImport" component={InvoiceImportScreen} options={{ title: 'Import Invoices (CSV)' }} />
+          <Stack.Screen name="AccDash" component={AccDashScreen} options={{ title: 'Accounts Dashboard' }} />
+          <Stack.Screen name="POD" component={PODScreen} options={{ title: 'POD Update' }} />
+          <Stack.Screen name="Backup" component={BackupScreen} options={{ title: 'Invoice Backup (Register)' }} />
+          <Stack.Screen name="Company" component={CompanyScreen} options={{ title: 'Company Dashboard' }} />
           <Stack.Screen name="LHC" component={LHCScreen} options={{ title: 'LHC / Truck Hire' }} />
           <Stack.Screen name="Advances" component={AdvancesScreen} options={{ title: 'Driver Khata (Advances)' }} />
           <Stack.Screen name="Fleet" component={FleetScreen} options={{ title: 'Owned Fleet' }} />

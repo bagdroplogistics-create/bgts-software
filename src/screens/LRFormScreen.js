@@ -3,7 +3,8 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert } from 'reac
 import { useStore } from '../store';
 import { C, S, Card, Btn } from '../ui';
 import {
-  uid, inr, todayISO, byId, blankLR, computeLR, clientName,
+  uid, inr, todayISO, byId, blankLR, computeLR, clientName, vendorName,
+  truckToVehicleId, lrHireBalance, convertInquiryToLRDraft,
   LR_CHG, PKG_TYPES, EXP_HEADS
 } from '../logic';
 
@@ -65,9 +66,16 @@ export default function LRFormScreen({ navigation, route }) {
   const params = route.params || {};
   const editing = params.lrId ? byId(db.lrs, params.lrId) : null;
   const booking = params.bookingId ? byId(db.bookings, params.bookingId) : null;
+  const inquiry = params.inquiryId ? byId(db.inquiries, params.inquiryId) : null;
 
   const [f, setF] = useState(() => {
     if (editing) return JSON.parse(JSON.stringify(editing));
+    if (inquiry) {
+      const l = convertInquiryToLRDraft(db, inquiry);
+      l.lrNo = db.company.lrPrefix + String(db.seq.lr).padStart(4, '0');
+      if (!l.goods.length) l.goods = [{ desc: '', pkgType: '', pcs: '', aw: '', cw: '', l: '', w: '', h: '' }];
+      return l;
+    }
     const l = blankLR();
     l.lrNo = db.company.lrPrefix + String(db.seq.lr).padStart(4, '0');
     if (booking) {
@@ -76,6 +84,10 @@ export default function LRFormScreen({ navigation, route }) {
       l.lorryType = booking.vehicleType || '';
       const v = byId(db.vehicles, booking.vehicleId);
       l.truckNo = booking.assignType === 'Owned' ? (v ? v.regNo : '') : (booking.hiredVehicleNo || '');
+      l.ownership = booking.assignType || 'Owned';
+      const bbr = byId(db.branches || [], booking.branchId);
+      l.bookingBranch = bbr ? bbr.name : (db.branches && db.branches[0] ? db.branches[0].name : 'VADODARA');
+      l.hire = { vendorId: booking.hiredVendorId || '', amount: String(Number(booking.hireCost) || ''), advance: '', payments: [] };
       l.ewayBillNo = booking.ewayBill || '';
       const c = byId(db.clients, booking.clientId) || {};
       l.consignor = { name: clientName(db, booking.clientId), city: c.addr || '', contact: c.phone || '', pan: '', gst: c.gstin || '' };
@@ -105,6 +117,7 @@ export default function LRFormScreen({ navigation, route }) {
   const save = () => {
     const req = [[f.truckNo, 'Truck No'], [f.lrNo, 'LR No'], [f.date, 'Date'], [f.fromPlace, 'From Place'], [f.toPlace, 'To Place'], [f.consignor.name, 'Consignor Name'], [f.consignee.name, 'Consignee Name']];
     for (const [v, l] of req) { if (!String(v || '').trim()) { Alert.alert('Missing field', l + ' is required.'); return; } }
+    if (f.ownership === 'Hired' && !f.hire.vendorId) { Alert.alert('Missing field', 'Select the Hire Vendor for a Hired-vehicle LR (Masters → Vendors).'); return; }
     if (db.lrs.some(l => l.lrNo === f.lrNo && l.id !== f.id)) { Alert.alert('Duplicate', 'LR No ' + f.lrNo + ' already exists.'); return; }
     update(d => {
       const rec = JSON.parse(JSON.stringify(f));
@@ -112,6 +125,16 @@ export default function LRFormScreen({ navigation, route }) {
       rec.expenses = (rec.expenses || []).filter(e => (Number(e.amount) || 0) > 0);
       rec.aWeight = String(wt.aw || ''); rec.cWeight = String(wt.cw || '');
       rec.subTotal = totals.subTotal; rec.igstAmt = totals.igstAmt; rec.cgstAmt = totals.cgstAmt; rec.sgstAmt = totals.sgstAmt; rec.gross = totals.gross;
+      rec.branchId = (d.branches[0] || {}).id || '';
+      d.branches.forEach(br => { if (br.name === rec.bookingBranch) rec.branchId = br.id; });
+      if (rec.ownership === 'Hired') {
+        rec.vehicleId = '';
+        rec.hire.amount = Number(rec.hire.amount) || 0;
+        rec.hire.advance = Number(rec.hire.advance) || 0;
+      } else {
+        rec.hire = { vendorId: '', amount: 0, advance: 0, payments: (rec.hire && rec.hire.payments) || [] };
+        rec.vehicleId = truckToVehicleId(d, rec.truckNo);
+      }
       if (!rec.id) {
         rec.id = uid('lr');
         d.lrs.push(rec);
@@ -120,14 +143,26 @@ export default function LRFormScreen({ navigation, route }) {
         const idx = d.lrs.findIndex(x => x.id === rec.id);
         if (idx >= 0) d.lrs[idx] = rec; else d.lrs.push(rec);
       }
+      /* replace any prior postings of this LR so edits don't double-post */
+      d.acctExp = d.acctExp.filter(e => !(e.src === 'lr' && e.lrId === rec.id));
       rec.expenses.forEach(e => {
-        d.acctExp.push({ id: uid('ax'), date: rec.date, account: e.account || 'Other Expenses', amount: Number(e.amount) || 0, paidThrough: 'Petty Cash', vendor: '', ref: 'LR ' + rec.lrNo, notes: e.remarks || 'LR expense', src: 'lr' });
+        d.acctExp.push({ id: uid('ax'), lrId: rec.id, branchId: rec.branchId, date: rec.date, account: e.account || 'Other Expenses', amount: Number(e.amount) || 0, paidThrough: 'Petty Cash', vendor: '', ref: 'LR ' + rec.lrNo, notes: e.remarks || 'LR expense', src: 'lr' });
       });
+      /* sync hire ADVANCE posting — one stable entry per LR, updated in place */
+      const advId = 'hadv_' + rec.id;
+      d.acctExp = d.acctExp.filter(e => e.id !== advId);
+      if (rec.ownership === 'Hired' && rec.hire.advance > 0) {
+        d.acctExp.push({ id: advId, lrId: rec.id, branchId: rec.branchId, date: rec.date, account: 'Hired Vehicle / Subcontractor', amount: rec.hire.advance, paidThrough: 'Bank — Current A/c', vendor: vendorName(d, rec.hire.vendorId), ref: 'LR ' + rec.lrNo + ' — hire advance', notes: 'Hire advance', src: 'hire' });
+      }
       if (rec.bookingId) {
         const b = byId(d.bookings, rec.bookingId);
         if (b) { b.lrNo = rec.lrNo; b.ewayBill = rec.ewayBillNo;
           if (b.status === 'Booked') b.status = 'Vehicle Assigned';
           if (b.status === 'Vehicle Assigned') b.status = 'In Transit'; }
+      }
+      if (params.inquiryId) {
+        const iq = byId(d.inquiries, params.inquiryId);
+        if (iq) { iq.status = 'CONVERTED'; iq.lrId = rec.id; }
       }
     });
     navigation.goBack();
@@ -144,11 +179,41 @@ export default function LRFormScreen({ navigation, route }) {
     <ScrollView style={S.screen} contentContainerStyle={S.pad} keyboardShouldPersistTaps="handled">
       <Card title={editing ? 'Edit LR — ' + editing.lrNo : 'ADD NEW LR' + (booking ? '  (from ' + booking.bkNo + ')' : '')}>
         <Chips l="LR Type *" v={f.lrType} set={set('lrType')} opts={['ORIGINAL', 'DUMMY']} />
+        <Chips l="Vehicle Ownership *" v={f.ownership} set={set('ownership')} opts={['Owned', 'Hired']} />
+        <Text style={{ fontSize: 10.5, color: C.mut, marginTop: -6, marginBottom: 8 }}>
+          Owned → add trip expenses against this LR later. Hired → hire advance & balance tracked below (internal — never prints on the LR).
+        </Text>
         {half(<Fld l="Truck No *" v={f.truckNo} set={set('truckNo')} />, <Fld l="LR No *" v={f.lrNo} set={set('lrNo')} />)}
-        {half(<Fld l="Date *" v={f.date} set={set('date')} />, <Fld l="Booking Branch" v={f.bookingBranch} set={set('bookingBranch')} />)}
+        <Fld l="Date *" v={f.date} set={set('date')} />
+        <Chips l="Booking Branch" v={f.bookingBranch} set={set('bookingBranch')} opts={(db.branches || []).map(b => b.name)} />
         {half(<Fld l="From Place *" v={f.fromPlace} set={set('fromPlace')} />, <Fld l="To Place *" v={f.toPlace} set={set('toPlace')} />)}
         <Fld l="To Branch" v={f.toBranch} set={set('toBranch')} />
       </Card>
+
+      {f.ownership === 'Hired' ? (
+        <Card title="Hire Details (internal — never prints)">
+          <Text style={{ fontSize: 10, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 4 }}>Hire Vendor *</Text>
+          <View style={S.wrapRow}>
+            {db.vendors.map(v => (
+              <TouchableOpacity key={v.id} onPress={() => setF(p => ({ ...p, hire: { ...p.hire, vendorId: v.id } }))} style={{
+                backgroundColor: f.hire.vendorId === v.id ? C.navy2 : '#fff', borderWidth: 1,
+                borderColor: f.hire.vendorId === v.id ? C.navy2 : C.line2, borderRadius: 14, paddingHorizontal: 11, paddingVertical: 5, marginBottom: 6
+              }}>
+                <Text style={{ fontSize: 11.5, fontWeight: '600', color: f.hire.vendorId === v.id ? '#fff' : C.txt }}>{v.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {half(
+            <Fld l="Lorry Hire ₹" v={f.hire.amount} set={t => setF(p => ({ ...p, hire: { ...p.hire, amount: t } }))} num />,
+            <Fld l="Advance Paid ₹" v={f.hire.advance} set={t => setF(p => ({ ...p, hire: { ...p.hire, advance: t } }))} num />
+          )}
+          <Text style={{ fontSize: 10.5, color: C.mut }}>
+            {(f.hire.payments && f.hire.payments.length)
+              ? 'Balance payments so far: ' + f.hire.payments.length + '. Current balance: ' + inr(lrHireBalance({ hire: f.hire })) + '. Record further payments from the LR register.'
+              : 'Balance payments are recorded later from the LR register (+ Hire Pay). Advance posts to Accounting under "Hired Vehicle / Subcontractor".'}
+          </Text>
+        </Card>
+      ) : null}
 
       <Card title="Invoice & E-Way Bill">
         {half(<Fld l="Invoice No" v={f.invoiceNo} set={set('invoiceNo')} />, <Fld l="Invoice Amount ₹" v={f.invAmount} set={set('invAmount')} num />)}
@@ -179,9 +244,14 @@ export default function LRFormScreen({ navigation, route }) {
             <Fld l={'Description ' + (i + 1)} v={g.desc} set={t => setGoods(i, 'desc', t)} />
             <Chips l="Pkgs Type" v={g.pkgType} set={t => setGoods(i, 'pkgType', t)} opts={PKG_TYPES} />
             {half(<Fld l="Pcs" v={g.pcs} set={t => setGoods(i, 'pcs', t)} num />, <Fld l="Actual Weight" v={g.aw} set={t => setGoods(i, 'aw', t)} num />)}
-            {half(<Fld l="Charged Weight" v={g.cw} set={t => setGoods(i, 'cw', t)} num />, <Fld l="L × W × H" v={(g.l || '') + (g.w || g.h ? '×' + (g.w || '') + '×' + (g.h || '') : '')} set={t => {
-              const p = String(t).split('×'); setF(x => { const gg = x.goods.slice(); gg[i] = { ...gg[i], l: p[0] || '', w: p[1] || '', h: p[2] || '' }; return { ...x, goods: gg }; });
-            }} />)}
+            {half(
+              <Fld l="Charged Weight" v={g.cw} set={t => setGoods(i, 'cw', t)} num />,
+              <View style={[S.row, { justifyContent: 'space-between' }]}>
+                <View style={{ width: '31%' }}><Fld l="L" v={g.l} set={t => setGoods(i, 'l', t)} num /></View>
+                <View style={{ width: '31%' }}><Fld l="W" v={g.w} set={t => setGoods(i, 'w', t)} num /></View>
+                <View style={{ width: '31%' }}><Fld l="H" v={g.h} set={t => setGoods(i, 'h', t)} num /></View>
+              </View>
+            )}
             {f.goods.length > 1 ? <Btn small tone="red" label="Remove Row" onPress={() => setF(x => ({ ...x, goods: x.goods.filter((_, j) => j !== i) }))} /> : null}
           </View>
         ))}

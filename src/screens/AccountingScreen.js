@@ -7,7 +7,7 @@ import {
   clientName, invPaid, invOutstanding, waLink, EXP_HEADS, PAY_THROUGH
 } from '../logic';
 
-export default function AccountingScreen() {
+export default function AccountingScreen({ navigation }) {
   const { db, update } = useStore();
   const [form, setForm] = useState(null);
   const uninv = db.bookings.filter(b => b.status === 'Delivered' && !b.invoiceId);
@@ -30,7 +30,7 @@ export default function AccountingScreen() {
         const amt = Number(v.amount) || 0, g = Number(v.gstPct) || 0;
         const total = Math.round(amt * (1 + g / 100) * 100) / 100;
         const inv = {
-          id: uid('i'), invNo: 'INV-' + String(d.seq.inv).padStart(4, '0'), date: v.date, clientId: b.clientId,
+          id: uid('i'), invNo: 'INV-' + String(d.seq.inv).padStart(4, '0'), date: v.date, branchId: b.branchId || (d.branches[0] || {}).id, clientId: b.clientId,
           bookingIds: [b.id], amount: amt, gstPct: g, total, dueDate: addDaysISO(Number(c.creditDays) || 30), notes: v.notes
         };
         d.seq.inv++; d.invoices.push(inv);
@@ -75,6 +75,7 @@ export default function AccountingScreen() {
     title: 'Record Business Expense',
     fields: [
       { key: 'date', label: 'Date', type: 'date', required: true, value: todayISO() },
+      { key: 'branchId', label: 'Branch', type: 'select', required: true, value: (db.branches[0] || {}).id, options: (db.branches || []).map(x => ({ v: x.id, l: x.name })) },
       { key: 'account', label: 'Account Head', type: 'select', required: true, value: 'Other Expenses', options: EXP_HEADS.map(x => ({ v: x, l: x })) },
       { key: 'amount', label: 'Amount ₹', type: 'number', required: true },
       { key: 'paidThrough', label: 'Paid Through', type: 'select', required: true, value: PAY_THROUGH[0], options: PAY_THROUGH.map(x => ({ v: x, l: x })) },
@@ -83,12 +84,18 @@ export default function AccountingScreen() {
       { key: 'notes', label: 'Notes', type: 'multiline' }
     ],
     onSubmit: (v) => update(d => {
-      d.acctExp.push({ id: uid('ax'), date: v.date, account: v.account, amount: Number(v.amount) || 0, paidThrough: v.paidThrough, vendor: v.vendor, ref: v.ref, notes: v.notes, src: 'manual' });
+      d.acctExp.push({ id: uid('ax'), branchId: v.branchId, date: v.date, account: v.account, amount: Number(v.amount) || 0, paidThrough: v.paidThrough, vendor: v.vendor, ref: v.ref, notes: v.notes, src: 'manual' });
     })
   });
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
+      <View style={[S.wrapRow, { marginBottom: 12 }]}>
+        <Btn small label="📊 Accounts Dashboard" onPress={() => navigation.navigate('AccDash')} />
+        <Btn small label="🏦 Banking / Reco" onPress={() => navigation.navigate('Banking')} />
+        <Btn small label="⬆ Import Invoices" onPress={() => navigation.navigate('InvoiceImport')} />
+        <Btn small label="🗂 Invoice Backup" onPress={() => navigation.navigate('Backup')} />
+      </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <Kpi label="Invoiced" value={inr(sum(db.invoices, i => i.total))} sub={db.invoices.length + ' invoices'} />
         <Kpi label="Collected" value={inr(sum(db.payments, p => p.amount))} sub={db.payments.length + ' payments'} tone="green" />

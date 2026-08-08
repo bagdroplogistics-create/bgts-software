@@ -4,7 +4,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
 import { C, S, Card, Btn, confirmDo } from '../ui';
-import { blankDB, seedSample, todayISO } from '../logic';
+import { blankDB, migrate, todayISO } from '../logic';
 
 const FIELDS = [['name', 'Company Name'], ['gstin', 'GSTIN'], ['addr', 'Address'], ['phone', 'Phone'], ['email', 'Email'], ['lrPrefix', 'LR Number Prefix']];
 
@@ -32,16 +32,14 @@ export default function SettingsScreen() {
     try {
       const d = JSON.parse(paste);
       if (!d || !d.company || !Array.isArray(d.bookings)) { Alert.alert('Invalid', 'Not a valid BGTS-OS backup.'); return; }
-      confirmDo('Replace ALL current data with the pasted backup?', () => { replace(d); setCo({ ...d.company }); setPaste(''); Alert.alert('Done', 'Backup restored.'); });
+      const md = migrate(d);   /* older backups get v2 keys (lrs, lhcs, advances, acctExp) */
+      confirmDo('Replace ALL current data with the pasted backup?', () => { replace(md); setCo({ ...md.company }); setPaste(''); Alert.alert('Done', 'Backup restored.'); });
     } catch (e) { Alert.alert('Invalid JSON', String(e.message || e)); }
   };
 
   const wipe = () => confirmDo('Erase ALL data on this device? Export a backup first.', () =>
     confirmDo('Final confirmation — erase everything?', () => { const d = blankDB(); replace(d); setCo({ ...d.company }); }));
 
-  const loadSample = () => confirmDo('Load sample data? (Adds clearly-marked sample records to current data — best used on an empty database.)', () => {
-    const d = JSON.parse(JSON.stringify(db)); seedSample(d); replace(d);
-  });
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
@@ -62,7 +60,6 @@ export default function SettingsScreen() {
         </Text>
         <View style={[S.wrapRow]}>
           <Btn label="⬇ Export Backup" onPress={exportBackup} />
-          <Btn label="Load Sample Data" tone="ghost" onPress={loadSample} />
           <Btn label="Erase ALL Data" tone="red" onPress={wipe} />
         </View>
         <Text style={{ fontSize: 10.5, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginTop: 14, marginBottom: 4 }}>Restore: paste backup JSON</Text>

@@ -19,6 +19,7 @@ export default function BookingsScreen({ navigation }) {
 
   const bookingFields = (b) => [
     { key: 'date', label: 'Booking Date', type: 'date', required: true, value: b ? b.date : todayISO() },
+    { key: 'branchId', label: 'Branch', type: 'select', required: true, value: (b && b.branchId) || (db.branches[0] || {}).id, options: (db.branches || []).map(x => ({ v: x.id, l: x.name })) },
     { key: 'clientId', label: 'Client', type: 'select', required: true, value: b && b.clientId, options: db.clients.map(c => ({ v: c.id, l: c.name })) },
     { key: 'mode', label: 'Mode', type: 'select', required: true, value: (b && b.mode) || 'Road', options: ['Road', 'Rail', 'Air'].map(x => ({ v: x, l: x })) },
     { key: 'vehicleType', label: 'Vehicle / Unit Type', value: b && b.vehicleType, hint: 'e.g. Open Body 18ft — must match contract rate lines' },
@@ -56,7 +57,7 @@ export default function BookingsScreen({ navigation }) {
       title: 'New Booking', fields: bookingFields(null),
       onSubmit: (v) => rateGuard(v, (freight, src) => update(d => {
         d.bookings.push({
-          id: uid('b'), bkNo: 'BK-' + String(d.seq.bk).padStart(4, '0'), date: v.date, clientId: v.clientId,
+          id: uid('b'), bkNo: 'BK-' + String(d.seq.bk).padStart(4, '0'), date: v.date, branchId: v.branchId, clientId: v.clientId,
           origin: v.origin, destination: v.destination, mode: v.mode, vehicleType: v.vehicleType,
           cargo: v.cargo, weightMT: v.weightMT, freight, rateSource: src,
           assignType: '', vehicleId: '', hiredVendorId: '', hiredVehicleNo: '', hireCost: 0,
@@ -71,7 +72,7 @@ export default function BookingsScreen({ navigation }) {
     title: 'Edit ' + b.bkNo, fields: bookingFields(b),
     onSubmit: (v) => rateGuard(v, (freight, src) => update(d => {
       const x = byId(d.bookings, b.id); if (!x) return;
-      x.date = v.date; x.clientId = v.clientId; x.mode = v.mode; x.vehicleType = v.vehicleType;
+      x.date = v.date; x.branchId = v.branchId; x.clientId = v.clientId; x.mode = v.mode; x.vehicleType = v.vehicleType;
       x.origin = v.origin; x.destination = v.destination; x.cargo = v.cargo; x.weightMT = v.weightMT;
       x.freight = freight; x.rateSource = src;
     }))

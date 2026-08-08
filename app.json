@@ -10,23 +10,8 @@
       "backgroundColor": "#0a1f38",
       "resizeMode": "contain"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.bgts.os"
-    },
-    "android": {
-      "package": "com.bgts.os",
-      "adaptiveIcon": {
-        "backgroundColor": "#0a1f38"
-      }
-    },
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
-    "plugins": [
-      "expo-asset"
-    ]
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.bgts.os" },
+    "android": { "package": "com.bgts.os", "adaptiveIcon": { "backgroundColor": "#0a1f38" } },
+    "platforms": ["ios", "android", "web"]
   }
 }
