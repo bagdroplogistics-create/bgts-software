@@ -196,6 +196,8 @@ export function confirmDo(msg, onYes) {
    1 col under 860px per the HTML's own media query), .modalbtns Cancel/Save pair. */
 export function ModalForm({ form, onClose }) {
   const [vals, setVals] = useState({});
+  const [pickerKey, setPickerKey] = useState(null);
+  const [pickerSearch, setPickerSearch] = useState('');
   const { width } = useWindowDimensions();
   const oneCol = width <= 860;
   useEffect(() => {
@@ -203,11 +205,14 @@ export function ModalForm({ form, onClose }) {
       const o = {};
       form.fields.forEach(f => { o[f.key] = f.value != null ? String(f.value) : ''; });
       setVals(o);
+      setPickerKey(null);
     }
   }, [form]);
   if (!form) return null;
 
   const set = (k, v) => setVals(p => ({ ...p, [k]: v }));
+  const activeField = pickerKey ? form.fields.find(f => f.key === pickerKey) : null;
+  const openPicker = (k) => { setPickerSearch(''); setPickerKey(k); };
   const submit = () => {
     for (const f of form.fields) {
       if (f.required && !String(vals[f.key] || '').trim()) { Alert.alert('Missing field', f.label + ' is required.'); return; }
@@ -237,17 +242,29 @@ export function ModalForm({ form, onClose }) {
                       {f.label}{f.required ? ' *' : ''}
                     </Text>
                     {f.type === 'select' ? (
-                      <View style={[S.wrapRow, { borderWidth: 1, borderColor: C.line2, borderRadius: 7, padding: 6, backgroundColor: '#fff' }]}>
-                        {(f.options || []).map(o => (
-                          <TouchableOpacity key={String(o.v)} onPress={() => set(f.key, String(o.v))} style={{
-                            backgroundColor: String(vals[f.key]) === String(o.v) ? C.navy2 : '#fff',
-                            borderWidth: 1, borderColor: String(vals[f.key]) === String(o.v) ? C.navy2 : C.line2,
-                            borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 4
-                          }}>
-                            <Text style={{ fontSize: 12, fontWeight: '600', color: String(vals[f.key]) === String(o.v) ? '#fff' : C.txt }}>{o.l}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
+                      (f.options || []).length <= 6 && (f.options || []).every(o => String(o.l).length <= 16) ? (
+                        <View style={[S.wrapRow, { borderWidth: 1, borderColor: C.line2, borderRadius: 7, padding: 6, backgroundColor: '#fff' }]}>
+                          {(f.options || []).map(o => (
+                            <TouchableOpacity key={String(o.v)} onPress={() => set(f.key, String(o.v))} style={{
+                              backgroundColor: String(vals[f.key]) === String(o.v) ? C.navy2 : '#fff',
+                              borderWidth: 1, borderColor: String(vals[f.key]) === String(o.v) ? C.navy2 : C.line2,
+                              borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 4
+                            }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: String(vals[f.key]) === String(o.v) ? '#fff' : C.txt }}>{o.l}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      ) : (
+                        <TouchableOpacity onPress={() => openPicker(f.key)} style={{
+                          borderWidth: 1, borderColor: C.line2, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 9,
+                          backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
+                        }}>
+                          <Text numberOfLines={1} style={{ fontSize: 13, color: vals[f.key] ? C.txt : C.line2, flex: 1 }}>
+                            {(f.options || []).find(o => String(o.v) === String(vals[f.key]))?.l || '— select —'}
+                          </Text>
+                          <Text style={{ color: C.mut, marginLeft: 6, fontSize: 11 }}>▾</Text>
+                        </TouchableOpacity>
+                      )
                     ) : (
                       <TextInput
                         value={vals[f.key] || ''}
@@ -276,6 +293,50 @@ export function ModalForm({ form, onClose }) {
           </View>
         </View>
       </View>
+
+      {/* Dropdown picker for long select lists (clients, vehicles, drivers, vendors…) —
+          opens as its own overlay instead of inline pills so it can't blow out the form's layout. */}
+      <Modal visible={!!activeField} transparent animationType="fade" onRequestClose={() => setPickerKey(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(10,31,56,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <TouchableOpacity accessible={false} activeOpacity={1} onPress={() => setPickerKey(null)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+          <View style={{ backgroundColor: '#fff', borderRadius: 12, width: '100%', maxWidth: 420, maxHeight: '70%', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10 }}>
+            <View style={{ padding: 16, borderBottomWidth: 2, borderBottomColor: C.amber }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: C.navy }}>{activeField ? activeField.label : ''}</Text>
+            </View>
+            <View style={{ padding: 12, paddingBottom: 6 }}>
+              <TextInput
+                value={pickerSearch}
+                onChangeText={setPickerSearch}
+                placeholder="Search…"
+                placeholderTextColor={C.line2}
+                autoFocus
+                style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: C.txt, backgroundColor: '#fff' }}
+              />
+            </View>
+            <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+              {!activeField || !(activeField.required && activeField.blank === false) ? (
+                <TouchableOpacity onPress={() => { set(activeField.key, ''); setPickerKey(null); }} style={{ paddingVertical: 11, paddingHorizontal: 16 }}>
+                  <Text style={{ fontSize: 13.5, color: C.mut, fontStyle: 'italic' }}>— select —</Text>
+                </TouchableOpacity>
+              ) : null}
+              {activeField ? (activeField.options || [])
+                .filter(o => String(o.l).toLowerCase().includes(pickerSearch.toLowerCase()))
+                .map(o => {
+                  const selected = String(vals[activeField.key]) === String(o.v);
+                  return (
+                    <TouchableOpacity key={String(o.v)} onPress={() => { set(activeField.key, String(o.v)); setPickerKey(null); }}
+                      style={{ paddingVertical: 11, paddingHorizontal: 16, backgroundColor: selected ? C.line : '#fff' }}>
+                      <Text style={{ fontSize: 13.5, color: selected ? C.navy : C.txt, fontWeight: selected ? '700' : '400' }}>{o.l}</Text>
+                    </TouchableOpacity>
+                  );
+                }) : null}
+              {activeField && !(activeField.options || []).some(o => String(o.l).toLowerCase().includes(pickerSearch.toLowerCase())) ? (
+                <Text style={{ padding: 16, fontSize: 12.5, color: C.mut, textAlign: 'center' }}>No matches.</Text>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
