@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Kpi, Empty } from '../ui';
+import { C, S, Card, Kpi, Empty, Table } from '../ui';
 import { inr, sum, pad, invOutstanding, invPaid, ageingBuckets } from '../logic';
 
 function Bars({ items, fmt }) {
@@ -87,19 +87,33 @@ export default function AccDashScreen() {
       </Card>
 
       <Card title="Company / Branch-wise Accounts">
-        {(db.branches || []).map(br => {
-          const invs = db.invoices.filter(i => i.branchId === br.id);
-          const it = sum(invs, i => i.total), ct = sum(invs, i => invPaid(db, i));
-          const ex = sum(db.acctExp.filter(e => e.branchId === br.id), e => e.amount);
-          return (
-            <View key={br.id} style={{ borderBottomWidth: 1, borderBottomColor: C.line, paddingVertical: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>{br.name} <Text style={{ fontWeight: '400', fontSize: 11, color: C.mut }}>{br.entityName || db.company.name}</Text></Text>
-              <Text style={{ fontSize: 11.5, color: C.txt, marginTop: 2 }}>
-                Invoiced {inr(it)} · Collected {inr(ct)} · <Text style={{ fontWeight: '800', color: it - ct > 0 ? C.red : C.green }}>Out {inr(it - ct)}</Text> · Exp {inr(ex)} · Net <Text style={{ fontWeight: '800', color: ct - ex >= 0 ? C.green : C.red }}>{inr(ct - ex)}</Text>
-              </Text>
-            </View>
-          );
-        })}
+        {!(db.branches || []).length ? <Empty text="No branches configured." /> : (
+          <Table
+            cols={[
+              { key: 'branch', label: 'Branch', width: 110 },
+              { key: 'entity', label: 'Entity', width: 150 },
+              { key: 'invoiced', label: 'Invoiced', width: 100 },
+              { key: 'collected', label: 'Collected', width: 100 },
+              { key: 'outstanding', label: 'Outstanding', width: 100 },
+              { key: 'expenses', label: 'Expenses', width: 100 },
+              { key: 'net', label: 'Net Cash', width: 100 }
+            ]}
+            rows={db.branches.map(br => {
+              const invs = db.invoices.filter(i => i.branchId === br.id);
+              const it = sum(invs, i => i.total), ct = sum(invs, i => invPaid(db, i));
+              const ex = sum(db.acctExp.filter(e => e.branchId === br.id), e => e.amount);
+              return {
+                branch: <Text style={{ fontWeight: '700', color: C.navy }}>{br.name}</Text>,
+                entity: br.entityName || db.company.name,
+                invoiced: inr(it),
+                collected: inr(ct),
+                outstanding: <Text style={{ fontWeight: '800', color: it - ct > 0 ? C.red : C.green }}>{inr(it - ct)}</Text>,
+                expenses: inr(ex),
+                net: <Text style={{ fontWeight: '800', color: ct - ex >= 0 ? C.green : C.red }}>{inr(ct - ex)}</Text>
+              };
+            })}
+          />
+        )}
       </Card>
 
       <Card title="Expenses by Head (top 8)">

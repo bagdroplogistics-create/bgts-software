@@ -4,7 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, Table } from '../ui';
 import {
   inr, fmtDate, csvString, parseCSV, buildLRImportPlan, applyLRImportAoa,
   LR_IMPORT_HEADERS, todayISO
@@ -90,24 +90,34 @@ export default function LRImportScreen({ navigation }) {
               {errCount ? <Badge text={errCount + ' SKIP (ERRORS)'} tone="red" /> : null}
               {plan.unknownHeaders.length ? <Badge text={plan.unknownHeaders.length + ' cols ignored'} tone="amber" /> : null}
             </View>
-            {plan.items.slice(0, 30).map(it => (
-              <View key={it.row} style={{ borderBottomWidth: 1, borderBottomColor: C.line, paddingVertical: 7 }}>
-                <View style={[S.row, { justifyContent: 'space-between' }]}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy, flex: 1 }}>
-                    Row {it.row} · {it.lr.lrNo}{it.autoNo ? ' (auto)' : ''} · {it.lr.ownership === 'Hired' ? 'HIRED' : 'OWNED'}
-                  </Text>
-                  <Badge text={it.errors.length ? 'SKIP' : 'OK'} tone={it.errors.length ? 'red' : 'green'} />
-                </View>
-                <Text style={{ fontSize: 11.5, color: C.txt }}>
-                  {fmtDate(it.lr.date)} · {it.lr.truckNo} · {it.lr.fromPlace} → {it.lr.toPlace} · {inr(it.lr.gross)}
-                </Text>
-                {(it.errors.length || it.warns.length) ? (
-                  <Text style={{ fontSize: 10.5, color: it.errors.length ? C.red : C.mut }}>
-                    {it.errors.concat(it.warns).join('; ')}
-                  </Text>
-                ) : null}
-              </View>
-            ))}
+            <Table
+              cols={[
+                { key: 'row', label: 'Row', width: 50 },
+                { key: 'status', label: 'Status', width: 80 },
+                { key: 'lrNo', label: 'LR No', width: 110 },
+                { key: 'date', label: 'Date', width: 80 },
+                { key: 'own', label: 'Own', width: 80 },
+                { key: 'truck', label: 'Truck', width: 90 },
+                { key: 'route', label: 'Route', width: 150 },
+                { key: 'parties', label: 'Consignor → Consignee', width: 190 },
+                { key: 'gross', label: 'Gross', width: 90 },
+                { key: 'issues', label: 'Issues', width: 220 }
+              ]}
+              rows={plan.items.slice(0, 30).map(it => ({
+                row: it.row,
+                status: <Badge text={it.errors.length ? 'SKIP' : 'OK'} tone={it.errors.length ? 'red' : 'green'} />,
+                lrNo: it.lr.lrNo + (it.autoNo ? ' (auto)' : ''),
+                date: fmtDate(it.lr.date),
+                own: it.lr.ownership === 'Hired' ? 'HIRED' : 'OWNED',
+                truck: it.lr.truckNo,
+                route: it.lr.fromPlace + ' → ' + it.lr.toPlace,
+                parties: ((it.lr.consignor || {}).name || '—') + ' → ' + ((it.lr.consignee || {}).name || '—'),
+                gross: inr(it.lr.gross),
+                issues: (it.errors.length || it.warns.length)
+                  ? <Text style={{ fontSize: 10.5, color: it.errors.length ? C.red : C.mut }}>{it.errors.concat(it.warns).join('; ')}</Text>
+                  : '—'
+              }))}
+            />
             {plan.items.length > 30 ? <Text style={{ fontSize: 11, color: C.mut, marginTop: 6 }}>…and {plan.items.length - 30} more rows (all processed on import)</Text> : null}
             <View style={[S.wrapRow, { justifyContent: 'flex-end', marginTop: 12 }]}>
               <Btn label="Cancel" tone="ghost" onPress={() => { setAoa(null); }} />

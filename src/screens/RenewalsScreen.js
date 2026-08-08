@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, RenewalsTable } from '../ui';
 import { uid, fmtDate, vehicleReg, byId, removeById, allRenewalItems } from '../logic';
 
 const DOC_TYPES = ['Insurance', 'Permit (National)', 'Permit (State)', 'Fitness', 'PUC', 'Road Tax', 'RC', 'Goods Carriage Permit', 'Other'];
@@ -37,37 +37,36 @@ export default function RenewalsScreen() {
       </View>
 
       <Card title="Compliance Calendar (all expiries)">
-        {!items.length ? <Empty text="Nothing tracked yet." /> :
-          items.map((r, i) => (
-            <View key={r.kind + '-' + r.id + '-' + i} style={[S.row, { justifyContent: 'space-between', marginBottom: 8 }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{r.label}</Text>
-                <Text style={{ fontSize: 11, color: C.mut }}>{r.detail} · {fmtDate(r.expiry)}</Text>
-              </View>
-              <Badge
-                text={r.days == null ? 'NO DATE' : r.days < 0 ? 'EXPIRED' : r.days <= 7 ? 'URGENT ' + r.days + 'd' : r.days <= 30 ? 'DUE ' + r.days + 'd' : 'OK ' + r.days + 'd'}
-                tone={r.days == null ? 'amber' : r.days <= 7 ? 'red' : r.days <= 30 ? 'amber' : 'green'} />
-            </View>
-          ))}
+        <RenewalsTable items={items} />
         <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 6 }}>
           Covers vehicle documents, driver licences, contract validity, and BG/EMD expiry. Bands: ≤30 days amber, ≤7 days red.
         </Text>
       </Card>
 
       <Card title="Vehicle Documents on File">
-        {!db.renewals.length ? <Empty text="No vehicle documents tracked yet." /> :
-          db.renewals.map(r => (
-            <View key={r.id} style={[S.row, { justifyContent: 'space-between', marginBottom: 8 }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{vehicleReg(db, r.vehicleId)} · {r.docType}</Text>
-                <Text style={{ fontSize: 11, color: C.mut }}>{r.ref || 'no ref'} · expires {fmtDate(r.expiry)}</Text>
-              </View>
-              <View style={S.wrapRow}>
-                <Btn small tone="ghost" label="Edit" onPress={() => editDoc(r)} />
-                <Btn small tone="red" label="✕" onPress={() => confirmDo('Stop tracking this document?', () => update(d => removeById(d.renewals, r.id)))} />
-              </View>
-            </View>
-          ))}
+        {!db.renewals.length ? <Empty text="No vehicle documents tracked yet." /> : (
+          <Table
+            cols={[
+              { key: 'vehicle', label: 'Vehicle', width: 120 },
+              { key: 'doc', label: 'Document', width: 140 },
+              { key: 'ref', label: 'Ref No.', width: 150 },
+              { key: 'expiry', label: 'Expiry', width: 90 },
+              { key: 'actions', label: '', width: 150 }
+            ]}
+            rows={db.renewals.map(r => ({
+              vehicle: <Text style={{ fontWeight: '700', color: C.navy }}>{vehicleReg(db, r.vehicleId)}</Text>,
+              doc: r.docType,
+              ref: r.ref || 'no ref',
+              expiry: fmtDate(r.expiry),
+              actions: (
+                <View style={S.wrapRow}>
+                  <Btn small tone="ghost" label="Edit" onPress={() => editDoc(r)} />
+                  <Btn small tone="red" label="✕" onPress={() => confirmDo('Stop tracking this document?', () => update(d => removeById(d.renewals, r.id)))} />
+                </View>
+              )
+            }))}
+          />
+        )}
       </Card>
       <ModalForm form={form} onClose={() => setForm(null)} />
     </ScrollView>

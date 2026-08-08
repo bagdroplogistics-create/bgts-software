@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, Table } from '../ui';
 import {
   inr, fmtDate, parseCSV, buildInvImportPlan, applyInvImportAoa, clientName,
   isBillingRegister, parseBillingRegister, registerToInvoiceAoa
@@ -76,22 +76,28 @@ export default function InvoiceImportScreen({ navigation }) {
               <Badge text={okCount + ' READY'} tone="green" />
               {plan.items.length - okCount ? <Badge text={(plan.items.length - okCount) + ' SKIP'} tone="red" /> : null}
             </View>
-            {plan.items.slice(0, 25).map(it => (
-              <View key={it.row} style={{ borderBottomWidth: 1, borderBottomColor: C.line, paddingVertical: 7 }}>
-                <View style={[S.row, { justifyContent: 'space-between' }]}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy, flex: 1 }}>
-                    Row {it.row} · {it.inv.invNo}{it.autoNo ? ' (auto)' : ''}
-                  </Text>
-                  <Badge text={it.errors.length ? 'SKIP' : 'OK'} tone={it.errors.length ? 'red' : 'green'} />
-                </View>
-                <Text style={{ fontSize: 11.5, color: C.txt }}>
-                  {fmtDate(it.inv.date)} · {it.inv.clientId ? clientName(db, it.inv.clientId) : (it.clientNameNew || '—')} · {inr(it.inv.total)}
-                </Text>
-                {(it.errors.length || it.warns.length) ? (
-                  <Text style={{ fontSize: 10.5, color: it.errors.length ? C.red : C.mut }}>{it.errors.concat(it.warns).join('; ')}</Text>
-                ) : null}
-              </View>
-            ))}
+            <Table
+              cols={[
+                { key: 'row', label: 'Row', width: 50 },
+                { key: 'status', label: 'Status', width: 80 },
+                { key: 'invoice', label: 'Invoice', width: 110 },
+                { key: 'date', label: 'Date', width: 80 },
+                { key: 'client', label: 'Client', width: 160 },
+                { key: 'total', label: 'Total', width: 90 },
+                { key: 'issues', label: 'Issues', width: 220 }
+              ]}
+              rows={plan.items.slice(0, 25).map(it => ({
+                row: it.row,
+                status: <Badge text={it.errors.length ? 'SKIP' : 'OK'} tone={it.errors.length ? 'red' : 'green'} />,
+                invoice: it.inv.invNo + (it.autoNo ? ' (auto)' : ''),
+                date: fmtDate(it.inv.date),
+                client: it.inv.clientId ? clientName(db, it.inv.clientId) : (it.clientNameNew || '—'),
+                total: inr(it.inv.total),
+                issues: (it.errors.length || it.warns.length)
+                  ? <Text style={{ fontSize: 10.5, color: it.errors.length ? C.red : C.mut }}>{it.errors.concat(it.warns).join('; ')}</Text>
+                  : '—'
+              }))}
+            />
             <View style={[S.wrapRow, { justifyContent: 'flex-end', marginTop: 12 }]}>
               <Btn label="Cancel" tone="ghost" onPress={() => setAoa(null)} />
               {okCount ? <Btn label={'Import ' + okCount} tone="amber" onPress={doImport} /> : null}

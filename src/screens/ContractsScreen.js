@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
 import { uid, inr, fmtDate, daysTo, clientName, byId, removeById } from '../logic';
 
 export default function ContractsScreen() {
@@ -65,18 +65,30 @@ export default function ContractsScreen() {
                 {clientName(db, c.clientId)} · Valid {fmtDate(c.validFrom)} – {fmtDate(c.validTo)}
                 {c.emd ? ' · EMD/BG ' + inr(c.emd) : ''}{c.bgExpiry ? ' · BG exp ' + fmtDate(c.bgExpiry) : ''}
               </Text>
-              {(c.rates && c.rates.length) ? c.rates.map((r, i) => (
-                <View key={i} style={[S.row, { justifyContent: 'space-between', marginTop: 8, borderTopWidth: i === 0 ? 1 : 0, borderTopColor: C.line, paddingTop: i === 0 ? 8 : 0 }]}>
-                  <Text style={{ fontSize: 12, color: C.txt, flex: 1 }}>{r.origin} → {r.destination} · {r.vehicleType || 'Any'}</Text>
-                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: C.navy }}>{inr(r.rate)}</Text>
-                  <Btn small tone="red" label="✕" style={{ marginLeft: 8 }}
-                    onPress={() => confirmDo('Remove this rate line?', () => update(dd => { const x = byId(dd.contracts, c.id); if (x) x.rates.splice(i, 1); }))} />
+              {(c.rates && c.rates.length) ? (
+                <View style={{ marginTop: 10 }}>
+                  <Table
+                    cols={[
+                      { key: 'origin', label: 'Origin', width: 130 },
+                      { key: 'destination', label: 'Destination', width: 130 },
+                      { key: 'vehicleType', label: 'Vehicle Type', width: 130 },
+                      { key: 'rate', label: 'Rate (₹/trip)', width: 110 },
+                      { key: 'actions', label: '', width: 60 }
+                    ]}
+                    rows={c.rates.map((r, i) => ({
+                      origin: r.origin,
+                      destination: r.destination,
+                      vehicleType: r.vehicleType || 'Any',
+                      rate: <Text style={{ fontWeight: '800', color: C.navy }}>{inr(r.rate)}</Text>,
+                      actions: <Btn small tone="red" label="✕" onPress={() => confirmDo('Remove this rate line?', () => update(dd => { const x = byId(dd.contracts, c.id); if (x) x.rates.splice(i, 1); }))} />
+                    }))}
+                  />
                 </View>
-              )) : <Text style={{ fontSize: 11, color: C.mut, marginTop: 6 }}>No rate lines yet — add lanes so the booking rate guard can enforce them.</Text>}
+              ) : <Text style={{ fontSize: 11, color: C.mut, marginTop: 6 }}>No rate lines yet — add lanes so the booking rate guard can enforce them.</Text>}
               <View style={[S.wrapRow, { marginTop: 10 }]}>
                 <Btn small tone="ghost" label="+ Rate Line" onPress={() => addRate(c)} />
                 <Btn small tone="ghost" label="Edit" onPress={() => editContract(c)} />
-                <Btn small tone="red" label="Delete" onPress={() => confirmDo('Delete contract and its rate lines?', () => update(dd => removeById(dd.contracts, c.id)))} />
+                <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete this contract and its rate lines?', () => update(dd => removeById(dd.contracts, c.id)))} />
               </View>
             </Card>
           );

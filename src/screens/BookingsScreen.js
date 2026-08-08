@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TextInput, Linking, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, Linking, Alert } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, statusTone } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, statusTone, Table } from '../ui';
 import {
   uid, inr, todayISO, fmtDate, byId, removeById, clientName, vehicleReg,
-  findContractRate, waLink, waBookingMsg
+  findContractRate, waLink, waBookingMsg, lrHtml
 } from '../logic';
 
 export default function BookingsScreen({ navigation }) {
@@ -99,34 +101,52 @@ export default function BookingsScreen({ navigation }) {
 
   const genLR = (b) => navigation.navigate('LRForm', { bookingId: b.id });
 
+  const printLR = async (b) => {
+    const l = db.lrs.find(x => x.bookingId === b.id);
+    if (!l) { Alert.alert('Generate the LR first.'); return; }
+    try {
+      const { uri } = await Print.printToFileAsync({ html: lrHtml(db, l) });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: l.lrNo });
+      else Alert.alert('Saved', 'PDF created at:\n' + uri);
+    } catch (e) { Alert.alert('PDF error', String(e.message || e)); }
+  };
+
   const openWA = (b) => {
     const c = byId(db.clients, b.clientId);
     if (!c || !c.phone) { Alert.alert('No phone', 'Add a WhatsApp number for this client in Masters.'); return; }
     Linking.openURL(waLink(c.phone, waBookingMsg(db, b))).catch(() => Alert.alert('Error', 'Could not open WhatsApp.'));
   };
 
-  const renderItem = ({ item: b }) => (
-    <Card>
-      <View style={[S.row, { justifyContent: 'space-between', marginBottom: 6 }]}>
-        <Text style={S.h1}>{b.bkNo}  <Text style={{ color: C.mut, fontWeight: '400', fontSize: 12 }}>{fmtDate(b.date)} · {b.mode}</Text></Text>
+  const bookingRow = (b) => ({
+    bkNo: (
+      <View>
+        <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{b.bkNo}</Text>
+        <Text style={{ fontSize: 10, color: C.mut }}>{b.mode}</Text>
+      </View>
+    ),
+    date: fmtDate(b.date),
+    client: clientName(db, b.clientId),
+    route: b.origin + ' → ' + b.destination,
+    vehicle: b.assignType === 'Owned' ? <Text style={{ fontSize: 12 }}><Badge text="OWN" tone="navy" /> {vehicleReg(db, b.vehicleId)}</Text> :
+      b.assignType === 'Hired' ? <Text style={{ fontSize: 12 }}><Badge text="HIRE" tone="purple" /> {b.hiredVehicleNo || ''}</Text> :
+        <Badge text="UNASSIGNED" tone="red" />,
+    freight: (
+      <View>
+        <Text style={{ fontSize: 12.5, fontWeight: '800', color: C.navy }}>{inr(b.freight)}</Text>
+        <Text style={{ fontSize: 10, color: C.mut }}>{b.rateSource || ''}</Text>
+      </View>
+    ),
+    status: (
+      <View>
         <Badge text={b.status} tone={statusTone(b.status)} />
-      </View>
-      <Text style={{ fontSize: 13, color: C.txt, fontWeight: '600' }}>{clientName(db, b.clientId)}</Text>
-      <Text style={{ fontSize: 12.5, color: C.txt, marginTop: 2 }}>{b.origin} → {b.destination}</Text>
-      <View style={[S.wrapRow, { marginTop: 6 }]}>
-        <Text style={{ fontSize: 14, fontWeight: '800', color: C.navy }}>{inr(b.freight)}</Text>
-        <Text style={{ fontSize: 10.5, color: C.mut }}>{b.rateSource || ''}</Text>
-      </View>
-      <View style={[S.wrapRow, { marginTop: 4 }]}>
-        {b.assignType === 'Owned' ? <Badge text={'OWN ' + vehicleReg(db, b.vehicleId)} tone="navy" /> :
-          b.assignType === 'Hired' ? <Badge text={'HIRE ' + (b.hiredVehicleNo || '')} tone="purple" /> :
-            <Badge text="UNASSIGNED" tone="red" />}
-        {b.lrNo ? <Badge text={b.lrNo} tone="teal" /> : null}
+        {b.lrNo ? <Text style={{ fontSize: 10, color: C.txt, marginTop: 2 }}>{b.lrNo}</Text> : null}
         {b.podReceived ? <Badge text="POD ✓" tone="green" /> : null}
       </View>
-      <View style={[S.wrapRow, { marginTop: 10 }]}>
+    ),
+    actions: (
+      <View style={S.wrapRow}>
         {!b.assignType ? <Btn small label="Assign" onPress={() => assign(b)} /> : null}
-        {!b.lrNo ? <Btn small tone="amber" label="Gen LR" onPress={() => genLR(b)} /> : null}
+        {!b.lrNo ? <Btn small tone="amber" label="Gen LR" onPress={() => genLR(b)} /> : <Btn small tone="ghost" label="Print LR" onPress={() => printLR(b)} />}
         {(b.status === 'In Transit' || b.status === 'Vehicle Assigned') ?
           <Btn small tone="green" label="Delivered" onPress={() => update(d => { const x = byId(d.bookings, b.id); if (x) x.status = 'Delivered'; })} /> : null}
         {(b.status === 'Delivered' && !b.podReceived) ?
@@ -135,19 +155,35 @@ export default function BookingsScreen({ navigation }) {
         <Btn small tone="ghost" label="Edit" onPress={() => editBooking(b)} />
         <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete booking ' + b.bkNo + '?', () => update(d => removeById(d.bookings, b.id)))} />
       </View>
-    </Card>
-  );
+    )
+  });
 
   return (
     <View style={S.screen}>
       <View style={{ padding: 14, paddingBottom: 6, flexDirection: 'row', gap: 8 }}>
         <TextInput value={q} onChangeText={setQ} placeholder="Search bookings…" placeholderTextColor={C.mut}
           style={{ flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13 }} />
-        <Btn label="+ New" tone="amber" onPress={newBooking} />
+        <Btn label="+ New Booking" tone="amber" onPress={newBooking} />
       </View>
-      <FlatList data={list} keyExtractor={b => b.id} renderItem={renderItem}
-        contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}
-        ListEmptyComponent={<Empty text="No bookings match." />} />
+      <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
+        <Card>
+          {!list.length ? <Empty text="No bookings match." /> : (
+            <Table
+              cols={[
+                { key: 'bkNo', label: 'Bk No', width: 90 },
+                { key: 'date', label: 'Date', width: 80 },
+                { key: 'client', label: 'Client', width: 140 },
+                { key: 'route', label: 'Route', width: 160 },
+                { key: 'vehicle', label: 'Vehicle', width: 130 },
+                { key: 'freight', label: 'Freight', width: 100 },
+                { key: 'status', label: 'Status', width: 110 },
+                { key: 'actions', label: 'Actions', width: 340 }
+              ]}
+              rows={list.map(bookingRow)}
+            />
+          )}
+        </Card>
+      </ScrollView>
       <ModalForm form={form} onClose={() => setForm(null)} />
     </View>
   );

@@ -1,13 +1,41 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, Table } from '../ui';
 import {
   inr, sum, csvString, clientName, vehicleReg, vendorName, allRenewalItems,
-  invPaid, invOutstanding, daysSince, lhcPaid, lhcBalance
+  invPaid, invOutstanding, daysSince
 } from '../logic';
+
+/* Same "kpi" card look as the HTML's Report Library — white card, navy top border,
+   uppercase label, sub description, action button. Kept local since it's only used here. */
+function ReportCard({ label, sub, onPress, width, marginRight }) {
+  return (
+    <View style={{
+      width, marginRight, marginBottom: 10, backgroundColor: '#fff', borderRadius: 10,
+      borderWidth: 1, borderColor: C.line, borderTopWidth: 3, borderTopColor: C.navy3, padding: 14
+    }}>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: C.mut, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</Text>
+      <Text style={{ fontSize: 11, color: C.mut, marginTop: 6, marginBottom: 10 }}>{sub}</Text>
+      <Btn small label="Download CSV" onPress={onPress} />
+    </View>
+  );
+}
+function ReportGrid({ items }) {
+  const [w, setW] = useState(0);
+  const cols = w ? Math.max(2, Math.min(4, Math.floor(w / 190))) : 2;
+  const gap = 10;
+  const tileW = w ? (w - gap * (cols - 1)) / cols : undefined;
+  return (
+    <View onLayout={e => setW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+      {items.map((it, i) => (
+        <ReportCard key={i} {...it} width={tileW} marginRight={(i % cols === cols - 1) ? 0 : gap} />
+      ))}
+    </View>
+  );
+}
 
 export default function ReportsScreen() {
   const { db } = useStore();
@@ -26,12 +54,9 @@ export default function ReportsScreen() {
     ['Trip Register', 'All bookings with status, vehicle, freight', () => shareCSV('BGTS_Trip_Register.csv',
       [['Bk No', 'Date', 'Client', 'Mode', 'Origin', 'Destination', 'Vehicle Type', 'Assign', 'Vehicle', 'Weight MT', 'Freight', 'Hire Cost', 'Status', 'LR No', 'POD']]
         .concat(db.bookings.map(b => [b.bkNo, b.date, clientName(db, b.clientId), b.mode, b.origin, b.destination, b.vehicleType, b.assignType, (b.assignType === 'Owned' ? vehicleReg(db, b.vehicleId) : b.hiredVehicleNo), b.weightMT, b.freight, b.hireCost, b.status, b.lrNo, b.podReceived ? 'Yes' : 'No'])))],
-    ['LR Register', 'All consignment notes (incl. standalone LRs)', () => shareCSV('BGTS_LR_Register.csv',
-      [['LR No', 'Type', 'Date', 'Truck', 'From', 'To', 'Consignor', 'Consignee', 'Pay Terms', 'E-Way Bill', 'A Wt', 'C Wt', 'Sub Total', 'IGST', 'CGST', 'SGST', 'Gross', 'POD']]
-        .concat(db.lrs.map(l => [l.lrNo, l.lrType, l.date, l.truckNo, l.fromPlace, l.toPlace, (l.consignor || {}).name, (l.consignee || {}).name, l.payTerms, l.ewayBillNo, l.aWeight, l.cWeight, l.subTotal, l.igstAmt, l.cgstAmt, l.sgstAmt, l.gross, l.pod ? 'Yes' : 'No'])))],
-    ['LHC Register', 'Truck hire contracts with TDS and balances', () => shareCSV('BGTS_LHC_Register.csv',
-      [['LHC No', 'Date', 'Vendor', 'Truck', 'From', 'To', 'LRs', 'Lorry Hire', 'Advance', 'Deductions', 'TDS %', 'TDS Amt', 'Paid', 'Balance']]
-        .concat(db.lhcs.map(l => [l.lhcNo, l.date, vendorName(db, l.vendorId), l.truckNo, l.fromPlace, l.toPlace, l.lrNos, l.lorryHire, l.advance, l.deductions, l.tdsPct, l.tdsAmt, lhcPaid(l), lhcBalance(l)])))],
+    ['LR Register', 'All consignment notes with POD status', () => shareCSV('BGTS_LR_Register.csv',
+      [['LR No', 'Type', 'Date', 'Truck', 'From', 'To', 'Booking Branch', 'Consignor', 'Consignee', 'Billing Party', 'Pay Terms', 'E-Way Bill', 'A Weight', 'C Weight', 'Sub Total', 'IGST', 'CGST', 'SGST', 'Gross', 'POD']]
+        .concat(db.lrs.map(l => [l.lrNo, l.lrType, l.date, l.truckNo, l.fromPlace, l.toPlace, l.bookingBranch, (l.consignor || {}).name, (l.consignee || {}).name, l.billingParty, l.payTerms, l.ewayBillNo, l.aWeight, l.cWeight, l.subTotal, l.igstAmt, l.cgstAmt, l.sgstAmt, l.gross, l.pod ? 'Yes' : 'No'])))],
     ['Receivables Ageing', 'Invoice-wise outstanding with buckets', () => shareCSV('BGTS_Receivables.csv',
       [['Invoice', 'Date', 'Client', 'Taxable', 'GST %', 'Total', 'Paid', 'Outstanding', 'Due Date', 'Age Days']]
         .concat(db.invoices.map(i => [i.invNo, i.date, clientName(db, i.clientId), i.amount, i.gstPct, i.total, invPaid(db, i), invOutstanding(db, i), i.dueDate, daysSince(i.date)])))],
@@ -51,29 +76,33 @@ export default function ReportsScreen() {
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
-      <Card title="Report Library — share as CSV (opens in Excel)">
-        {reports.map((r, i) => (
-          <View key={i} style={[S.row, { justifyContent: 'space-between', marginBottom: 10 }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>{r[0]}</Text>
-              <Text style={{ fontSize: 11, color: C.mut }}>{r[1]}</Text>
-            </View>
-            <Btn small label="Share CSV" onPress={r[2]} />
-          </View>
-        ))}
+      <Card title="Report Library">
+        <ReportGrid items={reports.map(r => ({ label: r[0], sub: r[1], onPress: r[2] }))} />
+        <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 4 }}>
+          CSV files open directly in Excel. These replace the manually-compiled Monday / Friday MIS registers.
+        </Text>
       </Card>
 
       <Card title="Client Revenue Mix">
-        {!tot ? <Empty text="No bookings yet." /> :
-          Object.keys(byC).sort((a, b) => byC[b] - byC[a]).map(cid => {
-            const sh = Math.round(byC[cid] / tot * 100);
-            return (
-              <View key={cid} style={[S.row, { justifyContent: 'space-between', marginBottom: 8 }]}>
-                <Text style={{ fontSize: 12.5, color: C.txt, fontWeight: '600', flex: 1 }}>{clientName(db, cid)} · {inr(byC[cid])}</Text>
-                <Badge text={sh + '%' + (sh > 35 ? ' OVER 35%' : '')} tone={sh > 35 ? 'red' : 'green'} />
-              </View>
-            );
-          })}
+        {!tot ? <Empty text="No bookings yet." /> : (
+          <Table
+            cols={[
+              { key: 'client', label: 'Client', width: 170 },
+              { key: 'booked', label: 'Booked Revenue', width: 120 },
+              { key: 'share', label: 'Share', width: 70 },
+              { key: 'exposure', label: 'Exposure', width: 160 }
+            ]}
+            rows={Object.keys(byC).sort((a, b) => byC[b] - byC[a]).map(cid => {
+              const sh = Math.round(byC[cid] / tot * 100);
+              return {
+                client: clientName(db, cid),
+                booked: inr(byC[cid]),
+                share: sh + '%',
+                exposure: sh > 35 ? <Badge text="OVER 35% TRIGGER" tone="red" /> : <Badge text="OK" tone="green" />
+              };
+            })}
+          />
+        )}
       </Card>
     </ScrollView>
   );

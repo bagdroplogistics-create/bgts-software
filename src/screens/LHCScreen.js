@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, KV, ModalForm, confirmDo } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
 import {
   uid, inr, fmtDate, todayISO, byId, removeById, vendorName,
   tdsAmount, lhcPaid, lhcBalance, lhcStatus
@@ -86,34 +86,52 @@ export default function LHCScreen() {
         <Btn label="+ New LHC" tone="amber" onPress={addLHC} />
       </View>
 
-      {!list.length ? <Card><Empty text={onlyPending ? 'No LHCs with pending balance.' : 'No LHCs yet. Create one when you hire a market truck.'} /></Card> :
-        list.map(l => {
-          const bal = lhcBalance(l), st = lhcStatus(l);
-          return (
-            <Card key={l.id}>
-              <View style={[S.row, { justifyContent: 'space-between', marginBottom: 4 }]}>
-                <Text style={S.h1}>{l.lhcNo} · {vendorName(db, l.vendorId)}</Text>
-                <Badge text={st} tone={st === 'SETTLED' ? 'green' : st === 'PART PAID' ? 'amber' : 'red'} />
-              </View>
-              <Text style={{ fontSize: 11.5, color: C.mut, marginBottom: 6 }}>
-                {fmtDate(l.date)} · {l.truckNo} · {l.fromPlace} → {l.toPlace}{l.lrNos ? ' · LRs: ' + l.lrNos : ''}
-              </Text>
-              <KV k="Lorry Hire" v={inr(l.lorryHire)} />
-              <KV k="Advance" v={inr(l.advance)} />
-              {Number(l.deductions) ? <KV k="Deductions" v={inr(l.deductions)} /> : null}
-              <KV k={'TDS ' + l.tdsPct + '%'} v={inr(l.tdsAmt)} />
-              <KV k="Paid (post-adv)" v={inr(lhcPaid(l))} />
-              <View style={[S.row, { justifyContent: 'space-between', marginTop: 6 }]}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: bal > 0 ? C.red : C.green }}>Balance: {inr(bal)}</Text>
-              </View>
-              <View style={[S.wrapRow, { marginTop: 10 }]}>
-                {bal > 0 ? <Btn small tone="green" label="+ Payment" onPress={() => payBalance(l)} /> : null}
-                <Btn small tone="ghost" label="Edit" onPress={() => editLHC(l)} />
-                <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete ' + l.lhcNo + '?', () => update(d => removeById(d.lhcs, l.id)))} />
-              </View>
-            </Card>
-          );
-        })}
+      <Card>
+        {!list.length ? <Empty text={onlyPending ? 'No LHCs with pending balance.' : 'No LHCs yet. Create one when you hire a market truck.'} /> : (
+          <Table
+            cols={[
+              { key: 'lhcNo', label: 'LHC No / Vendor', width: 160 },
+              { key: 'date', label: 'Date', width: 80 },
+              { key: 'route', label: 'Truck / Route', width: 170 },
+              { key: 'lorryHire', label: 'Lorry Hire', width: 90 },
+              { key: 'advance', label: 'Advance', width: 90 },
+              { key: 'deductions', label: 'Deductions', width: 90 },
+              { key: 'tds', label: 'TDS', width: 90 },
+              { key: 'paid', label: 'Paid', width: 90 },
+              { key: 'balance', label: 'Balance', width: 100 },
+              { key: 'status', label: 'Status', width: 100 },
+              { key: 'actions', label: 'Actions', width: 220 }
+            ]}
+            rows={list.map(l => {
+              const bal = lhcBalance(l), st = lhcStatus(l);
+              return {
+                lhcNo: (
+                  <View>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{l.lhcNo}</Text>
+                    <Text style={{ fontSize: 10, color: C.mut }}>{vendorName(db, l.vendorId)}</Text>
+                  </View>
+                ),
+                date: fmtDate(l.date),
+                route: l.truckNo + '\n' + l.fromPlace + ' → ' + l.toPlace + (l.lrNos ? '\nLRs: ' + l.lrNos : ''),
+                lorryHire: inr(l.lorryHire),
+                advance: inr(l.advance),
+                deductions: Number(l.deductions) ? inr(l.deductions) : '—',
+                tds: inr(l.tdsAmt) + ' (' + l.tdsPct + '%)',
+                paid: inr(lhcPaid(l)),
+                balance: <Text style={{ fontWeight: '800', color: bal > 0 ? C.red : C.green }}>{inr(bal)}</Text>,
+                status: <Badge text={st} tone={st === 'SETTLED' ? 'green' : st === 'PART PAID' ? 'amber' : 'red'} />,
+                actions: (
+                  <View style={S.wrapRow}>
+                    {bal > 0 ? <Btn small tone="green" label="+ Payment" onPress={() => payBalance(l)} /> : null}
+                    <Btn small tone="ghost" label="Edit" onPress={() => editLHC(l)} />
+                    <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete ' + l.lhcNo + '?', () => update(d => removeById(d.lhcs, l.id)))} />
+                  </View>
+                )
+              };
+            })}
+          />
+        )}
+      </Card>
       <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 4 }}>
         Balance = Lorry Hire − Advance − Deductions − TDS − Payments. TDS deducted here accrues to TDS Payable — deposit per your CA's calendar.
       </Text>

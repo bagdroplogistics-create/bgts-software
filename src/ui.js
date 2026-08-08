@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, Alert, useWindowDimensions } from 'react-native';
+import { fmtDate } from './logic';
 
 export const C = {
   navy: '#0a1f38', navy2: '#153a66', navy3: '#1d4d84',
@@ -107,6 +108,79 @@ export function KV({ k, v }) {
 
 export function Empty({ text }) { return <Text style={S.empty}>{text}</Text>; }
 
+/* Generic data table matching the HTML build's table.data styling:
+   navy header row (white uppercase text) + white body rows with bottom borders.
+   cols: [{key,label,width}]  rows: [{ [col.key]: string|number|ReactNode }]
+   The HTML's <table> is width:100% — it stretches columns to fill the card and only
+   needs overflow-x when the content genuinely doesn't fit. To match that instead of
+   always rendering at the sum of the fixed column widths (which left empty space on
+   wide screens/desktop web), this measures its own width and scales every column up
+   proportionally to fill it; it only falls back to a narrower, horizontally-scrollable
+   table when the container is too narrow for the columns even at their original size. */
+export function Table({ cols, rows }) {
+  const [w, setW] = useState(0);
+  const natural = cols.reduce((s, c) => s + c.width, 0);
+  const scale = w && natural ? Math.max(1, w / natural) : 1;
+  const sCols = scale === 1 ? cols : cols.map(c => ({ ...c, width: c.width * scale }));
+  return (
+    <View onLayout={e => setW(e.nativeEvent.layout.width)}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={{ width: scale > 1 ? w : undefined }}>
+          <View style={{ flexDirection: 'row', backgroundColor: C.navy }}>
+            {sCols.map(c => (
+              <Text key={c.key} style={{
+                width: c.width, paddingVertical: 8, paddingHorizontal: 10, color: '#fff',
+                fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4
+              }}>{c.label}</Text>
+            ))}
+          </View>
+          {rows.map((r, i) => (
+            <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.line, backgroundColor: '#fff' }}>
+              {sCols.map(c => (
+                <View key={c.key} style={{ width: c.width, paddingVertical: 8, paddingHorizontal: 10, justifyContent: 'center' }}>
+                  {(typeof r[c.key] === 'string' || typeof r[c.key] === 'number')
+                    ? <Text style={{ fontSize: 12, color: C.txt }}>{r[c.key]}</Text> : r[c.key]}
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+/* Shared renewals/compliance table — used by Dashboard's "Upcoming Renewals" and the
+   full Renewals & Compliance screen so both render the same badge thresholds identically. */
+export function renewalStatus(days) {
+  if (days == null) return <Badge text="NO DATE" tone="amber" />;
+  if (days < 0) return <Badge text="EXPIRED" tone="red" />;
+  if (days <= 7) return <Badge text="URGENT" tone="red" />;
+  if (days <= 30) return <Badge text="DUE SOON" tone="amber" />;
+  return <Badge text="OK" tone="green" />;
+}
+export function RenewalsTable({ items }) {
+  if (!items.length) return <Empty text="Nothing tracked yet." />;
+  return (
+    <Table
+      cols={[
+        { key: 'label', label: 'Document / Item', width: 170 },
+        { key: 'detail', label: 'For', width: 150 },
+        { key: 'expiry', label: 'Expiry', width: 90 },
+        { key: 'days', label: 'Days Left', width: 80 },
+        { key: 'status', label: 'Status', width: 100 }
+      ]}
+      rows={items.map(r => ({
+        label: <Text style={{ fontSize: 12, fontWeight: '700', color: C.navy }}>{r.label}</Text>,
+        detail: r.detail,
+        expiry: fmtDate(r.expiry),
+        days: r.days == null ? '—' : String(r.days),
+        status: renewalStatus(r.days)
+      }))}
+    />
+  );
+}
+
 export function confirmDo(msg, onYes) {
   Alert.alert('Confirm', msg, [
     { text: 'Cancel', style: 'cancel' },
@@ -117,8 +191,13 @@ export function confirmDo(msg, onYes) {
 /* ---------- generic modal form ----------
    form = { title, fields:[{key,label,type:'text'|'number'|'date'|'select'|'multiline',options:[{v,l}],required,hint,value}], onSubmit(values) }
 */
+/* Matches the HTML's #modalwrap/#modal: centered card, max-width 640, radius 12,
+   padding 22/24, h3 title with amber underline, .frm 2-col field grid (collapsing to
+   1 col under 860px per the HTML's own media query), .modalbtns Cancel/Save pair. */
 export function ModalForm({ form, onClose }) {
   const [vals, setVals] = useState({});
+  const { width } = useWindowDimensions();
+  const oneCol = width <= 860;
   useEffect(() => {
     if (form) {
       const o = {};
@@ -139,51 +218,59 @@ export function ModalForm({ form, onClose }) {
   };
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(10,31,56,0.55)', justifyContent: 'flex-end' }}>
-        <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '88%' }}>
-          <View style={{ padding: 16, borderBottomWidth: 2, borderBottomColor: C.amber }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: C.navy }}>{form.title}</Text>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(10,31,56,0.55)', alignItems: 'center', paddingVertical: 40, paddingHorizontal: 16 }}>
+        <TouchableOpacity accessible={false} activeOpacity={1} onPress={onClose} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+        <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 0, width: '100%', maxWidth: 640, maxHeight: '100%', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10 }}>
+          <View style={{ paddingHorizontal: 24, paddingTop: 22 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: C.navy, borderBottomWidth: 2, borderBottomColor: C.amber, paddingBottom: 8 }}>
+              {form.title}
+            </Text>
           </View>
-          <ScrollView style={{ paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled">
-            {form.fields.map(f => (
-              <View key={f.key} style={{ marginTop: 12 }}>
-                <Text style={{ fontSize: 10.5, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 5 }}>
-                  {f.label}{f.required ? ' *' : ''}
-                </Text>
-                {f.type === 'select' ? (
-                  <View style={S.wrapRow}>
-                    {(f.options || []).map(o => (
-                      <TouchableOpacity key={String(o.v)} onPress={() => set(f.key, String(o.v))} style={{
-                        backgroundColor: String(vals[f.key]) === String(o.v) ? C.navy2 : '#fff',
-                        borderWidth: 1, borderColor: String(vals[f.key]) === String(o.v) ? C.navy2 : C.line2,
-                        borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 4
-                      }}>
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: String(vals[f.key]) === String(o.v) ? '#fff' : C.txt }}>{o.l}</Text>
-                      </TouchableOpacity>
-                    ))}
+          <ScrollView style={{ paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 16 }}>
+              {form.fields.map(f => {
+                const full = oneCol || f.full || f.type === 'multiline';
+                return (
+                  <View key={f.key} style={{ width: full ? '100%' : '48%', marginBottom: 12 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: C.mut, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
+                      {f.label}{f.required ? ' *' : ''}
+                    </Text>
+                    {f.type === 'select' ? (
+                      <View style={[S.wrapRow, { borderWidth: 1, borderColor: C.line2, borderRadius: 7, padding: 6, backgroundColor: '#fff' }]}>
+                        {(f.options || []).map(o => (
+                          <TouchableOpacity key={String(o.v)} onPress={() => set(f.key, String(o.v))} style={{
+                            backgroundColor: String(vals[f.key]) === String(o.v) ? C.navy2 : '#fff',
+                            borderWidth: 1, borderColor: String(vals[f.key]) === String(o.v) ? C.navy2 : C.line2,
+                            borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 4
+                          }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: String(vals[f.key]) === String(o.v) ? '#fff' : C.txt }}>{o.l}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : (
+                      <TextInput
+                        value={vals[f.key] || ''}
+                        onChangeText={t => set(f.key, t)}
+                        placeholder={f.type === 'date' ? 'YYYY-MM-DD' : ''}
+                        placeholderTextColor={C.line2}
+                        keyboardType={f.type === 'number' ? 'numeric' : 'default'}
+                        multiline={f.type === 'multiline'}
+                        style={{
+                          borderWidth: 1, borderColor: C.line2, borderRadius: 7, paddingHorizontal: 10,
+                          paddingVertical: 8, fontSize: 13, color: C.txt, backgroundColor: '#fff',
+                          minHeight: f.type === 'multiline' ? 60 : undefined
+                        }}
+                      />
+                    )}
+                    {f.hint ? <Text style={{ fontSize: 11, color: C.mut, marginTop: 3 }}>{f.hint}</Text> : null}
                   </View>
-                ) : (
-                  <TextInput
-                    value={vals[f.key] || ''}
-                    onChangeText={t => set(f.key, t)}
-                    placeholder={f.type === 'date' ? 'YYYY-MM-DD' : ''}
-                    placeholderTextColor={C.line2}
-                    keyboardType={f.type === 'number' ? 'numeric' : 'default'}
-                    multiline={f.type === 'multiline'}
-                    style={{
-                      borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 10,
-                      paddingVertical: 8, fontSize: 13.5, color: C.txt, backgroundColor: '#fff',
-                      minHeight: f.type === 'multiline' ? 60 : undefined
-                    }}
-                  />
-                )}
-                {f.hint ? <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 3 }}>{f.hint}</Text> : null}
-              </View>
-            ))}
-            <View style={{ height: 16 }} />
+                );
+              })}
+            </View>
+            <View style={{ height: 4 }} />
           </ScrollView>
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: C.line }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, padding: 22 }}>
             <Btn label="Cancel" tone="ghost" onPress={onClose} />
             <Btn label={form.submitLabel || 'Save'} tone="amber" onPress={submit} />
           </View>

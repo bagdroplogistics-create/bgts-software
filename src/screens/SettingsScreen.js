@@ -59,14 +59,14 @@ export default function SettingsScreen() {
           Data lives on this device (AsyncStorage). Export a JSON backup regularly — it is your off-device safety copy until the hosted multi-user backend is built.
         </Text>
         <View style={[S.wrapRow]}>
-          <Btn label="⬇ Export Backup" onPress={exportBackup} />
+          <Btn label="⬇ Export Backup (JSON)" onPress={exportBackup} />
           <Btn label="Erase ALL Data" tone="red" onPress={wipe} />
         </View>
         <Text style={{ fontSize: 10.5, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginTop: 14, marginBottom: 4 }}>Restore: paste backup JSON</Text>
         <TextInput value={paste} onChangeText={setPaste} multiline placeholder='{"company":{...}}' placeholderTextColor={C.line2}
           style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, padding: 10, fontSize: 11, color: C.txt, backgroundColor: '#fff', minHeight: 80 }} />
         <View style={{ marginTop: 8 }}>
-          <Btn label="Restore Backup" onPress={restore} />
+          <Btn label="⬆ Restore Backup" onPress={restore} />
         </View>
       </Card>
 

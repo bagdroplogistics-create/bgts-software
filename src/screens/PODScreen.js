@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, Table } from '../ui';
 import { inr, fmtDate, todayISO, byId } from '../logic';
 
 export default function PODScreen() {
@@ -67,47 +67,61 @@ export default function PODScreen() {
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
       <Card title={'Pending POD (' + pending.length + ') — photograph the signed copy against the move'}>
-        {!pending.length ? <Empty text="Nothing pending. Every move has its POD. 🏁" /> :
-          pending.map(l => (
-            <View key={l.id} style={{ borderBottomWidth: 1, borderBottomColor: C.line, paddingVertical: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>{l.lrNo} · {l.truckNo}</Text>
-              <Text style={{ fontSize: 11.5, color: C.mut, marginTop: 2 }}>
-                {fmtDate(l.date)} · {l.fromPlace} → {l.toPlace} · {(l.consignee || {}).name || '—'} · {inr(l.gross)}
-              </Text>
-              <View style={[S.wrapRow, { marginTop: 8 }]}>
-                <Btn small tone="amber" label="📷 Camera" onPress={() => capture(l, true)} />
-                <Btn small label="🖼 Gallery" onPress={() => capture(l, false)} />
-                <Btn small tone="ghost" label="Mark w/o file" onPress={() => markNoFile(l)} />
-              </View>
-            </View>
-          ))}
+        {!pending.length ? <Empty text="Nothing pending. Every move has its POD. 🏁" /> : (
+          <Table
+            cols={[
+              { key: 'lrNo', label: 'LR No', width: 100 },
+              { key: 'date', label: 'Date', width: 80 },
+              { key: 'truck', label: 'Truck', width: 90 },
+              { key: 'route', label: 'Route', width: 150 },
+              { key: 'consignee', label: 'Consignee', width: 140 },
+              { key: 'gross', label: 'Gross', width: 90 },
+              { key: 'actions', label: 'Actions', width: 260 }
+            ]}
+            rows={pending.map(l => ({
+              lrNo: <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{l.lrNo}</Text>,
+              date: fmtDate(l.date),
+              truck: l.truckNo,
+              route: l.fromPlace + ' → ' + l.toPlace,
+              consignee: (l.consignee || {}).name || '—',
+              gross: inr(l.gross),
+              actions: (
+                <View style={S.wrapRow}>
+                  <Btn small tone="amber" label="📷 Camera" onPress={() => capture(l, true)} />
+                  <Btn small label="🖼 Gallery" onPress={() => capture(l, false)} />
+                  <Btn small tone="ghost" label="Mark w/o file" onPress={() => markNoFile(l)} />
+                </View>
+              )
+            }))}
+          />
+        )}
       </Card>
 
       <Card title={'POD Received (' + done.length + ')'}>
-        {!done.length ? <Empty text="No PODs recorded yet." /> :
-          done.slice(0, 40).map(l => (
-            <View key={l.id} style={{ borderBottomWidth: 1, borderBottomColor: C.line, paddingVertical: 8 }}>
-              <View style={[S.row, { justifyContent: 'space-between' }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>{l.lrNo}</Text>
-                  <Text style={{ fontSize: 11.5, color: C.mut }}>
-                    {fmtDate(l.podDate || l.date)} · {l.podReceiver || '—'} · {l.fromPlace} → {l.toPlace}
-                  </Text>
-                </View>
-                {l.podFileUri ? (
-                  <View style={S.wrapRow}>
-                    <Image source={{ uri: l.podFileUri }} style={{ width: 46, height: 46, borderRadius: 6, borderWidth: 1, borderColor: C.line2 }} />
-                    <Btn small tone="ghost" label="Share" onPress={() => sharePod(l)} />
-                  </View>
-                ) : (
-                  <View style={S.wrapRow}>
-                    <Badge text="NO FILE" tone="amber" />
-                    <Btn small tone="ghost" label="+ Add" onPress={() => capture(l, false)} />
-                  </View>
-                )}
-              </View>
-            </View>
-          ))}
+        {!done.length ? <Empty text="No PODs recorded yet." /> : (
+          <Table
+            cols={[
+              { key: 'lrNo', label: 'LR No', width: 100 },
+              { key: 'podDate', label: 'POD Date', width: 90 },
+              { key: 'receiver', label: 'Receiver', width: 130 },
+              { key: 'route', label: 'Route', width: 150 },
+              { key: 'file', label: 'File', width: 60 },
+              { key: 'actions', label: '', width: 100 }
+            ]}
+            rows={done.slice(0, 40).map(l => ({
+              lrNo: <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{l.lrNo}</Text>,
+              podDate: fmtDate(l.podDate || l.date),
+              receiver: l.podReceiver || '—',
+              route: l.fromPlace + ' → ' + l.toPlace,
+              file: l.podFileUri
+                ? <Image source={{ uri: l.podFileUri }} style={{ width: 40, height: 40, borderRadius: 6, borderWidth: 1, borderColor: C.line2 }} />
+                : <Badge text="NO FILE" tone="amber" />,
+              actions: l.podFileUri
+                ? <Btn small tone="ghost" label="Share" onPress={() => sharePod(l)} />
+                : <Btn small tone="ghost" label="+ Add" onPress={() => capture(l, false)} />
+            }))}
+          />
+        )}
       </Card>
       <ModalForm form={form} onClose={() => setForm(null)} />
     </ScrollView>

@@ -32,6 +32,9 @@ export function waLink(phone, msg){
   const p = String(phone || '').replace(/[^0-9]/g, '');
   return 'https://wa.me/' + p + '?text=' + encodeURIComponent(msg);
 }
+export function mailLink(to, subj, body){
+  return 'mailto:' + encodeURIComponent(to || '') + '?subject=' + encodeURIComponent(subj || '') + '&body=' + encodeURIComponent(body || '');
+}
 export function csvString(rows){
   const cell = v => {
     v = String(v == null ? '' : v);

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Kpi, Btn, Empty } from '../ui';
+import { C, S, Card, Kpi, Btn, Empty, Table } from '../ui';
 import { inr, sum } from '../logic';
 
 export default function BackupScreen() {
@@ -28,12 +28,20 @@ export default function BackupScreen() {
         <Kpi label="Total Value" value={inr(total)} sub="archived billing value" tone="green" />
       </View>
       <Card title="Company-wise Summary">
-        {Object.keys(comps).sort((a, b) => comps[b].total - comps[a].total).map(k => (
-          <View key={k} style={[S.row, { justifyContent: 'space-between', marginBottom: 6 }]}>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: C.txt, flex: 1 }}>{k}</Text>
-            <Text style={{ fontSize: 12, fontWeight: '800', color: C.navy }}>{comps[k].bills} · {inr(comps[k].total)}</Text>
-          </View>
-        ))}
+        {!Object.keys(comps).length ? <Empty text="No archive data yet." /> : (
+          <Table
+            cols={[
+              { key: 'company', label: 'Company', width: 200 },
+              { key: 'bills', label: 'Bills', width: 80 },
+              { key: 'total', label: 'Total Billed', width: 110 }
+            ]}
+            rows={Object.keys(comps).sort((a, b) => comps[b].total - comps[a].total).map(k => ({
+              company: <Text style={{ fontWeight: '700', color: C.navy }}>{k}</Text>,
+              bills: comps[k].bills,
+              total: <Text style={{ fontWeight: '800', color: C.navy }}>{inr(comps[k].total)}</Text>
+            }))}
+          />
+        )}
       </Card>
       <Card title="Search Archive">
         <Text style={{ fontSize: 11, color: C.mut, marginBottom: 8 }}>
@@ -42,34 +50,57 @@ export default function BackupScreen() {
         <TextInput value={q} onChangeText={setQ} placeholder="Search LR no or company, e.g. BRD/06452 or RAJKOT…" placeholderTextColor={C.mut}
           style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, backgroundColor: '#fff', marginBottom: 10 }} />
         {hits ? (
-          !hits.length ? <Empty text={'No LR matching "' + q + '".'} /> :
-            hits.slice(0, 40).map((x, i) => (
-              <View key={i} style={{ marginBottom: 7 }}>
-                <View style={[S.row, { justifyContent: 'space-between' }]}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{x.lr}</Text>
-                  <Text style={{ fontSize: 12, color: C.txt }}>{inr(x.amt)} · {x.bill}</Text>
-                </View>
-                {x.client ? <Text style={{ fontSize: 10.5, color: C.mut }}>{x.client}</Text> : null}
+          !hits.length ? <Empty text={'No LR matching "' + q + '".'} /> : (
+            <Table
+              cols={[
+                { key: 'lr', label: 'LR No', width: 120 },
+                { key: 'amt', label: 'Amount', width: 100 },
+                { key: 'bill', label: 'Bill', width: 100 },
+                { key: 'client', label: 'Client', width: 160 }
+              ]}
+              rows={hits.slice(0, 40).map((x, i) => ({
+                lr: <Text style={{ fontWeight: '700', color: C.navy }}>{x.lr}</Text>,
+                amt: inr(x.amt),
+                bill: x.bill,
+                client: x.client || '—'
+              }))}
+            />
+          )
+        ) : !bb.length ? <Empty text="No archive data yet." /> : (
+          <>
+            <Table
+              cols={[
+                { key: 'bill', label: 'Bill No / Company', width: 220 },
+                { key: 'lines', label: 'LR Lines', width: 80 },
+                { key: 'total', label: 'Total', width: 100 },
+                { key: 'actions', label: '', width: 90 }
+              ]}
+              rows={bb.map((g, i) => ({
+                bill: (
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>
+                    {g.no} · {(g.client || '').slice(0, 22)}{g.client && g.client.length > 22 ? '…' : ''}
+                  </Text>
+                ),
+                lines: g.lines.length,
+                total: <Text style={{ fontWeight: '800', color: C.navy }}>{inr(g.total)}</Text>,
+                actions: <Btn small tone="ghost" label={open === i ? 'Hide' : 'Lines'} onPress={() => setOpen(open === i ? null : i)} />
+              }))}
+            />
+            {open != null && bb[open] ? (
+              <View style={{ marginTop: 10 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 6 }}>
+                  {bb[open].no} — LR Lines
+                </Text>
+                <Table
+                  cols={[
+                    { key: 'lr', label: 'LR No', width: 160 },
+                    { key: 'amount', label: 'Amount', width: 120 }
+                  ]}
+                  rows={bb[open].lines.map((x, j) => ({ lr: x[0], amount: inr(x[1]) }))}
+                />
               </View>
-            ))
-        ) : (
-          bb.map((g, i) => (
-            <View key={g.no} style={{ borderBottomWidth: 1, borderBottomColor: C.line, paddingVertical: 6 }}>
-              <View style={[S.row, { justifyContent: 'space-between' }]}>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy, flex: 1 }}>{g.no} · {(g.client || '').slice(0, 22)}{g.client && g.client.length > 22 ? '…' : ''} · {g.lines.length} LRs</Text>
-                <View style={S.wrapRow}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: C.navy }}>{inr(g.total)}</Text>
-                  <Btn small tone="ghost" label={open === i ? 'Hide' : 'Lines'} onPress={() => setOpen(open === i ? null : i)} />
-                </View>
-              </View>
-              {open === i ? g.lines.map((x, j) => (
-                <View key={j} style={[S.row, { justifyContent: 'space-between', paddingLeft: 10, marginTop: 3 }]}>
-                  <Text style={{ fontSize: 11.5, color: C.txt }}>{x[0]}</Text>
-                  <Text style={{ fontSize: 11.5, color: C.txt }}>{inr(x[1])}</Text>
-                </View>
-              )) : null}
-            </View>
-          ))
+            ) : null}
+          </>
         )}
       </Card>
     </ScrollView>

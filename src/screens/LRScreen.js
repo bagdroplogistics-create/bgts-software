@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, Alert } from 'react-native';
+import { View, Text, ScrollView, Alert } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
 import {
-  uid, inr, fmtDate, todayISO, byId, removeById, lrHtml, vendorName,
+  uid, inr, fmtDate, todayISO, byId, removeById, lrHtml, vendorName, csvString,
   lrHireBalance, lrTripExpTotal, truckToVehicleId, TRIP_EXP_CATS
 } from '../logic';
 
@@ -13,6 +14,17 @@ export default function LRScreen({ navigation }) {
   const { db, update } = useStore();
   const [form, setForm] = useState(null);
   const list = db.lrs.slice().reverse();
+
+  const exportCsv = async () => {
+    try {
+      const rows = [['LR No', 'Type', 'Date', 'Truck', 'From', 'To', 'Booking Branch', 'Consignor', 'Consignee', 'Billing Party', 'Pay Terms', 'E-Way Bill', 'A Weight', 'C Weight', 'Sub Total', 'IGST', 'CGST', 'SGST', 'Gross', 'POD']];
+      db.lrs.forEach(l => rows.push([l.lrNo, l.lrType, l.date, l.truckNo, l.fromPlace, l.toPlace, l.bookingBranch, (l.consignor || {}).name, (l.consignee || {}).name, l.billingParty, l.payTerms, l.ewayBillNo, l.aWeight, l.cWeight, l.subTotal, l.igstAmt, l.cgstAmt, l.sgstAmt, l.gross, l.pod ? 'Yes' : 'No']));
+      const uri = FileSystem.cacheDirectory + 'BGTS_LR_Register.csv';
+      await FileSystem.writeAsStringAsync(uri, csvString(rows));
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'BGTS_LR_Register.csv' });
+      else Alert.alert('Saved', uri);
+    } catch (e) { Alert.alert('Error', String(e.message || e)); }
+  };
 
   const sharePdf = async (l) => {
     try {
@@ -85,59 +97,74 @@ export default function LRScreen({ navigation }) {
     });
   };
 
-  const renderItem = ({ item: l }) => {
+  const lrRow = (l) => {
     const hired = l.ownership === 'Hired';
     const bal = hired ? lrHireBalance(l) : 0;
     const te = !hired ? lrTripExpTotal(l) : 0;
-    return (
-      <Card>
-        <View style={[S.row, { justifyContent: 'space-between', marginBottom: 4 }]}>
-          <Text style={S.h1}>{l.lrNo}</Text>
-          <View style={S.wrapRow}>
-            <Badge text={hired ? 'HIRED' : 'OWNED'} tone={hired ? 'purple' : 'navy'} />
-            <Badge text={l.lrType} tone={l.lrType === 'DUMMY' ? 'amber' : 'green'} />
-            {l.pod ? <Badge text="POD ✓" tone="green" /> : <Badge text="POD Pending" tone="red" />}
-          </View>
+    return {
+      lrNo: (
+        <View>
+          <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{l.lrNo}</Text>
+          <Badge text={hired ? 'HIRED' : 'OWNED'} tone={hired ? 'purple' : 'navy'} />
         </View>
-        <Text style={{ fontSize: 12.5, color: C.txt, fontWeight: '600' }}>
-          {fmtDate(l.date)} · {l.truckNo} · {l.fromPlace} → {l.toPlace}
+      ),
+      type: <Badge text={l.lrType} tone={l.lrType === 'DUMMY' ? 'amber' : 'green'} />,
+      date: fmtDate(l.date),
+      truck: l.truckNo,
+      route: l.fromPlace + ' → ' + l.toPlace,
+      parties: ((l.consignor || {}).name || '—') + ' → ' + ((l.consignee || {}).name || '—') + '\n' + l.payTerms,
+      gross: <Text style={{ fontWeight: '800', color: C.navy }}>{inr(l.gross)}</Text>,
+      hireOrExp: hired ? (
+        <Text style={{ fontSize: 11.5, color: C.mut }}>
+          {vendorName(db, (l.hire || {}).vendorId)} · Hire {inr((l.hire || {}).amount)}{'\n'}<Text style={{ fontWeight: '800', color: bal > 0 ? C.red : C.green }}>Bal {inr(bal)}</Text>
         </Text>
-        <Text style={{ fontSize: 11.5, color: C.mut, marginTop: 2 }}>
-          {(l.consignor || {}).name || '—'} → {(l.consignee || {}).name || '—'} · {l.payTerms}
+      ) : (
+        <Text style={{ fontSize: 11.5, color: C.mut }}>
+          {(l.tripExpenses && l.tripExpenses.length) ? l.tripExpenses.length + ' trip exp · ' + inr(te) : 'no trip exp yet'}
         </Text>
-        <View style={[S.wrapRow, { marginTop: 4 }]}>
-          <Text style={{ fontSize: 14, fontWeight: '800', color: C.navy }}>{inr(l.gross)}</Text>
-          {hired ? (
-            <Text style={{ fontSize: 11.5, color: C.mut }}>
-              · {vendorName(db, (l.hire || {}).vendorId)} · Hire {inr((l.hire || {}).amount)} · <Text style={{ fontWeight: '800', color: bal > 0 ? C.red : C.green }}>Bal {inr(bal)}</Text>
-            </Text>
-          ) : (
-            <Text style={{ fontSize: 11.5, color: C.mut }}>
-              {(l.tripExpenses && l.tripExpenses.length) ? '· ' + l.tripExpenses.length + ' trip exp · ' + inr(te) : '· no trip exp yet'}
-            </Text>
-          )}
-        </View>
-        <View style={[S.wrapRow, { marginTop: 10 }]}>
+      ),
+      pod: l.pod ? <Badge text="POD ✓" tone="green" /> : <Badge text="POD Pending" tone="red" />,
+      actions: (
+        <View style={S.wrapRow}>
           {hired && bal > 0 ? <Btn small tone="green" label="+ Hire Pay" onPress={() => addHirePay(l)} /> : null}
           {!hired ? <Btn small label="+ Trip Exp" onPress={() => addTripExp(l)} /> : null}
-          <Btn small tone="ghost" label="Share PDF" onPress={() => sharePdf(l)} />
+          <Btn small tone="ghost" label="Print" onPress={() => sharePdf(l)} />
           <Btn small tone="ghost" label="Edit" onPress={() => navigation.navigate('LRForm', { lrId: l.id })} />
           {!l.pod ? <Btn small tone="green" label="POD ✓" onPress={() => markPOD(l)} /> : null}
           <Btn small tone="red" label="✕" onPress={() => del(l)} />
         </View>
-      </Card>
-    );
+      )
+    };
   };
 
   return (
     <View style={S.screen}>
       <View style={{ padding: 14, paddingBottom: 6, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-        <Btn label="⬆ Import CSV" onPress={() => navigation.navigate('LRImport')} />
+        <Btn label="Export CSV" tone="ghost" onPress={exportCsv} />
+        <Btn label="⬆ Import CSV / Excel" onPress={() => navigation.navigate('LRImport')} />
         <Btn label="+ ADD NEW LR" tone="amber" onPress={() => navigation.navigate('LRForm', {})} />
       </View>
-      <FlatList data={list} keyExtractor={l => l.id} renderItem={renderItem}
-        contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}
-        ListEmptyComponent={<Empty text="No LRs yet. Tap + ADD NEW LR." />} />
+      <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
+        <Card>
+          {!list.length ? <Empty text="No LRs yet. Tap + ADD NEW LR." /> : (
+            <Table
+              cols={[
+                { key: 'lrNo', label: 'LR No', width: 100 },
+                { key: 'type', label: 'Type', width: 80 },
+                { key: 'date', label: 'Date', width: 80 },
+                { key: 'truck', label: 'Truck', width: 90 },
+                { key: 'route', label: 'Route', width: 150 },
+                { key: 'parties', label: 'Consignor → Consignee', width: 190 },
+                { key: 'gross', label: 'Gross', width: 90 },
+                { key: 'hireOrExp', label: 'Hire / Trip Exp', width: 150 },
+                { key: 'pod', label: 'POD', width: 110 },
+                { key: 'actions', label: 'Actions', width: 320 }
+              ]}
+              rows={list.map(lrRow)}
+            />
+          )}
+        </Card>
+      </ScrollView>
       <ModalForm form={form} onClose={() => setForm(null)} />
     </View>
   );

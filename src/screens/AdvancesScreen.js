@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
 import { uid, inr, fmtDate, todayISO, daysSince, byId, removeById, driverName, sum } from '../logic';
 
 export default function AdvancesScreen() {
@@ -50,29 +50,41 @@ export default function AdvancesScreen() {
         </Text>
         <Btn label="+ New Advance" tone="amber" onPress={addAdvance} />
       </View>
-      {!list.length ? <Card><Empty text="No driver advances recorded." /></Card> :
-        list.map(a => {
-          const open = (Number(a.amount) || 0) - (Number(a.settledAmount) || 0);
-          const age = daysSince(a.date);
-          return (
-            <Card key={a.id}>
-              <View style={[S.row, { justifyContent: 'space-between', marginBottom: 4 }]}>
-                <Text style={S.h1}>{driverName(db, a.driverId)}</Text>
-                <Badge text={open <= 0 ? 'SETTLED' : age > 10 ? 'OPEN ' + age + 'd ⚑' : 'OPEN'} tone={open <= 0 ? 'green' : age > 10 ? 'red' : 'amber'} />
-              </View>
-              <Text style={{ fontSize: 11.5, color: C.mut }}>
-                {fmtDate(a.date)} · {a.purpose || 'advance'} · Given {inr(a.amount)} · Settled {inr(a.settledAmount)}
-              </Text>
-              <Text style={{ fontSize: 13.5, fontWeight: '800', color: open > 0 ? C.red : C.green, marginTop: 4 }}>
-                Open: {inr(open)}
-              </Text>
-              <View style={[S.wrapRow, { marginTop: 8 }]}>
-                {open > 0 ? <Btn small tone="green" label="Settle" onPress={() => settle(a)} /> : null}
-                <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete this advance record?', () => update(d => removeById(d.advances, a.id)))} />
-              </View>
-            </Card>
-          );
-        })}
+      <Card>
+        {!list.length ? <Empty text="No driver advances recorded." /> : (
+          <Table
+            cols={[
+              { key: 'driver', label: 'Driver', width: 130 },
+              { key: 'date', label: 'Date', width: 80 },
+              { key: 'purpose', label: 'Purpose', width: 130 },
+              { key: 'given', label: 'Given', width: 90 },
+              { key: 'settled', label: 'Settled', width: 90 },
+              { key: 'open', label: 'Open', width: 90 },
+              { key: 'status', label: 'Status', width: 110 },
+              { key: 'actions', label: '', width: 150 }
+            ]}
+            rows={list.map(a => {
+              const open = (Number(a.amount) || 0) - (Number(a.settledAmount) || 0);
+              const age = daysSince(a.date);
+              return {
+                driver: <Text style={{ fontWeight: '700', color: C.navy }}>{driverName(db, a.driverId)}</Text>,
+                date: fmtDate(a.date),
+                purpose: a.purpose || 'advance',
+                given: inr(a.amount),
+                settled: inr(a.settledAmount),
+                open: <Text style={{ fontWeight: '800', color: open > 0 ? C.red : C.green }}>{inr(open)}</Text>,
+                status: <Badge text={open <= 0 ? 'SETTLED' : age > 10 ? 'OPEN ' + age + 'd ⚑' : 'OPEN'} tone={open <= 0 ? 'green' : age > 10 ? 'red' : 'amber'} />,
+                actions: (
+                  <View style={S.wrapRow}>
+                    {open > 0 ? <Btn small tone="green" label="Settle" onPress={() => settle(a)} /> : null}
+                    <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete this advance record?', () => update(d => removeById(d.advances, a.id)))} />
+                  </View>
+                )
+              };
+            })}
+          />
+        )}
+      </Card>
       <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 4 }}>
         Advances open beyond 10 days flag on the dashboard — the driver khata is where trip cash leaks.
       </Text>

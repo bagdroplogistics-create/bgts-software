@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
 import { uid, inr, fmtDate, todayISO, byId, removeById, branchName, vehicleReg, vendorName, inqPartyName } from '../logic';
 
 const FILTERS = ['ACTIVE', 'OPEN', 'CONFIRMED', 'CONVERTED', 'LOST', 'ALL'];
@@ -64,6 +64,40 @@ export default function InquiriesScreen({ navigation }) {
   });
   const setStatus = (q, st) => update(d => { const x = byId(d.inquiries, q.id); if (x) x.status = st; });
 
+  const inquiryRow = (q) => ({
+    inqNo: (
+      <View>
+        <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{q.inqNo}</Text>
+        <Text style={{ fontSize: 10, color: C.mut }}>{branchName(db, q.branchId)}</Text>
+      </View>
+    ),
+    date: fmtDate(q.date),
+    party: inqPartyName(db, q),
+    route: (q.fromPlace || '?') + ' → ' + (q.toPlace || '?'),
+    vehicleNeeded: (q.vehicleType || '—') + (q.weightMT ? ' · ' + q.weightMT + ' MT' : ''),
+    expected: q.expectedDate ? fmtDate(q.expectedDate) : '—',
+    rateQuoted: q.rateQuoted ? inr(q.rateQuoted) : '—',
+    placedWith: q.assignType === 'Owned' && q.assignedVehicleId ? <Text style={{ fontSize: 12 }}><Badge text="OWN" tone="navy" /> {vehicleReg(db, q.assignedVehicleId)}</Text>
+      : q.assignType === 'Hired' ? <Text style={{ fontSize: 12 }}><Badge text="HIRE" tone="purple" /> {vendorName(db, q.assignedVendorId)}{q.assignedTruckNo ? ' · ' + q.assignedTruckNo : ''}</Text>
+      : <Text style={{ fontSize: 11, color: C.mut }}>No vehicle planned</Text>,
+    status: <Badge text={q.status} tone={q.status === 'CONVERTED' ? 'green' : q.status === 'LOST' ? 'red' : q.status === 'CONFIRMED' ? 'amber' : 'purple'} />,
+    actions: (
+      <View style={S.wrapRow}>
+        {(q.status === 'OPEN' || q.status === 'CONFIRMED') ? (<>
+          <Btn small label={q.assignType ? 'Re-plan' : 'Plan Vehicle'} onPress={() => planVehicle(q)} />
+          <Btn small tone="amber" label="→ LR" onPress={() => navigation.navigate('LRForm', { inquiryId: q.id })} />
+          <Btn small tone="ghost" label="Edit" onPress={() => editInquiry(q)} />
+          <Btn small tone="ghost" label="Lost" onPress={() => setStatus(q, 'LOST')} />
+        </>) : q.status === 'LOST' ? (
+          <Btn small tone="ghost" label="Reopen" onPress={() => setStatus(q, 'OPEN')} />
+        ) : (
+          <Btn small tone="ghost" label="View LR" onPress={() => navigation.navigate('LR')} />
+        )}
+        <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete ' + q.inqNo + '?', () => update(d => removeById(d.inquiries, q.id)))} />
+      </View>
+    )
+  });
+
   return (
     <View style={S.screen}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 14, paddingBottom: 6 }}>
@@ -76,42 +110,28 @@ export default function InquiriesScreen({ navigation }) {
           </TouchableOpacity>
         ))}
         <View style={{ flex: 1 }} />
-        <Btn small label="+ New" tone="amber" onPress={newInquiry} />
+        <Btn small label="+ New Inquiry" tone="amber" onPress={newInquiry} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
-        {!list.length ? <Card><Empty text="No inquiries here. Every job starts as an inquiry — capture what you have, plan a vehicle, convert to LR." /></Card> :
-          list.map(q => (
-            <Card key={q.id}>
-              <View style={[S.row, { justifyContent: 'space-between', marginBottom: 4 }]}>
-                <Text style={S.h1}>{q.inqNo} · {inqPartyName(db, q)}</Text>
-                <Badge text={q.status} tone={q.status === 'CONVERTED' ? 'green' : q.status === 'LOST' ? 'red' : q.status === 'CONFIRMED' ? 'amber' : 'purple'} />
-              </View>
-              <Text style={{ fontSize: 12, color: C.txt }}>
-                {fmtDate(q.date)} · {branchName(db, q.branchId)} · {(q.fromPlace || '?') + ' → ' + (q.toPlace || '?')}
-                {q.vehicleType ? ' · ' + q.vehicleType : ''}{q.weightMT ? ' · ' + q.weightMT + ' MT' : ''}
-              </Text>
-              <Text style={{ fontSize: 11.5, color: C.mut, marginTop: 2 }}>
-                {q.expectedDate ? 'Loads ' + fmtDate(q.expectedDate) + ' · ' : ''}
-                {q.rateQuoted ? 'Quoted ' + inr(q.rateQuoted) + ' · ' : ''}
-                {q.assignType === 'Owned' && q.assignedVehicleId ? 'Placed: OWN ' + vehicleReg(db, q.assignedVehicleId)
-                  : q.assignType === 'Hired' ? 'Placed: HIRE ' + vendorName(db, q.assignedVendorId) + (q.assignedTruckNo ? ' · ' + q.assignedTruckNo : '')
-                  : 'No vehicle planned'}
-              </Text>
-              <View style={[S.wrapRow, { marginTop: 10 }]}>
-                {(q.status === 'OPEN' || q.status === 'CONFIRMED') ? (<>
-                  <Btn small label={q.assignType ? 'Re-plan' : 'Plan Vehicle'} onPress={() => planVehicle(q)} />
-                  <Btn small tone="amber" label="→ LR" onPress={() => navigation.navigate('LRForm', { inquiryId: q.id })} />
-                  <Btn small tone="ghost" label="Edit" onPress={() => editInquiry(q)} />
-                  <Btn small tone="ghost" label="Lost" onPress={() => setStatus(q, 'LOST')} />
-                </>) : q.status === 'LOST' ? (
-                  <Btn small tone="ghost" label="Reopen" onPress={() => setStatus(q, 'OPEN')} />
-                ) : (
-                  <Btn small tone="ghost" label="View LRs" onPress={() => navigation.navigate('LR')} />
-                )}
-                <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete ' + q.inqNo + '?', () => update(d => removeById(d.inquiries, q.id)))} />
-              </View>
-            </Card>
-          ))}
+        <Card>
+          {!list.length ? <Empty text="No inquiries here. Every job starts as an inquiry — capture what you have, plan a vehicle, convert to LR." /> : (
+            <Table
+              cols={[
+                { key: 'inqNo', label: 'Inq No', width: 110 },
+                { key: 'date', label: 'Date', width: 80 },
+                { key: 'party', label: 'Party', width: 140 },
+                { key: 'route', label: 'Route', width: 150 },
+                { key: 'vehicleNeeded', label: 'Vehicle Needed', width: 130 },
+                { key: 'expected', label: 'Expected', width: 80 },
+                { key: 'rateQuoted', label: 'Rate Quoted', width: 100 },
+                { key: 'placedWith', label: 'Placed With', width: 140 },
+                { key: 'status', label: 'Status', width: 100 },
+                { key: 'actions', label: 'Actions', width: 340 }
+              ]}
+              rows={list.map(inquiryRow)}
+            />
+          )}
+        </Card>
       </ScrollView>
       <ModalForm form={form} onClose={() => setForm(null)} />
     </View>

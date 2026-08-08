@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
 import { uid, fmtDate, daysTo, driverName, byId, removeById } from '../logic';
 
 const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['routes', 'Routes'], ['branches', 'Branches']];
+const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', drivers: '+ Add Driver', vendors: '+ Add Vendor', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
 
 export default function MastersScreen() {
   const { db, update } = useStore();
@@ -69,16 +70,9 @@ export default function MastersScreen() {
   const editDriver = (dd) => setForm({ title: 'Edit Driver', fields: driverFields(dd), onSubmit: v => update(d => { const x = byId(d.drivers, dd.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendor = (vv) => setForm({ title: 'Edit Vendor', fields: vendorFields(vv), onSubmit: v => update(d => { const x = byId(d.vendors, vv.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
 
-  const Row = ({ title, sub, onEdit, onDel, badge }) => (
-    <View style={[S.row, { justifyContent: 'space-between', marginBottom: 9 }]}>
-      <View style={{ flex: 1 }}>
-        <View style={S.wrapRow}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>{title}</Text>
-          {badge}
-        </View>
-        {sub ? <Text style={{ fontSize: 11, color: C.mut }}>{sub}</Text> : null}
-      </View>
-      {onEdit ? <Btn small tone="ghost" label="Edit" onPress={onEdit} style={{ marginRight: 6 }} /> : null}
+  const rowActions = (onEdit, onDel) => (
+    <View style={S.wrapRow}>
+      {onEdit ? <Btn small tone="ghost" label="Edit" onPress={onEdit} /> : null}
       <Btn small tone="red" label="✕" onPress={onDel} />
     </View>
   );
@@ -95,43 +89,136 @@ export default function MastersScreen() {
           </TouchableOpacity>
         ))}
         <View style={{ flex: 1 }} />
-        <Btn small label="+ Add" tone="amber" onPress={add} />
+        <Btn small label={ADD_LABEL[tab] || '+ Add'} tone="amber" onPress={add} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
         <Card>
-          {tab === 'clients' && (!db.clients.length ? <Empty text="No clients." /> : db.clients.map(c => (
-            <Row key={c.id} title={c.name} sub={(c.gstin || 'no GSTIN') + ' · ' + (c.phone || 'no phone') + ' · credit ' + (c.creditDays || '—') + 'd'}
-              onEdit={() => editClient(c)} onDel={() => confirmDo('Delete client?', () => update(d => removeById(d.clients, c.id)))} />
-          )))}
-          {tab === 'vehicles' && (!db.vehicles.length ? <Empty text="No vehicles." /> : db.vehicles.map(v => (
-            <Row key={v.id} title={v.regNo} sub={(v.make || '—') + ' · ' + (v.type || '—') + ' · driver: ' + driverName(db, v.driverId)}
-              badge={<Badge text={v.owned ? 'OWNED' : 'EMPANELLED'} tone={v.owned ? 'navy' : 'purple'} />}
-              onEdit={() => editVehicle(v)} onDel={() => confirmDo('Delete vehicle?', () => update(d => removeById(d.vehicles, v.id)))} />
-          )))}
-          {tab === 'drivers' && (!db.drivers.length ? <Empty text="No drivers." /> : db.drivers.map(dd => {
-            const dl = daysTo(dd.licExpiry);
-            return <Row key={dd.id} title={dd.name} sub={(dd.phone || 'no phone') + ' · lic ' + (dd.licNo || '—') + ' · exp ' + fmtDate(dd.licExpiry)}
-              badge={dl != null && dl <= 30 ? <Badge text={dl < 0 ? 'LIC EXPIRED' : 'LIC ' + dl + 'd'} tone="red" /> : null}
-              onEdit={() => editDriver(dd)} onDel={() => confirmDo('Delete driver?', () => update(d => removeById(d.drivers, dd.id)))} />;
-          }))}
-          {tab === 'vendors' && (!db.vendors.length ? <Empty text="No vendors." /> : db.vendors.map(v => (
-            <Row key={v.id} title={v.name} sub={(v.city || '—') + ' · ' + (v.phone || 'no phone') + ' · rating ' + (v.rating || '—')}
-              onEdit={() => editVendor(v)} onDel={() => confirmDo('Delete vendor?', () => update(d => removeById(d.vendors, v.id)))} />
-          )))}
-          {tab === 'routes' && (!db.routes.length ? <Empty text="No routes." /> : db.routes.map(r => (
-            <Row key={r.id} title={r.origin + ' → ' + r.destination} sub={(r.km || '—') + ' km'}
-              onDel={() => confirmDo('Delete route?', () => update(d => removeById(d.routes, r.id)))} />
-          )))}
-          {tab === 'branches' && (db.branches || []).map((bb, i) => (
-            <Row key={bb.id} title={bb.name} sub={(bb.entityName || 'company default') + (bb.gstin ? ' · ' + bb.gstin : '') + (bb.lrPrefix ? ' · ' + bb.lrPrefix : '')}
-              badge={i === 0 ? <Badge text="MAIN" tone="navy" /> : null}
-              onEdit={() => editBranch(bb)}
-              onDel={i === 0 ? () => Alert.alert('Protected', 'The main branch cannot be deleted.') : () => {
-                const used = db.lrs.some(l => l.branchId === bb.id) || db.bookings.some(b => b.branchId === bb.id);
-                if (used) { Alert.alert('In use', 'This branch has bookings/LRs tagged to it — reassign them first.'); return; }
-                confirmDo('Delete branch ' + bb.name + '?', () => update(d => removeById(d.branches, bb.id)));
-              }} />
+          {tab === 'clients' && (!db.clients.length ? <Empty text="No clients." /> : (
+            <Table
+              cols={[
+                { key: 'name', label: 'Name', width: 150 },
+                { key: 'gstin', label: 'GSTIN', width: 130 },
+                { key: 'phone', label: 'Phone (WA)', width: 120 },
+                { key: 'email', label: 'Email', width: 150 },
+                { key: 'credit', label: 'Credit Days', width: 90 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={db.clients.map(c => ({
+                name: <Text style={{ fontWeight: '700', color: C.navy }}>{c.name}</Text>,
+                gstin: c.gstin || 'no GSTIN',
+                phone: c.phone || 'no phone',
+                email: c.email || '—',
+                credit: (c.creditDays || '—') + 'd',
+                actions: rowActions(() => editClient(c), () => confirmDo('Delete client?', () => update(d => removeById(d.clients, c.id))))
+              }))}
+            />
           ))}
+          {tab === 'vehicles' && (!db.vehicles.length ? <Empty text="No vehicles." /> : (
+            <Table
+              cols={[
+                { key: 'regNo', label: 'Reg No', width: 110 },
+                { key: 'make', label: 'Make / Model', width: 150 },
+                { key: 'type', label: 'Type', width: 120 },
+                { key: 'owned', label: 'Ownership', width: 110 },
+                { key: 'gvw', label: 'GVW (kg)', width: 90 },
+                { key: 'driver', label: 'Default Driver', width: 130 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={db.vehicles.map(v => ({
+                regNo: <Text style={{ fontWeight: '700', color: C.navy }}>{v.regNo}</Text>,
+                make: v.make || '—',
+                type: v.type || '—',
+                owned: <Badge text={v.owned ? 'OWNED' : 'EMPANELLED'} tone={v.owned ? 'navy' : 'purple'} />,
+                gvw: v.gvw || '—',
+                driver: driverName(db, v.driverId),
+                actions: rowActions(() => editVehicle(v), () => confirmDo('Delete vehicle?', () => update(d => removeById(d.vehicles, v.id))))
+              }))}
+            />
+          ))}
+          {tab === 'drivers' && (!db.drivers.length ? <Empty text="No drivers." /> : (
+            <Table
+              cols={[
+                { key: 'name', label: 'Name', width: 140 },
+                { key: 'phone', label: 'Phone', width: 120 },
+                { key: 'licNo', label: 'Licence No.', width: 120 },
+                { key: 'licExpiry', label: 'Licence Expiry', width: 130 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={db.drivers.map(dd => {
+                const dl = daysTo(dd.licExpiry);
+                return {
+                  name: <Text style={{ fontWeight: '700', color: C.navy }}>{dd.name}</Text>,
+                  phone: dd.phone || 'no phone',
+                  licNo: dd.licNo || '—',
+                  licExpiry: dl != null && dl <= 30
+                    ? <Text>{fmtDate(dd.licExpiry)} <Badge text={dl < 0 ? 'EXPIRED' : dl + 'd'} tone="red" /></Text>
+                    : fmtDate(dd.licExpiry),
+                  actions: rowActions(() => editDriver(dd), () => confirmDo('Delete driver?', () => update(d => removeById(d.drivers, dd.id))))
+                };
+              })}
+            />
+          ))}
+          {tab === 'vendors' && (!db.vendors.length ? <Empty text="No vendors." /> : (
+            <Table
+              cols={[
+                { key: 'name', label: 'Name', width: 150 },
+                { key: 'phone', label: 'Phone', width: 120 },
+                { key: 'city', label: 'City', width: 120 },
+                { key: 'rating', label: 'Rating', width: 80 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={db.vendors.map(v => ({
+                name: <Text style={{ fontWeight: '700', color: C.navy }}>{v.name}</Text>,
+                phone: v.phone || 'no phone',
+                city: v.city || '—',
+                rating: v.rating || '—',
+                actions: rowActions(() => editVendor(v), () => confirmDo('Delete vendor?', () => update(d => removeById(d.vendors, v.id))))
+              }))}
+            />
+          ))}
+          {tab === 'routes' && (!db.routes.length ? <Empty text="No routes." /> : (
+            <Table
+              cols={[
+                { key: 'origin', label: 'Origin', width: 150 },
+                { key: 'destination', label: 'Destination', width: 150 },
+                { key: 'km', label: 'Distance (km)', width: 110 },
+                { key: 'actions', label: '', width: 80 }
+              ]}
+              rows={db.routes.map(r => ({
+                origin: <Text style={{ fontWeight: '700', color: C.navy }}>{r.origin}</Text>,
+                destination: r.destination,
+                km: r.km || '—',
+                actions: <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete route?', () => update(d => removeById(d.routes, r.id)))} />
+              }))}
+            />
+          ))}
+          {tab === 'branches' && (
+            <Table
+              cols={[
+                { key: 'branch', label: 'Branch', width: 130 },
+                { key: 'entity', label: 'Entity (prints on LR)', width: 170 },
+                { key: 'gstin', label: 'GSTIN', width: 130 },
+                { key: 'lrPrefix', label: 'LR Prefix', width: 110 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={(db.branches || []).map((bb, i) => ({
+                branch: (
+                  <View>
+                    <Text style={{ fontWeight: '700', color: C.navy }}>{bb.name}</Text>
+                    {i === 0 ? <Badge text="MAIN" tone="navy" /> : null}
+                  </View>
+                ),
+                entity: bb.entityName || 'company default',
+                gstin: bb.gstin || '—',
+                lrPrefix: bb.lrPrefix || '—',
+                actions: rowActions(() => editBranch(bb), i === 0 ? () => Alert.alert('Protected', 'The main branch cannot be deleted.') : () => {
+                  const used = db.lrs.some(l => l.branchId === bb.id) || db.bookings.some(b => b.branchId === bb.id);
+                  if (used) { Alert.alert('In use', 'This branch has bookings/LRs tagged to it — reassign them first.'); return; }
+                  confirmDo('Delete branch ' + bb.name + '?', () => update(d => removeById(d.branches, bb.id)));
+                })
+              }))}
+            />
+          )}
         </Card>
       </ScrollView>
       <ModalForm form={form} onClose={() => setForm(null)} />

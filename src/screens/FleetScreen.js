@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, KV, ModalForm, confirmDo } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
 import { uid, inr, sum, fmtDate, todayISO, vehicleReg, removeById } from '../logic';
 
 export default function FleetScreen() {
@@ -33,45 +33,74 @@ export default function FleetScreen() {
         <Btn label="+ Add Expense" tone="amber" onPress={addExpense} />
       </View>
 
-      {!owned.length ? <Card><Empty text="No owned vehicles. Add them in Masters → Vehicles." /></Card> :
-        owned.map(v => {
-          const trips = db.bookings.filter(b => b.vehicleId === v.id);
-          const rev = sum(trips, b => b.freight);
-          const ex = db.expenses.filter(e => e.vehicleId === v.id);
-          const fuel = sum(ex.filter(e => e.category === 'Fuel'), e => e.amount);
-          const maint = sum(ex.filter(e => e.category === 'Maintenance'), e => e.amount);
-          const other = sum(ex.filter(e => e.category !== 'Fuel' && e.category !== 'Maintenance'), e => e.amount);
-          const net = rev - fuel - maint - other;
-          const fp = rev > 0 ? Math.round(fuel / rev * 100) : 0;
-          const last = trips.length ? trips.map(b => b.date).sort().pop() : null;
-          return (
-            <Card key={v.id} title={v.regNo}>
-              <Text style={{ fontSize: 11, color: C.mut, marginTop: -8, marginBottom: 8 }}>{v.make}</Text>
-              <KV k="Trips" v={String(trips.length)} />
-              <KV k="Revenue" v={inr(rev)} />
-              <KV k="Fuel" v={inr(fuel) + (rev > 0 ? '  (' + fp + '% of revenue)' : '')} />
-              <KV k="Maintenance" v={inr(maint)} />
-              <KV k="Other expenses" v={inr(other)} />
-              <KV k="Last trip" v={last ? fmtDate(last) : '—'} />
-              <View style={[S.wrapRow, { marginTop: 8 }]}>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: net >= 0 ? C.green : C.red }}>Net: {inr(net)}</Text>
-                {rev > 0 ? <Badge text={'Fuel ' + fp + '%'} tone={fp > 32 ? 'red' : 'green'} /> : null}
-              </View>
-            </Card>
-          );
-        })}
+      <Card title="Owned Fleet">
+        {!owned.length ? <Empty text="No owned vehicles. Add them in Masters → Vehicles." /> : (
+          <Table
+            cols={[
+              { key: 'vehicle', label: 'Vehicle', width: 150 },
+              { key: 'trips', label: 'Trips', width: 60 },
+              { key: 'revenue', label: 'Revenue', width: 90 },
+              { key: 'fuel', label: 'Fuel', width: 90 },
+              { key: 'fuelPct', label: 'Fuel %', width: 70 },
+              { key: 'maint', label: 'Maint.', width: 90 },
+              { key: 'other', label: 'Other Exp', width: 90 },
+              { key: 'net', label: 'Net Contribution', width: 110 },
+              { key: 'last', label: 'Last Trip', width: 90 }
+            ]}
+            rows={owned.map(v => {
+              const trips = db.bookings.filter(b => b.vehicleId === v.id);
+              const rev = sum(trips, b => b.freight);
+              const ex = db.expenses.filter(e => e.vehicleId === v.id);
+              const fuel = sum(ex.filter(e => e.category === 'Fuel'), e => e.amount);
+              const maint = sum(ex.filter(e => e.category === 'Maintenance'), e => e.amount);
+              const other = sum(ex.filter(e => e.category !== 'Fuel' && e.category !== 'Maintenance'), e => e.amount);
+              const net = rev - fuel - maint - other;
+              const fp = rev > 0 ? Math.round(fuel / rev * 100) : 0;
+              const last = trips.length ? trips.map(b => b.date).sort().pop() : null;
+              return {
+                vehicle: (
+                  <View>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{v.regNo}</Text>
+                    <Text style={{ fontSize: 10, color: C.mut }}>{v.make}</Text>
+                  </View>
+                ),
+                trips: trips.length,
+                revenue: inr(rev),
+                fuel: inr(fuel),
+                fuelPct: rev > 0 ? <Badge text={fp + '%'} tone={fp > 32 ? 'red' : 'green'} /> : '—',
+                maint: inr(maint),
+                other: inr(other),
+                net: <Text style={{ fontWeight: '800', color: net >= 0 ? C.green : C.red }}>{inr(net)}</Text>,
+                last: last ? fmtDate(last) : '—'
+              };
+            })}
+          />
+        )}
+      </Card>
 
       <Card title="Expense Log">
-        {!db.expenses.length ? <Empty text="No expenses logged." /> :
-          db.expenses.slice().reverse().map(e => (
-            <View key={e.id} style={[S.row, { justifyContent: 'space-between', marginBottom: 8 }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{e.category} · {inr(e.amount)}</Text>
-                <Text style={{ fontSize: 11, color: C.mut }}>{vehicleReg(db, e.vehicleId)} · {fmtDate(e.date)}{e.litres ? ' · ' + e.litres + 'L' : ''}{e.notes ? ' · ' + e.notes : ''}</Text>
-              </View>
-              <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete expense entry?', () => update(d => removeById(d.expenses, e.id)))} />
-            </View>
-          ))}
+        {!db.expenses.length ? <Empty text="No expenses logged." /> : (
+          <Table
+            cols={[
+              { key: 'date', label: 'Date', width: 80 },
+              { key: 'vehicle', label: 'Vehicle', width: 100 },
+              { key: 'category', label: 'Category', width: 110 },
+              { key: 'amount', label: 'Amount', width: 90 },
+              { key: 'litres', label: 'Litres', width: 70 },
+              { key: 'notes', label: 'Notes', width: 150 },
+              { key: 'actions', label: '', width: 60 }
+            ]}
+            rows={db.expenses.slice().reverse().map(e => ({
+              date: fmtDate(e.date),
+              vehicle: vehicleReg(db, e.vehicleId),
+              category: e.category,
+              amount: <Text style={{ fontWeight: '700', color: C.navy }}>{inr(e.amount)}</Text>,
+              litres: e.litres || '—',
+              notes: e.notes || '—',
+              actions: <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete expense entry?', () => update(d => removeById(d.expenses, e.id)))} />
+            }))}
+          />
+        )}
       </Card>
       <ModalForm form={form} onClose={() => setForm(null)} />
     </ScrollView>

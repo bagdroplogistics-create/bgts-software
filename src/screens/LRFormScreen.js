@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useStore } from '../store';
 import { C, S, Card, Btn } from '../ui';
 import {
   uid, inr, todayISO, byId, blankLR, computeLR, clientName, vendorName,
-  truckToVehicleId, lrHireBalance, convertInquiryToLRDraft,
+  truckToVehicleId, lrHireBalance, convertInquiryToLRDraft, lrHtml,
   LR_CHG, PKG_TYPES, EXP_HEADS
 } from '../logic';
 
@@ -114,11 +116,12 @@ export default function LRFormScreen({ navigation, route }) {
     return { aw, cw };
   }, [f.goods]);
 
-  const save = () => {
+  const save = (andPrint) => {
     const req = [[f.truckNo, 'Truck No'], [f.lrNo, 'LR No'], [f.date, 'Date'], [f.fromPlace, 'From Place'], [f.toPlace, 'To Place'], [f.consignor.name, 'Consignor Name'], [f.consignee.name, 'Consignee Name']];
     for (const [v, l] of req) { if (!String(v || '').trim()) { Alert.alert('Missing field', l + ' is required.'); return; } }
     if (f.ownership === 'Hired' && !f.hire.vendorId) { Alert.alert('Missing field', 'Select the Hire Vendor for a Hired-vehicle LR (Masters → Vendors).'); return; }
     if (db.lrs.some(l => l.lrNo === f.lrNo && l.id !== f.id)) { Alert.alert('Duplicate', 'LR No ' + f.lrNo + ' already exists.'); return; }
+    let savedRec = null;
     update(d => {
       const rec = JSON.parse(JSON.stringify(f));
       rec.goods = rec.goods.filter(g => String(g.desc || '').trim());
@@ -164,7 +167,13 @@ export default function LRFormScreen({ navigation, route }) {
         const iq = byId(d.inquiries, params.inquiryId);
         if (iq) { iq.status = 'CONVERTED'; iq.lrId = rec.id; }
       }
+      savedRec = rec;
     });
+    if (andPrint && savedRec) {
+      Print.printToFileAsync({ html: lrHtml(db, savedRec) })
+        .then(({ uri }) => Sharing.isAvailableAsync().then(ok => { if (ok) Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: savedRec.lrNo }); }))
+        .catch(e => Alert.alert('PDF error', String(e.message || e)));
+    }
     navigation.goBack();
   };
 
@@ -307,7 +316,8 @@ export default function LRFormScreen({ navigation, route }) {
 
       <View style={[S.wrapRow, { justifyContent: 'flex-end', marginBottom: 30 }]}>
         <Btn label="Cancel" tone="ghost" onPress={() => navigation.goBack()} />
-        <Btn label="Save LR" tone="amber" onPress={save} />
+        <Btn label="Save LR" onPress={() => save(false)} />
+        <Btn label="Save & Print" tone="amber" onPress={() => save(true)} />
       </View>
     </ScrollView>
   );
