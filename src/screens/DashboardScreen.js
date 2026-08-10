@@ -104,10 +104,12 @@ export default function DashboardScreen({ navigation }) {
   const pendingInv = db.bookings.filter(b => b.status === 'Delivered' && !b.invoiceId).length;
   const podPending = db.lrs.filter(l => !l.pod).length;
   const flags = riskFlags(db);
+  const invoiced = sum(db.invoices, i => i.total);
 
   const kpis = [
+    { label: 'Total Revenue (Invoiced, All-Time)', value: inr(invoiced), sub: db.invoices.length + ' invoices raised', tone: 'green', onPress: () => navigation.navigate('Accounting') },
     { label: 'LR Revenue (' + R.label + ')', value: inr(lrGrossPeriod), sub: 'gross of LRs in period', tone: 'green', onPress: () => navigation.navigate('LR') },
-    { label: 'LR Revenue (Total)', value: inr(lrGrossTotal), sub: db.lrs.length + ' LRs on record', onPress: () => navigation.navigate('LR') },
+    { label: 'Total Business Done (All-Time)', value: inr(lrGrossTotal), sub: db.lrs.length + ' LRs on record', onPress: () => navigation.navigate('LR') },
     { label: 'Collected (' + R.label + ')', value: inr(collectedPeriod), sub: 'payments received in period', tone: 'green', onPress: () => navigation.navigate('Accounting') },
     { label: 'Outstanding', value: inr(outstanding), sub: 'receivables across clients', tone: outstanding > 0 ? 'amber' : 'green', onPress: () => navigation.navigate('Accounting') },
     { label: 'Hire Balance Due', value: inr(hireBalTotal), sub: hiredLRs.length + ' hired LRs', tone: hireBalTotal > 0 ? 'amber' : 'green', onPress: () => navigation.navigate('Hired') },
@@ -154,6 +156,23 @@ export default function DashboardScreen({ navigation }) {
   const months = last6Months();
   const mvals = months.map(m => sum(db.lrs.filter(l => String(l.date).slice(0, 7) === m.key), l => l.gross));
   const mmax = Math.max(...mvals, 1);
+
+  /* ---- total business done till now — month-wise split (all-time accumulation) ---- */
+  const mmBuckets = {};
+  db.lrs.forEach(l => { const k = String(l.date || '').slice(0, 7); if (!k) return; mmBuckets[k] = (mmBuckets[k] || 0) + (Number(l.gross) || 0); });
+  const mmKeys = Object.keys(mmBuckets).sort();
+  const PIE_COLORS = ['#1d4d84', '#e8a33d', '#1e8a5f', '#7a5ea8', '#2596a5', '#c14343', '#0f2b4d', '#cf8c28', '#153a66', '#5750a8', '#94a3b8', '#c7d0dc'];
+  const pieSegs = [];
+  if (mmKeys.length > 12) {
+    const recentKeys = mmKeys.slice(-11);
+    let earlierTotal = 0;
+    mmKeys.slice(0, mmKeys.length - 11).forEach(k => { earlierTotal += mmBuckets[k]; });
+    pieSegs.push({ label: 'Earlier', value: earlierTotal, color: '#94a3b8' });
+    recentKeys.forEach((k, i) => { const parts = k.split('-'); pieSegs.push({ label: MN[Number(parts[1]) - 1] + ' ' + parts[0].slice(2), value: mmBuckets[k], color: PIE_COLORS[i % PIE_COLORS.length] }); });
+  } else {
+    mmKeys.forEach((k, i) => { const parts = k.split('-'); pieSegs.push({ label: MN[Number(parts[1]) - 1] + ' ' + parts[0].slice(2), value: mmBuckets[k], color: PIE_COLORS[i % PIE_COLORS.length] }); });
+  }
+  const pieTotal = sum(pieSegs, s => s.value);
 
   /* ---- business mix ---- */
   const ownGross = sum(ownedLRs, l => l.gross);
@@ -219,8 +238,8 @@ export default function DashboardScreen({ navigation }) {
               { key: 'client', label: 'Client', width: 180 },
               { key: 'bk', label: 'Bookings', width: 70 },
               { key: 'booked', label: 'Booked ₹', width: 90 },
-              { key: 'inv', label: 'Invoiced ₹', width: 90 },
-              { key: 'col', label: 'Collected ₹', width: 90 },
+              { key: 'inv', label: 'Turnover ₹', width: 90 },
+              { key: 'col', label: 'Payment Receipt ₹', width: 90 },
               { key: 'out', label: 'Outstanding ₹', width: 100 },
               { key: 'share', label: 'Rev Share', width: 110 },
               { key: 'credit', label: 'Credit', width: 60 },
@@ -425,6 +444,27 @@ export default function DashboardScreen({ navigation }) {
         </View>
       </Card>
 
+      {/* ---- total business done till now — month-wise split ---- */}
+      <Card title="Total Business Done Till Now — Month-wise Split" right={<Text style={{ fontSize: 11, color: C.mut }}>{inr(lrGrossTotal)} accumulated across {mmKeys.length} month(s)</Text>}>
+        {pieSegs.length ? (
+          <>
+            <View style={{ flexDirection: 'row', height: 16, borderRadius: 8, overflow: 'hidden', backgroundColor: C.line }}>
+              {pieSegs.map((s, i) => (
+                <View key={i} style={{ width: (pieTotal > 0 ? Math.round(s.value / pieTotal * 100) : 0) + '%', backgroundColor: s.color }} />
+              ))}
+            </View>
+            <View style={{ marginTop: 10 }}>
+              {pieSegs.map((s, i) => (
+                <View key={i} style={[S.row, { alignItems: 'center', gap: 8, marginBottom: 6 }]}>
+                  <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: s.color }} />
+                  <Text style={{ fontSize: 12, color: C.txt }}>{s.label} — <Text style={{ fontWeight: '800' }}>{inr(s.value)}</Text> ({pieTotal > 0 ? Math.round(s.value / pieTotal * 100) : 0}%)</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : <Empty text="No LR revenue recorded yet." />}
+      </Card>
+
       {/* ---- business mix ---- */}
       <Card title="Overall Report — Business Mix (Owned vs Hired)">
         {mixTotal > 0 ? (
@@ -510,7 +550,7 @@ export default function DashboardScreen({ navigation }) {
       <Card title="Quick Actions">
         <View style={[S.wrapRow]}>
           <Btn tone="amber" label="+ New Inquiry" onPress={() => navigation.navigate('Inquiries')} />
-          <Btn label="+ New Booking" onPress={() => navigation.navigate('Bookings')} />
+          <Btn tone="ghost" label="View Bookings" onPress={() => navigation.navigate('Bookings')} />
           <Btn label="+ New LR" onPress={() => navigation.navigate('LRForm')} />
           <Btn tone="ghost" label="✓ POD Update" onPress={() => navigation.navigate('POD')} />
           <Btn tone="ghost" label="Receivables" onPress={() => navigation.navigate('Accounting')} />

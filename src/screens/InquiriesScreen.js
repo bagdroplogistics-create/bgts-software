@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, alert, Table } from '../ui';
 import { uid, inr, fmtDate, todayISO, byId, removeById, branchName, vehicleReg, vendorName, inqPartyName } from '../logic';
 
 const FILTERS = ['ACTIVE', 'OPEN', 'CONFIRMED', 'CONVERTED', 'LOST', 'ALL'];
@@ -64,6 +64,41 @@ export default function InquiriesScreen({ navigation }) {
   });
   const setStatus = (q, st) => update(d => { const x = byId(d.inquiries, q.id); if (x) x.status = st; });
 
+  /* Confirmed inquiries convert into a Booking (not a direct LR) — mirrors the
+     BGTS workflow: Inquiry -> Confirm -> Booking -> (from the Booking) LR. */
+  const convertInquiryToBooking = (q) => {
+    if (!q.clientId) {
+      alert('Client required', 'Select an Existing Client on this inquiry before converting to a booking (Edit → Existing Client). New parties must first be added under Masters → Clients.');
+      return;
+    }
+    let savedBooking = null, inqNo = q.inqNo;
+    update(d => {
+      const x = byId(d.inquiries, q.id); if (!x) return;
+      const b = {
+        id: uid('b'), bkNo: 'BK-' + String(d.seq.bk).padStart(4, '0'), date: todayISO(), branchId: x.branchId || (d.branches[0] || {}).id,
+        clientId: x.clientId, origin: x.fromPlace || '', destination: x.toPlace || '', mode: 'Road', vehicleType: x.vehicleType || '',
+        cargo: x.cargo || '', weightMT: x.weightMT || '', freight: Number(x.rateQuoted) || 0, rateSource: 'From confirmed inquiry ' + x.inqNo,
+        assignType: x.assignType || '', vehicleId: x.assignType === 'Owned' ? x.assignedVehicleId : '',
+        hiredVendorId: x.assignType === 'Hired' ? x.assignedVendorId : '', hiredVehicleNo: x.assignType === 'Hired' ? x.assignedTruckNo : '',
+        hireCost: 0, driverId: '', status: x.assignType ? 'Vehicle Assigned' : 'Booked', lrNo: '', ewayBill: '', podReceived: false, invoiceId: ''
+      };
+      d.seq.bk++; d.bookings.push(b);
+      x.status = 'CONVERTED'; x.bookingId = b.id;
+      inqNo = x.inqNo;
+      savedBooking = b;
+    });
+    if (savedBooking) {
+      alert(
+        'Booking created',
+        'Booking ' + savedBooking.bkNo + ' created from ' + inqNo + '.\n\nCreate the LR now and feed the pending details?',
+        [
+          { text: 'Go to Bookings', style: 'cancel', onPress: () => navigation.navigate('Bookings') },
+          { text: 'Create LR now', onPress: () => navigation.navigate('LRForm', { bookingId: savedBooking.id }) }
+        ]
+      );
+    }
+  };
+
   const inquiryRow = (q) => ({
     inqNo: (
       <View>
@@ -85,14 +120,14 @@ export default function InquiriesScreen({ navigation }) {
       <View style={S.wrapRow}>
         {(q.status === 'OPEN' || q.status === 'CONFIRMED') ? (<>
           <Btn small label={q.assignType ? 'Re-plan' : 'Plan Vehicle'} onPress={() => planVehicle(q)} />
-          <Btn small tone="amber" label="→ LR" onPress={() => navigation.navigate('LRForm', { inquiryId: q.id })} />
+          {q.status === 'CONFIRMED' ? <Btn small tone="amber" label="✓ Confirm → Booking" onPress={() => convertInquiryToBooking(q)} /> : null}
           <Btn small tone="ghost" label="Edit" onPress={() => editInquiry(q)} />
           <Btn small tone="ghost" label="Lost" onPress={() => setStatus(q, 'LOST')} />
         </>) : q.status === 'LOST' ? (
           <Btn small tone="ghost" label="Reopen" onPress={() => setStatus(q, 'OPEN')} />
-        ) : (
-          <Btn small tone="ghost" label="View LR" onPress={() => navigation.navigate('LR')} />
-        )}
+        ) : q.status === 'CONVERTED' ? (
+          <Btn small tone="ghost" label="View Booking" onPress={() => navigation.navigate('Bookings')} />
+        ) : null}
         <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete ' + q.inqNo + '?', () => update(d => removeById(d.inquiries, q.id)))} />
       </View>
     )
@@ -114,7 +149,7 @@ export default function InquiriesScreen({ navigation }) {
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
         <Card>
-          {!list.length ? <Empty text="No inquiries here. Every job starts as an inquiry — capture what you have, plan a vehicle, convert to LR." /> : (
+          {!list.length ? <Empty text="No inquiries here. Every new job starts as an inquiry — capture it with whatever details you have, plan the vehicle, then confirm it into a Booking. The LR is generated from the Booking once it's ready." /> : (
             <Table
               cols={[
                 { key: 'inqNo', label: 'Inq No', width: 110 },

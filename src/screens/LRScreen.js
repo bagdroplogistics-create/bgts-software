@@ -1,17 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, TextInput } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert, PickerField, DatePicker } from '../ui';
 import { downloadFile, printHtml } from '../fileIO';
 import {
   uid, inr, fmtDate, todayISO, byId, removeById, lrHtml, vendorName, csvString,
-  lrHireBalance, lrTripExpTotal, truckToVehicleId, TRIP_EXP_CATS
+  lrHireBalance, lrTripExpTotal, truckToVehicleId, TRIP_EXP_CATS, sum
 } from '../logic';
+
+/* ---------- LR Register filter bar (from bgts-os-app_8.html's lrFilterBar/lrMatches) ---------- */
+function FilterField({ label, grow, children }) {
+  return (
+    <View style={{ minWidth: grow ? 200 : 140, flexGrow: grow ? 1 : 0, gap: 4 }}>
+      <Text style={{ fontSize: 9.5, fontWeight: '800', color: C.mut, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</Text>
+      {children}
+    </View>
+  );
+}
 
 export default function LRScreen({ navigation }) {
   const { db, update } = useStore();
   const [form, setForm] = useState(null);
-  const list = db.lrs.slice().reverse();
+  const [flt, setFlt] = useState({ from: '', to: '', company: '', branchId: '', q: '', sort: 'desc' });
+  const setF = (k, v) => setFlt(prev => ({ ...prev, [k]: v }));
+  const resetFilter = () => setFlt({ from: '', to: '', company: '', branchId: '', q: '', sort: 'desc' });
+
+  const companyOptions = (() => {
+    const set = {};
+    db.lrs.forEach(l => { const n = (l.consignor || {}).name; if (n) set[n] = 1; });
+    db.clients.forEach(c => { set[c.name] = 1; });
+    return Object.keys(set).sort();
+  })();
+
+  const lrMatches = (l) => {
+    if (flt.from && String(l.date) < flt.from) return false;
+    if (flt.to && String(l.date) > flt.to) return false;
+    if (flt.company && String((l.consignor || {}).name || '').toLowerCase() !== flt.company.toLowerCase()) return false;
+    if (flt.branchId && l.branchId !== flt.branchId) return false;
+    if (flt.q) {
+      const q = flt.q.toLowerCase();
+      const hay = (l.lrNo + ' ' + l.truckNo + ' ' + l.fromPlace + ' ' + l.toPlace + ' ' + ((l.consignor || {}).name || '') + ' ' + ((l.consignee || {}).name || '')).toLowerCase();
+      if (hay.indexOf(q) < 0) return false;
+    }
+    return true;
+  };
+
+  const totalLRCount = db.lrs.length;
+  const list = db.lrs.slice().filter(lrMatches).sort((a, b) => {
+    const d = String(a.date) < String(b.date) ? -1 : (String(a.date) > String(b.date) ? 1 : 0);
+    return flt.sort === 'asc' ? d : -d;
+  });
+  const listGross = sum(list, l => l.gross);
 
   const exportCsv = async () => {
     try {
@@ -138,7 +177,34 @@ export default function LRScreen({ navigation }) {
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
         <Card>
-          {!list.length ? <Empty text="No LRs yet. Tap + ADD NEW LR." /> : (
+          <View style={{
+            flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end',
+            backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 10, padding: 12, marginBottom: 14
+          }}>
+            <FilterField label="From Date"><DatePicker value={flt.from} onChange={v => setF('from', v)} /></FilterField>
+            <FilterField label="To Date"><DatePicker value={flt.to} onChange={v => setF('to', v)} /></FilterField>
+            <FilterField label="Company">
+              <PickerField value={flt.company} onChange={v => setF('company', v)} placeholder="All Companies"
+                options={[{ v: '', l: 'All Companies' }, ...companyOptions.map(n => ({ v: n, l: n }))]} />
+            </FilterField>
+            <FilterField label="Location / Hub (Branch)">
+              <PickerField value={flt.branchId} onChange={v => setF('branchId', v)} placeholder="All Locations"
+                options={[{ v: '', l: 'All Locations' }, ...(db.branches || []).map(b => ({ v: b.id, l: b.name }))]} />
+            </FilterField>
+            <FilterField label="Date Order">
+              <PickerField value={flt.sort} onChange={v => setF('sort', v)}
+                options={[{ v: 'desc', l: 'Newest first (descending)' }, { v: 'asc', l: 'Oldest first (ascending)' }]} />
+            </FilterField>
+            <FilterField label="Search (LR No / Truck / Route / Party)" grow>
+              <TextInput value={flt.q} onChangeText={v => setF('q', v)} placeholder="Type to search…" placeholderTextColor={C.mut}
+                style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 7, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 9, fontSize: 13, color: C.txt }} />
+            </FilterField>
+            <Btn small tone="ghost" label="Reset" onPress={resetFilter} />
+          </View>
+          {!list.length ? (
+            <Empty text={totalLRCount ? 'No LRs match this search. Adjust the filters above, or click "+ ADD NEW LR".' : 'No LRs yet. Tap + ADD NEW LR.'} />
+          ) : (<>
+            <Text style={{ fontSize: 11.5, color: C.mut, marginBottom: 8 }}>{list.length} LR(s) · Gross {inr(listGross)}</Text>
             <Table
               cols={[
                 { key: 'lrNo', label: 'LR No', width: 100 },
@@ -154,7 +220,7 @@ export default function LRScreen({ navigation }) {
               ]}
               rows={list.map(lrRow)}
             />
-          )}
+          </>)}
         </Card>
       </ScrollView>
       <ModalForm form={form} onClose={() => setForm(null)} />

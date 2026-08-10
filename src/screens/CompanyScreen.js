@@ -105,8 +105,8 @@ export default function CompanyScreen({ route, navigation }) {
         </Text>
       </Card>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-        <Kpi label="Total Billed" value={inr(billed)} sub={invs.length + ' bills'} />
-        <Kpi label="Collected" value={inr(collected)} sub="receipts recorded" tone="green" />
+        <Kpi label="Total Turnover" value={inr(billed)} sub={invs.length + ' bills'} />
+        <Kpi label="Payment Receipt" value={inr(collected)} sub="receipts recorded" tone="green" />
         <Kpi label="Outstanding" value={inr(out)} sub={openInvs.length + ' open bills'} tone={out > 0 ? 'amber' : 'green'} />
         <Kpi label="Oldest Due" value={oldest == null ? '—' : oldest + 'd'} sub="age of oldest open bill" tone={oldest != null && oldest > 60 ? 'red' : ''} />
         <Kpi label="Bookings" value={String(bks.length)} sub="operational bookings" />

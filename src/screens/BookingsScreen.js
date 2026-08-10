@@ -160,9 +160,11 @@ export default function BookingsScreen({ navigation }) {
       <View style={{ padding: 14, paddingBottom: 6, flexDirection: 'row', gap: 8 }}>
         <TextInput value={q} onChangeText={setQ} placeholder="Search bookings…" placeholderTextColor={C.mut}
           style={{ flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13 }} />
-        <Btn label="+ New Booking" tone="amber" onPress={newBooking} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
+        <Text style={{ fontSize: 11.5, color: C.mut, marginHorizontal: 14, marginBottom: 10 }}>
+          Bookings are created only from a confirmed Inquiry (Inquiries → Confirm → Booking). Generate the LR from a booking below once it's ready.
+        </Text>
         <Card>
           {!list.length ? <Empty text="No bookings match." /> : (
             <Table

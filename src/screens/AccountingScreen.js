@@ -1,18 +1,52 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Linking } from 'react-native';
+import { View, Text, ScrollView, Linking, TextInput } from 'react-native';
 import { useStore } from '../store';
 import { downloadFile, printHtml } from '../fileIO';
-import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
+import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert, PickerField, DatePicker } from '../ui';
 import {
   uid, inr, sum, fmtDate, todayISO, addDaysISO, daysSince, byId, removeById,
   clientName, invPaid, invOutstanding, waLink, mailLink, EXP_HEADS, PAY_THROUGH,
   csvString, receiptHtml
 } from '../logic';
 
+/* ---------- Invoices & Receivables filter bar (from bgts-os-app_8.html's invFilterBar/invMatches) ---------- */
+function FilterField({ label, grow, children }) {
+  return (
+    <View style={{ minWidth: grow ? 200 : 140, flexGrow: grow ? 1 : 0, gap: 4 }}>
+      <Text style={{ fontSize: 9.5, fontWeight: '800', color: C.mut, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
 export default function AccountingScreen({ navigation }) {
   const { db, update } = useStore();
   const [form, setForm] = useState(null);
   const uninv = db.bookings.filter(b => b.status === 'Delivered' && !b.invoiceId);
+
+  const [invF, setInvF] = useState({ from: '', to: '', clientId: '', branchId: '', q: '', sort: 'desc' });
+  const setIF = (k, v) => setInvF(prev => ({ ...prev, [k]: v }));
+  const resetInvFilter = () => setInvF({ from: '', to: '', clientId: '', branchId: '', q: '', sort: 'desc' });
+
+  const invMatches = (inv) => {
+    if (invF.from && String(inv.date) < invF.from) return false;
+    if (invF.to && String(inv.date) > invF.to) return false;
+    if (invF.clientId && inv.clientId !== invF.clientId) return false;
+    if (invF.branchId && inv.branchId !== invF.branchId) return false;
+    if (invF.q) {
+      const q = invF.q.toLowerCase();
+      if ((inv.invNo + ' ' + clientName(db, inv.clientId)).toLowerCase().indexOf(q) < 0) return false;
+    }
+    return true;
+  };
+  const totalInvCount = db.invoices.length;
+  const invList = db.invoices.slice().filter(invMatches).sort((a, b) => {
+    const d = String(a.date) < String(b.date) ? -1 : (String(a.date) > String(b.date) ? 1 : 0);
+    return invF.sort === 'asc' ? d : -d;
+  });
+  const invListTotal = sum(invList, i => i.total);
+  const invListPaid = sum(invList, i => invPaid(db, i));
+  const invListOut = invListTotal - invListPaid;
 
   const makeInvoice = (b) => {
     const c = byId(db.clients, b.clientId) || { creditDays: 30 };
@@ -183,7 +217,36 @@ export default function AccountingScreen({ navigation }) {
 
       <Card title="Invoices & Receivables Ageing"
         right={<Btn small tone="ghost" label="Export CSV" onPress={exportInvCsv} />}>
-        {!db.invoices.length ? <Empty text="No invoices raised yet." /> : (
+        <View style={{
+          flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end',
+          backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 10, padding: 12, marginBottom: 14
+        }}>
+          <FilterField label="From Date"><DatePicker value={invF.from} onChange={v => setIF('from', v)} /></FilterField>
+          <FilterField label="To Date"><DatePicker value={invF.to} onChange={v => setIF('to', v)} /></FilterField>
+          <FilterField label="Company">
+            <PickerField value={invF.clientId} onChange={v => setIF('clientId', v)} placeholder="All Companies"
+              options={[{ v: '', l: 'All Companies' }, ...db.clients.map(c => ({ v: c.id, l: c.name }))]} />
+          </FilterField>
+          <FilterField label="Location / Hub (Branch)">
+            <PickerField value={invF.branchId} onChange={v => setIF('branchId', v)} placeholder="All Locations"
+              options={[{ v: '', l: 'All Locations' }, ...(db.branches || []).map(b => ({ v: b.id, l: b.name }))]} />
+          </FilterField>
+          <FilterField label="Date Order">
+            <PickerField value={invF.sort} onChange={v => setIF('sort', v)}
+              options={[{ v: 'desc', l: 'Newest first (descending)' }, { v: 'asc', l: 'Oldest first (ascending)' }]} />
+          </FilterField>
+          <FilterField label="Search (Invoice No / Company)" grow>
+            <TextInput value={invF.q} onChangeText={v => setIF('q', v)} placeholder="Type to search…" placeholderTextColor={C.mut}
+              style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 7, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 9, fontSize: 13, color: C.txt }} />
+          </FilterField>
+          <Btn small tone="ghost" label="Reset" onPress={resetInvFilter} />
+        </View>
+        {!invList.length ? (
+          <Empty text={totalInvCount ? 'No invoices match this search.' : 'No invoices raised yet.'} />
+        ) : (<>
+          <Text style={{ fontSize: 11.5, color: C.mut, marginBottom: 8 }}>
+            {invList.length} invoice(s) · Turnover {inr(invListTotal)} · Payment Receipt {inr(invListPaid)} · Outstanding {inr(invListOut)}
+          </Text>
           <Table
             cols={[
               { key: 'invoice', label: 'Invoice', width: 100 },
@@ -196,7 +259,7 @@ export default function AccountingScreen({ navigation }) {
               { key: 'bucket', label: 'Bucket', width: 90 },
               { key: 'actions', label: 'Actions', width: 340 }
             ]}
-            rows={db.invoices.slice().reverse().map(inv => {
+            rows={invList.map(inv => {
               const out = invOutstanding(db, inv), age = daysSince(inv.date);
               return {
                 invoice: <Text style={{ fontWeight: '700', color: C.navy }}>{inv.invNo}</Text>,
@@ -222,7 +285,7 @@ export default function AccountingScreen({ navigation }) {
               };
             })}
           />
-        )}
+        </>)}
       </Card>
 
       <Card title="Business Expenses (Zoho-style account heads)"
@@ -286,13 +349,13 @@ export default function AccountingScreen({ navigation }) {
         </Card>
       ) : null}
 
-      <Card title="Customer Ledger">
+      <Card title="Customer Ledger — Company-wise Turnover & Payment Receipt">
         {!db.clients.length ? <Empty text="No clients." /> : (
           <Table
             cols={[
               { key: 'client', label: 'Client', width: 160 },
-              { key: 'invoiced', label: 'Invoiced', width: 100 },
-              { key: 'received', label: 'Received', width: 100 },
+              { key: 'invoiced', label: 'Total Turnover', width: 100 },
+              { key: 'received', label: 'Payment Receipt', width: 100 },
               { key: 'outstanding', label: 'Outstanding', width: 100 },
               { key: 'creditDays', label: 'Credit Days', width: 90 },
               { key: 'oldest', label: 'Oldest Due', width: 130 },
