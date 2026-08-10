@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Linking, TextInput } from 'react-native';
+import { View, Text, ScrollView, Linking, TextInput, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
 import { downloadFile, printHtml } from '../fileIO';
-import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert, PickerField, DatePicker } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert, PickerField, DatePicker } from '../ui';
 import {
   uid, inr, sum, fmtDate, todayISO, addDaysISO, daysSince, byId, removeById,
   clientName, invPaid, invOutstanding, waLink, mailLink, EXP_HEADS, PAY_THROUGH,
@@ -19,9 +19,31 @@ function FilterField({ label, grow, children }) {
   );
 }
 
+/* Subtabs — exact labels/order from bgts-os-app_8.html's vAccounting(). 'overview',
+   'banking' and 'backup' already exist as their own screens (AccDash / Banking /
+   Backup) rather than being duplicated here, so those three navigate away instead
+   of switching in-page content — everything else (receivables/expenses/payments/
+   customers) shows/hides the matching card right here, exactly like the HTML's
+   ACC_TAB-driven single-page switch. */
+const ACC_TABS = [
+  ['overview', 'Accounts Dashboard'],
+  ['receivables', 'Invoices & Receivables'],
+  ['banking', 'Banking / Reconciliation'],
+  ['expenses', 'Expenses'],
+  ['payments', 'Payments Received'],
+  ['customers', 'Customers'],
+  ['backup', 'Invoice Backup (Register)']
+];
+const ACC_TAB_SCREEN = { overview: 'AccDash', banking: 'Banking', backup: 'Backup' };
+
 export default function AccountingScreen({ navigation }) {
   const { db, update } = useStore();
   const [form, setForm] = useState(null);
+  const [accTab, setAccTab] = useState('receivables');
+  const pressAccTab = (id) => {
+    if (ACC_TAB_SCREEN[id]) navigation.navigate(ACC_TAB_SCREEN[id]);
+    else setAccTab(id);
+  };
   const uninv = db.bookings.filter(b => b.status === 'Delivered' && !b.invoiceId);
 
   const [invF, setInvF] = useState({ from: '', to: '', clientId: '', branchId: '', q: '', sort: 'desc' });
@@ -179,20 +201,18 @@ export default function AccountingScreen({ navigation }) {
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
-      <View style={[S.wrapRow, { marginBottom: 12 }]}>
-        <Btn small label="📊 Accounts Dashboard" onPress={() => navigation.navigate('AccDash')} />
-        <Btn small label="🏦 Banking / Reco" onPress={() => navigation.navigate('Banking')} />
-        <Btn small label="⬆ Import Invoices CSV / Excel" onPress={() => navigation.navigate('InvoiceImport')} />
-        <Btn small label="🗂 Invoice Backup" onPress={() => navigation.navigate('Backup')} />
-      </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-        <Kpi label="Invoiced" value={inr(sum(db.invoices, i => i.total))} sub={db.invoices.length + ' invoices'} />
-        <Kpi label="Collected" value={inr(sum(db.payments, p => p.amount))} sub={db.payments.length + ' payments'} tone="green" />
-        <Kpi label="Outstanding" value={inr(sum(db.invoices, i => invOutstanding(db, i)))} sub="across all clients" tone="amber" />
-        <Kpi label="Biz Expenses" value={inr(sum(db.acctExp, e => e.amount))} sub={db.acctExp.length + ' entries (incl. LR expenses)'} />
+      <View style={[S.wrapRow, { marginBottom: 14 }]}>
+        {ACC_TABS.map(([id, label]) => (
+          <TouchableOpacity key={id} onPress={() => pressAccTab(id)} style={{
+            backgroundColor: accTab === id ? C.navy : '#fff', borderWidth: 1, borderColor: accTab === id ? C.navy : C.line2,
+            borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6
+          }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: accTab === id ? '#fff' : C.txt }}>{label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {uninv.length ? (
+      {accTab === 'receivables' && uninv.length ? (
         <Card title="Ready to Invoice">
           <Table
             cols={[
@@ -215,8 +235,14 @@ export default function AccountingScreen({ navigation }) {
         </Card>
       ) : null}
 
+      {accTab === 'receivables' ? (
       <Card title="Invoices & Receivables Ageing"
-        right={<Btn small tone="ghost" label="Export CSV" onPress={exportInvCsv} />}>
+        right={
+          <View style={S.wrapRow}>
+            <Btn small tone="ghost" label="Export CSV" onPress={exportInvCsv} />
+            <Btn small label="⬆ Import Invoices CSV / Excel" onPress={() => navigation.navigate('InvoiceImport')} />
+          </View>
+        }>
         <View style={{
           flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end',
           backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 10, padding: 12, marginBottom: 14
@@ -277,7 +303,6 @@ export default function AccountingScreen({ navigation }) {
                 actions: (
                   <View style={S.wrapRow}>
                     {out > 0 ? <Btn small tone="green" label="+ Payment" onPress={() => recordPayment(inv)} /> : null}
-                    {out > 0 ? <Btn small tone="wa" label="WA Remind" onPress={() => waRemind(inv, out)} /> : null}
                     {out > 0 ? <Btn small tone="ghost" label="Email" onPress={() => emailRemind(inv, out)} /> : null}
                     <Btn small tone="red" label="✕" onPress={() => delInvoice(inv)} />
                   </View>
@@ -287,7 +312,9 @@ export default function AccountingScreen({ navigation }) {
           />
         </>)}
       </Card>
+      ) : null}
 
+      {accTab === 'expenses' ? (
       <Card title="Business Expenses (Zoho-style account heads)"
         right={<View style={S.wrapRow}><Btn small tone="ghost" label="Export CSV" onPress={exportExpCsv} /><Btn small tone="amber" label="+ Record Expense" onPress={addBizExpense} /></View>}>
         {!db.acctExp.length ? <Text style={S.empty}>No expenses yet. LR expenses post here automatically.</Text> : (
@@ -315,8 +342,9 @@ export default function AccountingScreen({ navigation }) {
           />
         )}
       </Card>
+      ) : null}
 
-      {(db.payments.length || db.invoices.some(i => invOutstanding(db, i) > 0)) ? (
+      {accTab === 'payments' && (db.payments.length || db.invoices.some(i => invOutstanding(db, i) > 0)) ? (
         <Card title="Payments Received"
           right={db.invoices.some(i => invOutstanding(db, i) > 0) ? <Btn small tone="amber" label="+ Record Payment" onPress={recordPaymentPick} /> : null}>
           {!db.payments.length ? <Empty text="No payments recorded yet." /> : (
@@ -349,6 +377,7 @@ export default function AccountingScreen({ navigation }) {
         </Card>
       ) : null}
 
+      {accTab === 'customers' ? (
       <Card title="Customer Ledger — Company-wise Turnover & Payment Receipt">
         {!db.clients.length ? <Empty text="No clients." /> : (
           <Table
@@ -386,6 +415,7 @@ export default function AccountingScreen({ navigation }) {
           />
         )}
       </Card>
+      ) : null}
       <ModalForm form={form} onClose={() => setForm(null)} />
     </ScrollView>
   );
