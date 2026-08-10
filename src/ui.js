@@ -143,37 +143,50 @@ export function Empty({ text }) { return <Text style={S.empty}>{text}</Text>; }
    split) — this is how "Lines"/"Hide"-style accordion rows (e.g. the Invoice
    Backup register's per-bill LR breakdown) get inserted right under the row that
    was clicked, matching the HTML build's `<td colspan="N">` sub-table pattern,
-   instead of being rendered as a separate table after the whole list. */
+   instead of being rendered as a separate table after the whole list.
+   IMPORTANT — why this isn't just a manually-wrapped `<View minWidth:'100%'>` inside
+   the ScrollView: react-native-web's ScrollView renders TWO nested divs — the
+   scrollable div itself (which gets our `style` prop) and an inner content-wrapper
+   div around its children. That inner wrapper div has NO width of its own by
+   default, so a plain child `minWidth:'100%'` resolves against an *indefinite*
+   parent width and is silently dropped by the browser (percentages need a definite
+   containing block) — the whole table then collapses to its natural minimum width,
+   which is exactly the "narrow columns + dead space" bug this component exists to
+   prevent. Confirmed by inspecting react-native-web's actual rendered output/CSS,
+   not just reasoning about it. The fix is `contentContainerStyle`, which is the prop
+   ScrollView uses specifically to style that inner wrapper div — giving IT an
+   explicit `width:'100%'` (resolved against the outer scrollable div, which does
+   have a definite width from our own `style` prop) makes the whole chain definite,
+   so the row's flexGrow columns can actually compute against a real container
+   width instead of an undefined one. */
 export function Table({ cols, rows }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
-      <View style={{ minWidth: '100%' }}>
-        <View style={{ flexDirection: 'row', backgroundColor: C.navy }}>
-          {cols.map(c => (
-            <Text key={c.key} numberOfLines={1} style={{
-              flexGrow: c.width, flexShrink: 0, flexBasis: 0, minWidth: c.width,
-              paddingVertical: 8, paddingHorizontal: 10, color: '#fff',
-              fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4
-            }}>{c.label}</Text>
-          ))}
-        </View>
-        {rows.map((r, i) => (
-          r && r._span !== undefined ? (
-            <View key={i} style={{ borderBottomWidth: 1, borderBottomColor: C.line, backgroundColor: C.bg }}>
-              {r._span}
-            </View>
-          ) : (
-            <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.line, backgroundColor: '#fff' }}>
-              {cols.map(c => (
-                <View key={c.key} style={{ flexGrow: c.width, flexShrink: 0, flexBasis: 0, minWidth: c.width, paddingVertical: 8, paddingHorizontal: 10, justifyContent: 'center' }}>
-                  {(typeof r[c.key] === 'string' || typeof r[c.key] === 'number')
-                    ? <Text numberOfLines={1} style={{ fontSize: 12, color: C.txt }}>{r[c.key]}</Text> : r[c.key]}
-                </View>
-              ))}
-            </View>
-          )
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ width: '100%', flexDirection: 'column' }}>
+      <View style={{ flexDirection: 'row', backgroundColor: C.navy }}>
+        {cols.map(c => (
+          <Text key={c.key} numberOfLines={1} style={{
+            flexGrow: c.width, flexShrink: 0, flexBasis: 0, minWidth: c.width,
+            paddingVertical: 8, paddingHorizontal: 10, color: '#fff',
+            fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4
+          }}>{c.label}</Text>
         ))}
       </View>
+      {rows.map((r, i) => (
+        r && r._span !== undefined ? (
+          <View key={i} style={{ borderBottomWidth: 1, borderBottomColor: C.line, backgroundColor: C.bg }}>
+            {r._span}
+          </View>
+        ) : (
+          <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.line, backgroundColor: '#fff' }}>
+            {cols.map(c => (
+              <View key={c.key} style={{ flexGrow: c.width, flexShrink: 0, flexBasis: 0, minWidth: c.width, paddingVertical: 8, paddingHorizontal: 10, justifyContent: 'center' }}>
+                {(typeof r[c.key] === 'string' || typeof r[c.key] === 'number')
+                  ? <Text numberOfLines={1} style={{ fontSize: 12, color: C.txt }}>{r[c.key]}</Text> : r[c.key]}
+              </View>
+            ))}
+          </View>
+        )
+      ))}
     </ScrollView>
   );
 }
