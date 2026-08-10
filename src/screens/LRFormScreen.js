@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Platform, Linking } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Linking } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Btn, DatePicker, PickerField, alert } from '../ui';
 import { printHtml } from '../fileIO';
@@ -27,24 +27,36 @@ function Grid({ children, min, max }) {
   );
 }
 
-/* Numeric fields get real up/down spinner controls on web (a plain HTML
-   number input) since react-native-web's TextInput has no such affordance;
-   on native this falls back to the standard numeric keyboard. */
+/* Numeric fields get their own always-visible up/down stepper (drawn ourselves,
+   not the browser's native number-input spinner — that one only appears on
+   hover in most browsers and its own box height doesn't match the rest of the
+   form's fields). Built on the same TextInput as every other field, so height
+   and border are guaranteed identical to the fields around it. */
 function NumBox({ value, onChangeText, style, placeholder }) {
-  if (Platform.OS === 'web') {
-    return React.createElement('input', {
-      type: 'number',
-      inputMode: 'decimal',
-      step: 'any',
-      value: value == null ? '' : value,
-      placeholder,
-      onChange: (e) => onChangeText(e.target.value),
-      style: { ...style, outline: 'none', fontFamily: 'inherit' }
-    });
-  }
+  const strVal = value == null ? '' : String(value);
+  const step = (dir) => {
+    const cur = Number(strVal) || 0;
+    const next = Math.round((cur + dir) * 100) / 100;
+    onChangeText(String(next));
+  };
   return (
-    <TextInput value={value == null ? '' : String(value)} onChangeText={onChangeText}
-      keyboardType="numeric" placeholder={placeholder} placeholderTextColor={C.line2} style={style} />
+    <View style={{ position: 'relative', justifyContent: 'center' }}>
+      <TextInput
+        value={strVal}
+        onChangeText={t => onChangeText(t.replace(/[^0-9.\-]/g, ''))}
+        keyboardType="numeric" placeholder={placeholder} placeholderTextColor={C.line2}
+        style={[style, { paddingRight: 22 }]}
+      />
+      <View style={{ position: 'absolute', right: 1, top: 1, bottom: 1, width: 20, borderLeftWidth: 1, borderLeftColor: C.line2, justifyContent: 'center' }}>
+        <TouchableOpacity onPress={() => step(1)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 8, lineHeight: 8, color: C.mut }}>▲</Text>
+        </TouchableOpacity>
+        <View style={{ height: 1, backgroundColor: C.line2 }} />
+        <TouchableOpacity onPress={() => step(-1)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 8, lineHeight: 8, color: C.mut }}>▼</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -346,10 +358,14 @@ export default function LRFormScreen({ navigation, route }) {
         </Grid>
         <Chips l="LR Mode" v={f.lrMode} set={set('lrMode')} opts={['Door Delivery', 'Godown Delivery', 'Direct Delivery']} />
         <Fld l="Delivery Address" v={f.deliveryAddress} set={set('deliveryAddress')} multi />
-        <Chips l="Billing Party" v={f.billingParty} set={set('billingParty')} opts={['Consignor', 'Consignee', 'Third Party']} />
-        <Chips l="GST Paid By" v={f.gstPaidBy} set={set('gstPaidBy')} opts={['Consignor', 'Consignee', 'Transporter']} />
-        <Chips l="GST Slab" v={f.gstSlab} set={setGstSlab} opts={['Exempt (RCM)', '0%', '5%', '12%', '18%']} />
-        <Chips l="Payment Terms" v={f.payTerms} set={set('payTerms')} opts={['PAID', 'TO PAY', 'TO BE BILLED']} />
+        <Grid min={220} max={2}>
+          <Chips l="Billing Party" v={f.billingParty} set={set('billingParty')} opts={['Consignor', 'Consignee', 'Third Party']} />
+          <Chips l="GST Paid By" v={f.gstPaidBy} set={set('gstPaidBy')} opts={['Consignor', 'Consignee', 'Transporter']} />
+        </Grid>
+        <Grid min={220} max={2}>
+          <Chips l="GST Slab" v={f.gstSlab} set={setGstSlab} opts={['Exempt (RCM)', '0%', '5%', '12%', '18%']} />
+          <Chips l="Payment Terms" v={f.payTerms} set={set('payTerms')} opts={['PAID', 'TO PAY', 'TO BE BILLED']} />
+        </Grid>
       </Card>
 
       <Card title="Goods Details">
