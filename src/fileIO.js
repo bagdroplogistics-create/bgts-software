@@ -41,14 +41,43 @@ export async function readPickedFile(asset) {
   return await FileSystem.readAsStringAsync(asset.uri);
 }
 
+/* expo-print's own docs are explicit about this: "on web this prints the HTML from
+   the page" — Print.printAsync({html}) on web ignores the html option entirely and
+   just calls window.print() on whatever page is currently open (confirmed in
+   expo-print's own source, ExponentPrint.web.ts). That's why "Print"/"Save & Print"
+   was printing the live app screen (sidebar, table, filters and all) instead of the
+   generated LR/receipt document. Render the document into an off-screen iframe and
+   print THAT frame's window instead — a standard, popup-blocker-proof technique that
+   doesn't depend on expo-print's web shim at all. */
+function printViaIframe(html) {
+  return new Promise((resolve) => {
+    let done = false;
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow.document;
+    doc.open(); doc.write(html); doc.close();
+    const fire = () => {
+      if (done) return;
+      done = true;
+      try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch (e) { /* ignore */ }
+      setTimeout(() => { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 1000);
+      resolve({ ok: true, web: true });
+    };
+    iframe.onload = fire;
+    /* document.write()'d content doesn't reliably fire iframe onload in every browser —
+       this timeout guarantees the print dialog still opens even if it doesn't. */
+    setTimeout(fire, 400);
+  });
+}
+
 /* Print/share an HTML document (LR consignment notes, payment receipts, etc.).
    Native: renders to a PDF file and opens the share sheet.
-   Web: expo-print can't render to a file on web, but it can open the browser's native
-   print dialog directly — which lets the user "Save as PDF" from there if they want a file. */
+   Web: prints the actual generated document via the iframe technique above, then the
+   user can "Save as PDF" from the browser's native print dialog if they want a file. */
 export async function printHtml(html, dialogTitle) {
   if (Platform.OS === 'web') {
-    await Print.printAsync({ html });
-    return { ok: true, web: true };
+    return await printViaIframe(html);
   }
   const { uri } = await Print.printToFileAsync({ html });
   const shareable = await Sharing.isAvailableAsync();
