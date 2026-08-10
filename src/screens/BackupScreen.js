@@ -86,8 +86,38 @@ export default function BackupScreen({ navigation }) {
               {hits.length > 50 ? <Text style={{ fontSize: 11, color: C.mut, marginTop: 6 }}>…{hits.length - 50} more matches</Text> : null}
             </>
           )
-        ) : !bb.length ? <Empty text="No archive data yet." /> : (
-          <>
+        ) : !bb.length ? <Empty text="No archive data yet." /> : (() => {
+          /* Match the HTML build's bbResultsHtml(): the LR-lines breakdown for an
+             opened bill renders as a full-width row inserted immediately after that
+             bill's own row (an inline accordion), not as a separate table tacked on
+             after the whole list. */
+          const rows = [];
+          bb.forEach((g, i) => {
+            rows.push({
+              bill: <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{g.no}</Text>,
+              company: g.client || '—',
+              date: fmtDate(g.date),
+              lines: g.lines.length,
+              total: <Text style={{ fontWeight: '800', color: C.navy }}>{inr(g.total)}</Text>,
+              actions: <Btn small tone="ghost" label={open === i ? 'Hide' : 'Lines'} onPress={() => setOpen(open === i ? null : i)} />
+            });
+            if (open === i) {
+              rows.push({
+                _span: (
+                  <View style={{ padding: 10 }}>
+                    <Table
+                      cols={[
+                        { key: 'lr', label: 'LR No', width: 160 },
+                        { key: 'amount', label: 'Amount', width: 120 }
+                      ]}
+                      rows={g.lines.map((x, j) => ({ lr: x[0], amount: inr(x[1]) }))}
+                    />
+                  </View>
+                )
+              });
+            }
+          });
+          return (
             <Table
               cols={[
                 { key: 'bill', label: 'Bill No', width: 120 },
@@ -97,31 +127,10 @@ export default function BackupScreen({ navigation }) {
                 { key: 'total', label: 'Total', width: 100 },
                 { key: 'actions', label: '', width: 90 }
               ]}
-              rows={bb.map((g, i) => ({
-                bill: <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.navy }}>{g.no}</Text>,
-                company: g.client || '—',
-                date: fmtDate(g.date),
-                lines: g.lines.length,
-                total: <Text style={{ fontWeight: '800', color: C.navy }}>{inr(g.total)}</Text>,
-                actions: <Btn small tone="ghost" label={open === i ? 'Hide' : 'Lines'} onPress={() => setOpen(open === i ? null : i)} />
-              }))}
+              rows={rows}
             />
-            {open != null && bb[open] ? (
-              <View style={{ marginTop: 10 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 6 }}>
-                  {bb[open].no} — LR Lines
-                </Text>
-                <Table
-                  cols={[
-                    { key: 'lr', label: 'LR No', width: 160 },
-                    { key: 'amount', label: 'Amount', width: 120 }
-                  ]}
-                  rows={bb[open].lines.map((x, j) => ({ lr: x[0], amount: inr(x[1]) }))}
-                />
-              </View>
-            ) : null}
-          </>
-        )}
+          );
+        })()}
       </Card>
     </ScrollView>
   );

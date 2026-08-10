@@ -55,10 +55,19 @@ export function Card({ title, right, children }) {
   );
 }
 
+/* The HTML build lays KPI cards out with CSS grid — repeat(auto-fit, minmax(170px,1fr)) —
+   so the row always fills the full card width: 2 cards on a phone, 4-6 on a wide desktop
+   monitor. Kpi previously hard-coded width:'48.5%' (always exactly 2 per row), which on a
+   wide desktop screen left the KPI row (and everything below it) looking like it was only
+   using half the available width. This mirrors the HTML's auto-fit behavior by picking a
+   column count from the current window width, so wide screens actually spread KPIs across
+   3-5 columns instead of leaving that space empty. */
 export function Kpi({ label, value, sub, tone }) {
+  const { width } = useWindowDimensions();
+  const cols = width >= 1700 ? 5 : width >= 1300 ? 4 : width >= 900 ? 3 : 2;
   const top = tone === 'red' ? C.red : tone === 'amber' ? C.amber : tone === 'green' ? C.green : C.navy3;
   return (
-    <View style={{ backgroundColor: '#fff', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: C.line, borderTopWidth: 3, borderTopColor: top, width: '48.5%', marginBottom: 10 }}>
+    <View style={{ backgroundColor: '#fff', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: C.line, borderTopWidth: 3, borderTopColor: top, width: (100 / cols - 1.5) + '%', marginBottom: 10 }}>
       <Text style={{ fontSize: 10, fontWeight: '700', color: C.mut, textTransform: 'uppercase' }}>{label}</Text>
       <Text style={{ fontSize: 19, fontWeight: '800', color: C.navy, marginTop: 3 }}>{value}</Text>
       {sub ? <Text style={{ fontSize: 10, color: C.mut, marginTop: 2 }}>{sub}</Text> : null}
@@ -112,41 +121,60 @@ export function Empty({ text }) { return <Text style={S.empty}>{text}</Text>; }
    navy header row (white uppercase text) + white body rows with bottom borders.
    cols: [{key,label,width}]  rows: [{ [col.key]: string|number|ReactNode }]
    The HTML's <table> is width:100% — it stretches columns to fill the card and only
-   needs overflow-x when the content genuinely doesn't fit. To match that instead of
-   always rendering at the sum of the fixed column widths (which left empty space on
-   wide screens/desktop web), this measures its own width and scales every column up
-   proportionally to fill it; it only falls back to a narrower, horizontally-scrollable
-   table when the container is too narrow for the columns even at their original size. */
+   needs overflow-x when the content genuinely doesn't fit.
+   A previous version measured its own width via onLayout + setState and multiplied
+   every column's px width by a computed scale factor. In practice that JS-measured
+   value was unreliable across nested ScrollViews/Cards on web (stale/zero width on
+   first paint, no re-measure on window resize) and regularly rendered at the raw
+   fixed widths, leaving a large dead gap to the right of the table on wide screens.
+   This version drops JS measurement entirely and lets CSS flexbox do the stretching:
+   each column gets `flexGrow: width` (so columns still share space in the same ratio
+   as their original design widths) with `flexBasis: 0` and `minWidth: width` (so no
+   column is ever squeezed below its usable size). The row lives inside a horizontal
+   ScrollView whose content wrapper is `minWidth: '100%'` — that percentage resolves
+   against the ScrollView's own rendered width (not the row's natural content width),
+   so on a wide container the columns grow to fill every last pixel, and on a narrow
+   one (natural sum > container) the row simply overflows into the horizontal scroll
+   instead of squashing. Text cells get numberOfLines={1} so long values (client
+   names, narrations, addresses) stay on a single line and ellipsize instead of
+   wrapping and inflating row height.
+   A row may also be a detail/expansion row instead of a normal data row: pass
+   `{ _span: <ReactNode> }` and it renders as one full-width cell (no per-column
+   split) — this is how "Lines"/"Hide"-style accordion rows (e.g. the Invoice
+   Backup register's per-bill LR breakdown) get inserted right under the row that
+   was clicked, matching the HTML build's `<td colspan="N">` sub-table pattern,
+   instead of being rendered as a separate table after the whole list. */
 export function Table({ cols, rows }) {
-  const [w, setW] = useState(0);
-  const natural = cols.reduce((s, c) => s + c.width, 0);
-  const scale = w && natural ? Math.max(1, w / natural) : 1;
-  const sCols = scale === 1 ? cols : cols.map(c => ({ ...c, width: c.width * scale }));
   return (
-    <View style={{ width: '100%', alignSelf: 'stretch' }} onLayout={e => setW(e.nativeEvent.layout.width)}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={{ width: scale > 1 ? w : undefined }}>
-          <View style={{ flexDirection: 'row', backgroundColor: C.navy }}>
-            {sCols.map(c => (
-              <Text key={c.key} style={{
-                width: c.width, paddingVertical: 8, paddingHorizontal: 10, color: '#fff',
-                fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4
-              }}>{c.label}</Text>
-            ))}
-          </View>
-          {rows.map((r, i) => (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
+      <View style={{ minWidth: '100%' }}>
+        <View style={{ flexDirection: 'row', backgroundColor: C.navy }}>
+          {cols.map(c => (
+            <Text key={c.key} numberOfLines={1} style={{
+              flexGrow: c.width, flexShrink: 0, flexBasis: 0, minWidth: c.width,
+              paddingVertical: 8, paddingHorizontal: 10, color: '#fff',
+              fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4
+            }}>{c.label}</Text>
+          ))}
+        </View>
+        {rows.map((r, i) => (
+          r && r._span !== undefined ? (
+            <View key={i} style={{ borderBottomWidth: 1, borderBottomColor: C.line, backgroundColor: C.bg }}>
+              {r._span}
+            </View>
+          ) : (
             <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.line, backgroundColor: '#fff' }}>
-              {sCols.map(c => (
-                <View key={c.key} style={{ width: c.width, paddingVertical: 8, paddingHorizontal: 10, justifyContent: 'center' }}>
+              {cols.map(c => (
+                <View key={c.key} style={{ flexGrow: c.width, flexShrink: 0, flexBasis: 0, minWidth: c.width, paddingVertical: 8, paddingHorizontal: 10, justifyContent: 'center' }}>
                   {(typeof r[c.key] === 'string' || typeof r[c.key] === 'number')
-                    ? <Text style={{ fontSize: 12, color: C.txt }}>{r[c.key]}</Text> : r[c.key]}
+                    ? <Text numberOfLines={1} style={{ fontSize: 12, color: C.txt }}>{r[c.key]}</Text> : r[c.key]}
                 </View>
               ))}
             </View>
-          ))}
-        </View>
-      </ScrollView>
-    </View>
+          )
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
