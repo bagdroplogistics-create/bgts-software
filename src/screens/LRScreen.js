@@ -48,7 +48,11 @@ export default function LRScreen({ navigation }) {
   const totalLRCount = db.lrs.length;
   const list = db.lrs.slice().filter(lrMatches).sort((a, b) => {
     const d = String(a.date) < String(b.date) ? -1 : (String(a.date) > String(b.date) ? 1 : 0);
-    return flt.sort === 'asc' ? d : -d;
+    if (d !== 0) return flt.sort === 'asc' ? d : -d;
+    /* Same date: always show the most recently created LR first regardless of the
+       date-order toggle, so a brand-new LR surfaces immediately at the top of its
+       date group instead of landing wherever the stable date-only sort leaves it. */
+    return String(b.id).localeCompare(String(a.id));
   });
   const listGross = sum(list, l => l.gross);
 

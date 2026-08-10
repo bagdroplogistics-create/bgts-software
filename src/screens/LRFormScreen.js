@@ -1,27 +1,69 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Platform, Linking } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Btn, DatePicker, PickerField, alert } from '../ui';
 import { printHtml } from '../fileIO';
 import {
-  uid, inr, todayISO, byId, blankLR, computeLR, clientName, vendorName,
+  uid, inr, fmtDate, todayISO, byId, blankLR, computeLR, clientName, vendorName, mailLink,
   truckToVehicleId, lrHireBalance, convertInquiryToLRDraft, lrHtml,
   LR_CHG, PKG_TYPES, EXP_HEADS
 } from '../logic';
 
-/* ---- small local form primitives ---- */
-function Fld({ l, v, set, num, multi, half }) {
-  const isDate = !multi && l.indexOf('Date') >= 0;
+/* ---- small local form primitives ----
+   Compact grid layout: fields flow into as many columns as comfortably fit
+   (up to `max`, default 4), collapsing to fewer/1 column on narrow screens —
+   same responsive technique already used by DashboardScreen's KpiRow. */
+function Grid({ children, min, max }) {
+  const [w, setW] = useState(0);
+  const kids = React.Children.toArray(children).filter(Boolean);
+  const capacity = w ? Math.max(1, Math.floor(w / (min || 190))) : 1;
+  const cols = Math.max(1, Math.min(max || 4, capacity, kids.length || 1));
+  const gap = 10;
+  const colW = w && cols > 1 ? (w - gap * (cols - 1)) / cols : (w ? w : '100%');
   return (
-    <View style={{ marginBottom: 10, width: half ? '48.5%' : '100%' }}>
+    <View onLayout={e => setW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
+      {kids.map((child, i) => <View key={i} style={{ width: colW }}>{child}</View>)}
+    </View>
+  );
+}
+
+/* Numeric fields get real up/down spinner controls on web (a plain HTML
+   number input) since react-native-web's TextInput has no such affordance;
+   on native this falls back to the standard numeric keyboard. */
+function NumBox({ value, onChangeText, style, placeholder }) {
+  if (Platform.OS === 'web') {
+    return React.createElement('input', {
+      type: 'number',
+      inputMode: 'decimal',
+      step: 'any',
+      value: value == null ? '' : value,
+      placeholder,
+      onChange: (e) => onChangeText(e.target.value),
+      style: { ...style, outline: 'none', fontFamily: 'inherit' }
+    });
+  }
+  return (
+    <TextInput value={value == null ? '' : String(value)} onChangeText={onChangeText}
+      keyboardType="numeric" placeholder={placeholder} placeholderTextColor={C.line2} style={style} />
+  );
+}
+
+function Fld({ l, v, set, num, multi }) {
+  const isDate = !multi && l.indexOf('Date') >= 0;
+  const boxStyle = {
+    borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7,
+    fontSize: 13, color: C.txt, backgroundColor: '#fff', minHeight: multi ? 56 : undefined, width: '100%'
+  };
+  return (
+    <View style={{ marginBottom: 10 }}>
       <Text style={{ fontSize: 10, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 4 }}>{l}</Text>
       {isDate ? (
         <DatePicker value={v == null ? '' : String(v)} onChange={set} />
+      ) : num ? (
+        <NumBox value={v} onChangeText={set} style={boxStyle} />
       ) : (
-        <TextInput value={v == null ? '' : String(v)} onChangeText={set}
-          keyboardType={num ? 'numeric' : 'default'} multiline={!!multi}
-          placeholderTextColor={C.line2}
-          style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7, fontSize: 13, color: C.txt, backgroundColor: '#fff', minHeight: multi ? 56 : undefined }} />
+        <TextInput value={v == null ? '' : String(v)} onChangeText={set} multiline={!!multi}
+          placeholderTextColor={C.line2} style={boxStyle} />
       )}
     </View>
   );
@@ -64,17 +106,21 @@ function Party({ label, p, setP, clients }) {
         />
       </View>
       <Fld l={label + ' Name *'} v={p.name} set={t => setP({ ...p, name: t })} />
-      <View style={[S.row, { justifyContent: 'space-between' }]}>
-        <View style={{ width: '48.5%' }}><Fld l="City" v={p.city} set={t => setP({ ...p, city: t })} /></View>
-        <View style={{ width: '48.5%' }}><Fld l="Contact" v={p.contact} set={t => setP({ ...p, contact: t })} /></View>
-      </View>
-      <View style={[S.row, { justifyContent: 'space-between' }]}>
-        <View style={{ width: '48.5%' }}><Fld l="PAN" v={p.pan} set={t => setP({ ...p, pan: t })} /></View>
-        <View style={{ width: '48.5%' }}><Fld l="GST" v={p.gst} set={t => setP({ ...p, gst: t })} /></View>
-      </View>
+      <Grid min={160}>
+        <Fld l="City" v={p.city} set={t => setP({ ...p, city: t })} />
+        <Fld l="Contact" v={p.contact} set={t => setP({ ...p, contact: t })} />
+        <Fld l="PAN" v={p.pan} set={t => setP({ ...p, pan: t })} />
+        <Fld l="GST" v={p.gst} set={t => setP({ ...p, gst: t })} />
+      </Grid>
     </Card>
   );
 }
+
+/* GST Slab -> auto-derived tax %. Kept as a single-bucket (IGST) auto-fill so the
+   existing separate IGST/CGST/SGST % fields stay exactly as they were (still
+   manually editable/overridable) — this just removes the need to hand-type the
+   percentage after picking a slab. */
+const GST_SLAB_PCT = { 'Exempt (RCM)': 0, '0%': 0, '5%': 5, '12%': 12, '18%': 18 };
 
 export default function LRFormScreen({ navigation, route }) {
   const { db, update } = useStore();
@@ -85,31 +131,38 @@ export default function LRFormScreen({ navigation, route }) {
 
   const [f, setF] = useState(() => {
     if (editing) return JSON.parse(JSON.stringify(editing));
+    let l;
     if (inquiry) {
-      const l = convertInquiryToLRDraft(db, inquiry);
+      l = convertInquiryToLRDraft(db, inquiry);
       l.lrNo = db.company.lrPrefix + String(db.seq.lr).padStart(4, '0');
       if (!l.goods.length) l.goods = [{ desc: '', pkgType: '', pcs: '', aw: '', cw: '', l: '', w: '', h: '' }];
-      return l;
+    } else {
+      l = blankLR();
+      l.lrNo = db.company.lrPrefix + String(db.seq.lr).padStart(4, '0');
+      if (booking) {
+        l.bookingId = booking.id;
+        l.fromPlace = booking.origin; l.toPlace = booking.destination;
+        l.lorryType = booking.vehicleType || '';
+        const v = byId(db.vehicles, booking.vehicleId);
+        l.truckNo = booking.assignType === 'Owned' ? (v ? v.regNo : '') : (booking.hiredVehicleNo || '');
+        l.ownership = booking.assignType || 'Owned';
+        const bbr = byId(db.branches || [], booking.branchId);
+        l.bookingBranch = bbr ? bbr.name : (db.branches && db.branches[0] ? db.branches[0].name : 'VADODARA');
+        l.hire = { vendorId: booking.hiredVendorId || '', amount: String(Number(booking.hireCost) || ''), advance: '', payments: [] };
+        l.ewayBillNo = booking.ewayBill || '';
+        const c = byId(db.clients, booking.clientId) || {};
+        l.consignor = { name: clientName(db, booking.clientId), city: c.addr || '', contact: c.phone || '', pan: '', gst: c.gstin || '' };
+        if (booking.cargo) l.goods = [{ desc: booking.cargo, pkgType: '', pcs: '', aw: String(booking.weightMT || ''), cw: String(booking.weightMT || ''), l: '', w: '', h: '' }];
+        l.charges.freight = String(Number(booking.freight) || 0);
+      }
+      if (!l.goods.length) l.goods = [{ desc: '', pkgType: '', pcs: '', aw: '', cw: '', l: '', w: '', h: '' }];
     }
-    const l = blankLR();
-    l.lrNo = db.company.lrPrefix + String(db.seq.lr).padStart(4, '0');
-    if (booking) {
-      l.bookingId = booking.id;
-      l.fromPlace = booking.origin; l.toPlace = booking.destination;
-      l.lorryType = booking.vehicleType || '';
-      const v = byId(db.vehicles, booking.vehicleId);
-      l.truckNo = booking.assignType === 'Owned' ? (v ? v.regNo : '') : (booking.hiredVehicleNo || '');
-      l.ownership = booking.assignType || 'Owned';
-      const bbr = byId(db.branches || [], booking.branchId);
-      l.bookingBranch = bbr ? bbr.name : (db.branches && db.branches[0] ? db.branches[0].name : 'VADODARA');
-      l.hire = { vendorId: booking.hiredVendorId || '', amount: String(Number(booking.hireCost) || ''), advance: '', payments: [] };
-      l.ewayBillNo = booking.ewayBill || '';
-      const c = byId(db.clients, booking.clientId) || {};
-      l.consignor = { name: clientName(db, booking.clientId), city: c.addr || '', contact: c.phone || '', pan: '', gst: c.gstin || '' };
-      if (booking.cargo) l.goods = [{ desc: booking.cargo, pkgType: '', pcs: '', aw: String(booking.weightMT || ''), cw: String(booking.weightMT || ''), l: '', w: '', h: '' }];
-      l.charges.freight = String(Number(booking.freight) || 0);
+    /* New LRs auto-calculate GST @ 18% out of the box (still fully editable below —
+       change the GST Slab chip or the %/amount fields directly to override). Editing
+       an existing saved LR is untouched: its own stored rates are used as-is. */
+    if (!l.gstSlab || l.gstSlab === 'Exempt (RCM)') {
+      l.gstSlab = '18%'; l.igstPct = '18'; l.cgstPct = '0'; l.sgstPct = '0';
     }
-    if (!l.goods.length) l.goods = [{ desc: '', pkgType: '', pcs: '', aw: '', cw: '', l: '', w: '', h: '' }];
     return l;
   });
 
@@ -121,6 +174,10 @@ export default function LRFormScreen({ navigation, route }) {
   const setExp = (i, k, t) => setF(p => {
     const e = p.expenses.slice(); e[i] = { ...e[i], [k]: t }; return { ...p, expenses: e };
   });
+  const setGstSlab = (slab) => {
+    const pct = GST_SLAB_PCT[slab] != null ? GST_SLAB_PCT[slab] : 0;
+    setF(p => ({ ...p, gstSlab: slab, igstPct: String(pct), cgstPct: '0', sgstPct: '0' }));
+  };
 
   const totals = useMemo(() => computeLR(f.charges, f.igstPct, f.cgstPct, f.sgstPct), [f.charges, f.igstPct, f.cgstPct, f.sgstPct]);
   const wt = useMemo(() => {
@@ -129,11 +186,39 @@ export default function LRFormScreen({ navigation, route }) {
     return { aw, cw };
   }, [f.goods]);
 
+  /* Email notification: reuses the app's existing mailto:-link pattern (the same
+     approach the WA/Email "remind" buttons already use elsewhere) — this is a
+     client-only app with no backend/SMTP, so this opens a pre-filled compose
+     window addressed to info@bgts.in immediately after a successful save. Only
+     fires for a brand-new LR (not on edits), and only after the save succeeded. */
+  const emailNewLR = (rec) => {
+    const goodsDesc = (rec.goods || []).map(g => g.desc).filter(Boolean).join(', ') || '—';
+    const gstTotal = (Number(rec.igstAmt) || 0) + (Number(rec.cgstAmt) || 0) + (Number(rec.sgstAmt) || 0);
+    const body = 'A new LR has been created in BGTS-OS.\n\n'
+      + 'LR No: ' + rec.lrNo + '\n'
+      + 'Date: ' + fmtDate(rec.date) + '\n'
+      + 'Truck No: ' + (rec.truckNo || '—') + '\n'
+      + 'From Place: ' + (rec.fromPlace || '—') + '\n'
+      + 'To Place: ' + (rec.toPlace || '—') + '\n'
+      + 'Consignor: ' + ((rec.consignor || {}).name || '—') + '\n'
+      + 'Consignee: ' + ((rec.consignee || {}).name || '—') + '\n'
+      + 'Goods Details: ' + goodsDesc + '\n'
+      + 'Actual Weight: ' + (rec.aWeight || '0') + '\n'
+      + 'Charged Weight: ' + (rec.cWeight || '0') + '\n'
+      + 'Sub Total: ' + inr(rec.subTotal) + '\n'
+      + 'GST: ' + inr(gstTotal) + '\n'
+      + 'Gross Amount: ' + inr(rec.gross) + '\n\n'
+      + '— Sent automatically by BGTS-OS';
+    Linking.openURL(mailLink('info@bgts.in', 'New LR Created — ' + rec.lrNo, body))
+      .catch(() => alert('Email not sent', 'Could not open your mail app to notify info@bgts.in. The LR itself was saved successfully.'));
+  };
+
   const save = (andPrint) => {
     const req = [[f.truckNo, 'Truck No'], [f.lrNo, 'LR No'], [f.date, 'Date'], [f.fromPlace, 'From Place'], [f.toPlace, 'To Place'], [f.consignor.name, 'Consignor Name'], [f.consignee.name, 'Consignee Name']];
     for (const [v, l] of req) { if (!String(v || '').trim()) { alert('Missing field', l + ' is required.'); return; } }
     if (f.ownership === 'Hired' && !f.hire.vendorId) { alert('Missing field', 'Select the Hire Vendor for a Hired-vehicle LR (Masters → Vendors).'); return; }
     if (db.lrs.some(l => l.lrNo === f.lrNo && l.id !== f.id)) { alert('Duplicate', 'LR No ' + f.lrNo + ' already exists.'); return; }
+    const isNew = !f.id;
     let savedRec = null;
     update(d => {
       const rec = JSON.parse(JSON.stringify(f));
@@ -186,29 +271,31 @@ export default function LRFormScreen({ navigation, route }) {
       printHtml(lrHtml(db, savedRec), savedRec.lrNo)
         .catch(e => alert('PDF error', String(e.message || e)));
     }
+    if (isNew && savedRec) emailNewLR(savedRec);
     navigation.goBack();
   };
-
-  const half = (a, b) => (
-    <View style={[S.row, { justifyContent: 'space-between' }]}>
-      <View style={{ width: '48.5%' }}>{a}</View>
-      <View style={{ width: '48.5%' }}>{b}</View>
-    </View>
-  );
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad} keyboardShouldPersistTaps="handled">
       <Card title={editing ? 'Edit LR — ' + editing.lrNo : 'ADD NEW LR' + (booking ? '  (from ' + booking.bkNo + ')' : '')}>
-        <Chips l="LR Type *" v={f.lrType} set={set('lrType')} opts={['ORIGINAL', 'DUMMY']} />
-        <Chips l="Vehicle Ownership *" v={f.ownership} set={set('ownership')} opts={['Owned', 'Hired']} />
+        <Grid min={220} max={2}>
+          <Chips l="LR Type *" v={f.lrType} set={set('lrType')} opts={['ORIGINAL', 'DUMMY']} />
+          <Chips l="Vehicle Ownership *" v={f.ownership} set={set('ownership')} opts={['Owned', 'Hired']} />
+        </Grid>
         <Text style={{ fontSize: 10.5, color: C.mut, marginTop: -6, marginBottom: 8 }}>
           Owned → add trip expenses against this LR later. Hired → hire advance & balance tracked below (internal — never prints on the LR).
         </Text>
-        {half(<Fld l="Truck No *" v={f.truckNo} set={set('truckNo')} />, <Fld l="LR No *" v={f.lrNo} set={set('lrNo')} />)}
-        <Fld l="Date *" v={f.date} set={set('date')} />
+        <Grid min={200}>
+          <Fld l="Truck No *" v={f.truckNo} set={set('truckNo')} />
+          <Fld l="LR No *" v={f.lrNo} set={set('lrNo')} />
+          <Fld l="Date *" v={f.date} set={set('date')} />
+          <Fld l="To Branch" v={f.toBranch} set={set('toBranch')} />
+        </Grid>
         <Chips l="Booking Branch" v={f.bookingBranch} set={set('bookingBranch')} opts={(db.branches || []).map(b => b.name)} />
-        {half(<Fld l="From Place *" v={f.fromPlace} set={set('fromPlace')} />, <Fld l="To Place *" v={f.toPlace} set={set('toPlace')} />)}
-        <Fld l="To Branch" v={f.toBranch} set={set('toBranch')} />
+        <Grid min={220}>
+          <Fld l="From Place *" v={f.fromPlace} set={set('fromPlace')} />
+          <Fld l="To Place *" v={f.toPlace} set={set('toPlace')} />
+        </Grid>
       </Card>
 
       {f.ownership === 'Hired' ? (
@@ -224,10 +311,10 @@ export default function LRFormScreen({ navigation, route }) {
               </TouchableOpacity>
             ))}
           </View>
-          {half(
-            <Fld l="Lorry Hire ₹" v={f.hire.amount} set={t => setF(p => ({ ...p, hire: { ...p.hire, amount: t } }))} num />,
+          <Grid min={200}>
+            <Fld l="Lorry Hire ₹" v={f.hire.amount} set={t => setF(p => ({ ...p, hire: { ...p.hire, amount: t } }))} num />
             <Fld l="Advance Paid ₹" v={f.hire.advance} set={t => setF(p => ({ ...p, hire: { ...p.hire, advance: t } }))} num />
-          )}
+          </Grid>
           <Text style={{ fontSize: 10.5, color: C.mut }}>
             {(f.hire.payments && f.hire.payments.length)
               ? 'Balance payments so far: ' + f.hire.payments.length + '. Current balance: ' + inr(lrHireBalance({ hire: f.hire })) + '. Record further payments from the LR register.'
@@ -237,42 +324,47 @@ export default function LRFormScreen({ navigation, route }) {
       ) : null}
 
       <Card title="Invoice & E-Way Bill">
-        {half(<Fld l="Invoice No" v={f.invoiceNo} set={set('invoiceNo')} />, <Fld l="Invoice Amount ₹" v={f.invAmount} set={set('invAmount')} num />)}
-        {half(<Fld l="Invoice Date" v={f.invoiceDate} set={set('invoiceDate')} />, <Fld l="P.O. Date" v={f.poDate} set={set('poDate')} />)}
-        <Fld l="E-Way Bill No" v={f.ewayBillNo} set={set('ewayBillNo')} />
-        {half(<Fld l="E-Way Bill Date" v={f.ewayBillDate} set={set('ewayBillDate')} />, <Fld l="E-Way Expiry Date" v={f.ewayExDate} set={set('ewayExDate')} />)}
+        <Grid min={190}>
+          <Fld l="Invoice No" v={f.invoiceNo} set={set('invoiceNo')} />
+          <Fld l="Invoice Amount ₹" v={f.invAmount} set={set('invAmount')} num />
+          <Fld l="Invoice Date" v={f.invoiceDate} set={set('invoiceDate')} />
+          <Fld l="P.O. Date" v={f.poDate} set={set('poDate')} />
+          <Fld l="E-Way Bill No" v={f.ewayBillNo} set={set('ewayBillNo')} />
+          <Fld l="E-Way Bill Date" v={f.ewayBillDate} set={set('ewayBillDate')} />
+          <Fld l="E-Way Expiry Date" v={f.ewayExDate} set={set('ewayExDate')} />
+        </Grid>
       </Card>
 
       <Card title="Shipment Details">
-        {half(<Fld l="Method of Packing" v={f.packing} set={set('packing')} />, <Fld l="Lorry Type" v={f.lorryType} set={set('lorryType')} />)}
-        {half(<Fld l="Private Mark" v={f.privateMark} set={set('privateMark')} />, <Fld l="Insurance" v={f.insurance} set={set('insurance')} />)}
+        <Grid min={190}>
+          <Fld l="Method of Packing" v={f.packing} set={set('packing')} />
+          <Fld l="Lorry Type" v={f.lorryType} set={set('lorryType')} />
+          <Fld l="Private Mark" v={f.privateMark} set={set('privateMark')} />
+          <Fld l="Insurance" v={f.insurance} set={set('insurance')} />
+          <Fld l="Agent" v={f.agent} set={set('agent')} />
+          <Fld l="To Be Billed At" v={f.billedAt} set={set('billedAt')} />
+        </Grid>
         <Chips l="LR Mode" v={f.lrMode} set={set('lrMode')} opts={['Door Delivery', 'Godown Delivery', 'Direct Delivery']} />
         <Fld l="Delivery Address" v={f.deliveryAddress} set={set('deliveryAddress')} multi />
         <Chips l="Billing Party" v={f.billingParty} set={set('billingParty')} opts={['Consignor', 'Consignee', 'Third Party']} />
         <Chips l="GST Paid By" v={f.gstPaidBy} set={set('gstPaidBy')} opts={['Consignor', 'Consignee', 'Transporter']} />
-        <Chips l="GST Slab" v={f.gstSlab} set={set('gstSlab')} opts={['Exempt (RCM)', '0%', '5%', '12%', '18%']} />
+        <Chips l="GST Slab" v={f.gstSlab} set={setGstSlab} opts={['Exempt (RCM)', '0%', '5%', '12%', '18%']} />
         <Chips l="Payment Terms" v={f.payTerms} set={set('payTerms')} opts={['PAID', 'TO PAY', 'TO BE BILLED']} />
-        {half(<Fld l="Agent" v={f.agent} set={set('agent')} />, <Fld l="To Be Billed At" v={f.billedAt} set={set('billedAt')} />)}
       </Card>
-
-      <Party label="CONSIGNOR" p={f.consignor} setP={p => setF(x => ({ ...x, consignor: p }))} clients={db.clients} color={C.navy3} />
-      <Party label="CONSIGNEE" p={f.consignee} setP={p => setF(x => ({ ...x, consignee: p }))} clients={db.clients} color={C.amberD} />
-      <Party label="BILLING TO" p={f.billingTo} setP={p => setF(x => ({ ...x, billingTo: p }))} clients={db.clients} color={C.green} />
 
       <Card title="Goods Details">
         {f.goods.map((g, i) => (
           <View key={i} style={{ borderWidth: 1, borderColor: C.line, borderRadius: 8, padding: 10, marginBottom: 10 }}>
             <Fld l={'Description ' + (i + 1)} v={g.desc} set={t => setGoods(i, 'desc', t)} />
             <Chips l="Pkgs Type" v={g.pkgType} set={t => setGoods(i, 'pkgType', t)} opts={PKG_TYPES} />
-            {half(<Fld l="Pcs" v={g.pcs} set={t => setGoods(i, 'pcs', t)} num />, <Fld l="Actual Weight" v={g.aw} set={t => setGoods(i, 'aw', t)} num />)}
-            {half(
-              <Fld l="Charged Weight" v={g.cw} set={t => setGoods(i, 'cw', t)} num />,
-              <View style={[S.row, { justifyContent: 'space-between' }]}>
-                <View style={{ width: '31%' }}><Fld l="L" v={g.l} set={t => setGoods(i, 'l', t)} num /></View>
-                <View style={{ width: '31%' }}><Fld l="W" v={g.w} set={t => setGoods(i, 'w', t)} num /></View>
-                <View style={{ width: '31%' }}><Fld l="H" v={g.h} set={t => setGoods(i, 'h', t)} num /></View>
-              </View>
-            )}
+            <Grid min={110} max={6}>
+              <Fld l="Pcs" v={g.pcs} set={t => setGoods(i, 'pcs', t)} num />
+              <Fld l="Actual Weight" v={g.aw} set={t => setGoods(i, 'aw', t)} num />
+              <Fld l="Charged Weight" v={g.cw} set={t => setGoods(i, 'cw', t)} num />
+              <Fld l="L" v={g.l} set={t => setGoods(i, 'l', t)} num />
+              <Fld l="W" v={g.w} set={t => setGoods(i, 'w', t)} num />
+              <Fld l="H" v={g.h} set={t => setGoods(i, 'h', t)} num />
+            </Grid>
             {f.goods.length > 1 ? <Btn small tone="red" label="Remove Row" onPress={() => setF(x => ({ ...x, goods: x.goods.filter((_, j) => j !== i) }))} /> : null}
           </View>
         ))}
@@ -282,11 +374,52 @@ export default function LRFormScreen({ navigation, route }) {
         </View>
       </Card>
 
+      <Party label="CONSIGNOR" p={f.consignor} setP={p => setF(x => ({ ...x, consignor: p }))} clients={db.clients} color={C.navy3} />
+      <Party label="CONSIGNEE" p={f.consignee} setP={p => setF(x => ({ ...x, consignee: p }))} clients={db.clients} color={C.amberD} />
+      <Party label="BILLING TO" p={f.billingTo} setP={p => setF(x => ({ ...x, billingTo: p }))} clients={db.clients} color={C.green} />
+
+      <Card title="Charges">
+        <Grid min={175}>
+          <Fld l="Above %" v={f.charges.abovePct} set={setCh('abovePct')} num />
+          <Fld l="Above — Charge ₹" v={f.charges.aboveCh} set={setCh('aboveCh')} num />
+          <Fld l="Below %" v={f.charges.belowPct} set={setCh('belowPct')} num />
+          <Fld l="Below — Charge ₹" v={f.charges.belowCh} set={setCh('belowCh')} num />
+          <Fld l="Rate" v={f.charges.rate} set={setCh('rate')} num />
+          {LR_CHG.map(c => (
+            <Fld key={c[0]} l={c[1] + ' ₹'} v={f.charges[c[0]]} set={setCh(c[0])} num />
+          ))}
+        </Grid>
+
+        <View style={{ backgroundColor: C.bg, borderRadius: 8, padding: 12, marginTop: 6 }}>
+          <View style={[S.row, { justifyContent: 'space-between' }]}>
+            <Text style={{ fontWeight: '800', color: C.navy }}>SUB TOTAL</Text>
+            <Text style={{ fontWeight: '800', color: C.navy }}>{inr(totals.subTotal)}</Text>
+          </View>
+          <Grid min={140} max={3}>
+            <Fld l="IGST %" v={f.igstPct} set={set('igstPct')} num />
+            <Fld l="CGST %" v={f.cgstPct} set={set('cgstPct')} num />
+            <Fld l="SGST %" v={f.sgstPct} set={set('sgstPct')} num />
+          </Grid>
+          <View style={[S.wrapRow, { justifyContent: 'space-between', marginBottom: 4 }]}>
+            <Text style={{ fontSize: 11.5, color: C.mut }}>IGST Amount: <Text style={{ fontWeight: '800', color: C.txt }}>{inr(totals.igstAmt)}</Text></Text>
+            <Text style={{ fontSize: 11.5, color: C.mut }}>CGST Amount: <Text style={{ fontWeight: '800', color: C.txt }}>{inr(totals.cgstAmt)}</Text></Text>
+            <Text style={{ fontSize: 11.5, color: C.mut }}>SGST Amount: <Text style={{ fontWeight: '800', color: C.txt }}>{inr(totals.sgstAmt)}</Text></Text>
+          </View>
+          <View style={[S.row, { justifyContent: 'space-between', borderTopWidth: 2, borderTopColor: C.amber, paddingTop: 8, marginTop: 4 }]}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: C.navy }}>GROSS AMOUNT</Text>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: C.navy }}>{inr(totals.gross)}</Text>
+          </View>
+        </View>
+      </Card>
+
       <Card title="LR Expenses (auto-posts to Accounting)">
         {(f.expenses || []).map((e, i) => (
           <View key={i} style={{ borderWidth: 1, borderColor: C.line, borderRadius: 8, padding: 10, marginBottom: 10 }}>
             <Chips l="Account" v={e.account} set={t => setExp(i, 'account', t)} opts={EXP_HEADS.slice(0, 8)} />
-            {half(<Fld l="Amount ₹" v={e.amount} set={t => setExp(i, 'amount', t)} num />, <Fld l="Remarks" v={e.remarks} set={t => setExp(i, 'remarks', t)} />)}
+            <Grid min={190}>
+              <Fld l="Amount ₹" v={e.amount} set={t => setExp(i, 'amount', t)} num />
+              <Fld l="Remarks" v={e.remarks} set={t => setExp(i, 'remarks', t)} />
+            </Grid>
             <Btn small tone="red" label="Remove" onPress={() => setF(x => ({ ...x, expenses: x.expenses.filter((_, j) => j !== i) }))} />
           </View>
         ))}
@@ -295,35 +428,10 @@ export default function LRFormScreen({ navigation, route }) {
 
       <Card title="Remarks & Staff">
         <Fld l="Remark" v={f.remark} set={set('remark')} multi />
-        {half(<Fld l="Employee" v={f.employee} set={set('employee')} />, <Fld l="Truck Driver No" v={f.driverNo} set={set('driverNo')} />)}
-      </Card>
-
-      <Card title="Charges">
-        {half(<Fld l="Above %" v={f.charges.abovePct} set={setCh('abovePct')} num />, <Fld l="Above — Charge ₹" v={f.charges.aboveCh} set={setCh('aboveCh')} num />)}
-        {half(<Fld l="Below %" v={f.charges.belowPct} set={setCh('belowPct')} num />, <Fld l="Below — Charge ₹" v={f.charges.belowCh} set={setCh('belowCh')} num />)}
-        <Fld l="Rate" v={f.charges.rate} set={setCh('rate')} num />
-        {LR_CHG.reduce((rows, c, i) => {
-          if (i % 2 === 0) rows.push([c]); else rows[rows.length - 1].push(c);
-          return rows;
-        }, []).map((pair, i) => (
-          <View key={i} style={[S.row, { justifyContent: 'space-between' }]}>
-            <View style={{ width: '48.5%' }}><Fld l={pair[0][1] + ' ₹'} v={f.charges[pair[0][0]]} set={setCh(pair[0][0])} num /></View>
-            <View style={{ width: '48.5%' }}>{pair[1] ? <Fld l={pair[1][1] + ' ₹'} v={f.charges[pair[1][0]]} set={setCh(pair[1][0])} num /> : null}</View>
-          </View>
-        ))}
-        <View style={{ backgroundColor: C.bg, borderRadius: 8, padding: 12, marginTop: 6 }}>
-          <View style={[S.row, { justifyContent: 'space-between' }]}>
-            <Text style={{ fontWeight: '800', color: C.navy }}>SUB TOTAL</Text>
-            <Text style={{ fontWeight: '800', color: C.navy }}>{inr(totals.subTotal)}</Text>
-          </View>
-          {half(<Fld l="IGST %" v={f.igstPct} set={set('igstPct')} num />, <View style={{ paddingTop: 18 }}><Text style={{ fontWeight: '700', color: C.txt }}>{inr(totals.igstAmt)}</Text></View>)}
-          {half(<Fld l="CGST %" v={f.cgstPct} set={set('cgstPct')} num />, <View style={{ paddingTop: 18 }}><Text style={{ fontWeight: '700', color: C.txt }}>{inr(totals.cgstAmt)}</Text></View>)}
-          {half(<Fld l="SGST %" v={f.sgstPct} set={set('sgstPct')} num />, <View style={{ paddingTop: 18 }}><Text style={{ fontWeight: '700', color: C.txt }}>{inr(totals.sgstAmt)}</Text></View>)}
-          <View style={[S.row, { justifyContent: 'space-between', borderTopWidth: 2, borderTopColor: C.amber, paddingTop: 8, marginTop: 4 }]}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: C.navy }}>GROSS AMOUNT</Text>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: C.navy }}>{inr(totals.gross)}</Text>
-          </View>
-        </View>
+        <Grid min={190}>
+          <Fld l="Employee" v={f.employee} set={set('employee')} />
+          <Fld l="Truck Driver No" v={f.driverNo} set={set('driverNo')} />
+        </Grid>
       </Card>
 
       <View style={[S.wrapRow, { justifyContent: 'flex-end', marginBottom: 30 }]}>
