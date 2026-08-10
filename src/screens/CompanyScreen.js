@@ -85,11 +85,6 @@ export default function CompanyScreen({ route, navigation }) {
       d.seq.mr++;
     })
   });
-  const waRemind = (inv, o) => {
-    if (!c.phone) { alert('No phone', 'Add a WhatsApp number in the client master.'); return; }
-    Linking.openURL(waLink(c.phone, 'BGTS Payment Reminder — Bill ' + inv.invNo + ' dated ' + fmtDate(inv.date) + ', balance ' + inr(o) + '. Kindly arrange payment. — Baroda Goods Transport Service Pvt. Ltd.')).catch(() => {});
-  };
-
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
       <Card title={c.name}
@@ -168,7 +163,6 @@ export default function CompanyScreen({ route, navigation }) {
                 actions: (
                   <View style={S.wrapRow}>
                     <Btn small tone="green" label="+ Payment" onPress={() => recordPayment(inv)} />
-                    <Btn small tone="wa" label="WA Remind" onPress={() => waRemind(inv, o)} />
                   </View>
                 )
               };

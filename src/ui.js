@@ -123,7 +123,7 @@ export function Table({ cols, rows }) {
   const scale = w && natural ? Math.max(1, w / natural) : 1;
   const sCols = scale === 1 ? cols : cols.map(c => ({ ...c, width: c.width * scale }));
   return (
-    <View onLayout={e => setW(e.nativeEvent.layout.width)}>
+    <View style={{ width: '100%', alignSelf: 'stretch' }} onLayout={e => setW(e.nativeEvent.layout.width)}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={{ width: scale > 1 ? w : undefined }}>
           <View style={{ flexDirection: 'row', backgroundColor: C.navy }}>

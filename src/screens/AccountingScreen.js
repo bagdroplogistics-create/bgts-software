@@ -5,7 +5,7 @@ import { downloadFile, printHtml } from '../fileIO';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert, PickerField, DatePicker } from '../ui';
 import {
   uid, inr, sum, fmtDate, todayISO, addDaysISO, daysSince, byId, removeById,
-  clientName, invPaid, invOutstanding, waLink, mailLink, EXP_HEADS, PAY_THROUGH,
+  clientName, invPaid, invOutstanding, mailLink, EXP_HEADS, PAY_THROUGH,
   csvString, receiptHtml
 } from '../logic';
 
@@ -114,13 +114,6 @@ export default function AccountingScreen({ navigation }) {
       }
     })
   });
-
-  const waRemind = (inv, out) => {
-    const c = byId(db.clients, inv.clientId);
-    if (!c || !c.phone) { alert('No phone', 'Add a WhatsApp number for this client in Masters.'); return; }
-    const msg = 'BGTS Payment Reminder — Invoice ' + inv.invNo + ' dated ' + fmtDate(inv.date) + '. Outstanding: ' + inr(out) + '. Kindly arrange payment at the earliest. — Baroda Goods Transport Service Pvt. Ltd.';
-    Linking.openURL(waLink(c.phone, msg)).catch(() => alert('Error', 'Could not open WhatsApp.'));
-  };
 
   const emailRemind = (inv, out) => {
     const c = byId(db.clients, inv.clientId);

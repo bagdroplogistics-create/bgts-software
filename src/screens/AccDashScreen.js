@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Kpi, Empty, Table } from '../ui';
+import { C, S, Card, Kpi, Empty, Table, Btn } from '../ui';
 import { inr, sum, pad, invOutstanding, invPaid, ageingBuckets } from '../logic';
 
 function Bars({ items, fmt }) {
@@ -24,7 +24,7 @@ function Bars({ items, fmt }) {
 }
 const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export default function AccDashScreen() {
+export default function AccDashScreen({ navigation }) {
   const { db } = useStore();
   const invoiced = sum(db.invoices, i => i.total);
   const collected = sum(db.payments, p => p.amount);
@@ -46,6 +46,9 @@ export default function AccDashScreen() {
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
+      <View style={{ marginBottom: 4 }}>
+        <Btn small tone="ghost" label="← Accounting" onPress={() => navigation.navigate('Accounting')} />
+      </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <Kpi label="Invoiced" value={inr(invoiced)} sub={db.invoices.length + ' invoices'} />
         <Kpi label="Collected" value={inr(collected)} sub={db.payments.length + ' receipts'} tone="green" />

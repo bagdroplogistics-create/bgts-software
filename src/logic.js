@@ -890,28 +890,6 @@ export function numWordsIN(n){
   if (n) parts.push(three(n));
   return parts.join(' ');
 }
-export function receiptHtml(db, p){
-  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const inv = byId(db.invoices, p.invoiceId) || {};
-  const br = byId(db.branches || [], inv.branchId) || {};
-  const co = { name: br.entityName || db.company.name, addr: br.addr || db.company.addr, gstin: br.gstin || db.company.gstin };
-  const bal = inv.id ? invOutstanding(db, inv) : 0;
-  return '<html><head><meta charset="utf-8"><style>body{font-family:Arial;font-size:12px;margin:20px}'
-    + '.doc{border:2px solid #0a1f38;max-width:620px}.head{background:#0a1f38;color:#fff;padding:12px 16px;display:flex;justify-content:space-between}'
-    + '.head h1{margin:0;font-size:16px}.head p{margin:2px 0 0;font-size:9.5px;color:#c7d0dc}.num{text-align:right;font-size:11px}.num b{color:#e8a33d;font-size:14px}'
-    + 'table{width:100%;border-collapse:collapse}td,th{border:1px solid #94a3b8;padding:7px 9px;font-size:11.5px;text-align:left}th{background:#eef1f5;width:35%}.sig{height:55px}'
-    + '.terms{font-size:8.5px;color:#555;padding:7px 10px}</style></head><body><div class="doc">'
-    + '<div class="head"><div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + '</p><p>MONEY RECEIPT</p></div>'
-    + '<div class="num">Receipt No.<br><b>' + esc(p.mrNo || 'MR') + '</b><br>Date: ' + fmtDate(p.date) + '</div></div>'
-    + '<table><tr><th>Received with thanks from</th><td><b>' + esc(clientName(db, inv.clientId)) + '</b></td></tr>'
-    + '<tr><th>The sum of</th><td><b>' + inr(p.amount) + '</b><br><span style="font-size:10px">Rupees ' + esc(numWordsIN(p.amount)) + ' Only</span></td></tr>'
-    + '<tr><th>By</th><td>' + esc(p.mode || '—') + (p.ref ? ' · Ref: ' + esc(p.ref) : '') + '</td></tr>'
-    + '<tr><th>Against Invoice</th><td>' + esc(inv.invNo || '—') + '</td></tr>'
-    + '<tr><th>Balance after this receipt</th><td><b>' + inr(bal) + '</b></td></tr></table>'
-    + '<table><tr><th style="width:50%">Receiver Signature</th><th>For ' + esc(co.name) + '</th></tr><tr><td class="sig"></td><td class="sig"></td></tr></table>'
-    + '<div class="terms">Subject to realisation. System-generated from BGTS-OS.</div></div></body></html>';
-}
-
 /* ---------- messages ---------- */
 export function waBookingMsg(db, b){
   let m = 'BGTS Update — Booking ' + b.bkNo + '\n' + b.origin + ' → ' + b.destination + '\nStatus: ' + b.status;
@@ -923,6 +901,69 @@ export function waBookingMsg(db, b){
   if (b.assignType === 'Hired') m += '\nVehicle: ' + (b.hiredVehicleNo || '');
   m += '\n— Baroda Goods Transport Service Pvt. Ltd.';
   return m;
+}
+
+/* Brand mark shared by every printable document (LR, receipt, and any future one) —
+   inline SVG so it prints crisply on its own standalone page, since these documents
+   open outside the app shell and can't reuse the app's own View-based <Logo/>. */
+function bgtsLogoSvg(size){
+  size = size || 46;
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">'
+    + '<defs><linearGradient id="bglg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d4d84"/><stop offset="1" stop-color="#0a1f38"/></linearGradient></defs>'
+    + '<rect width="64" height="64" rx="14" fill="url(#bglg)"/>'
+    + '<rect x="2" y="2" width="60" height="60" rx="12" fill="none" stroke="#e8a33d" stroke-width="1.6" opacity="0.85"/>'
+    + '<text x="32" y="22" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="12.5" font-weight="800" fill="#ffffff" letter-spacing="1.5">BGTS</text>'
+    + '<rect x="13" y="29" width="23" height="12" rx="2" fill="#e8a33d"/>'
+    + '<path d="M36 32 h8.5 l5 5.5 v3.5 h-13.5 z" fill="#e8a33d"/>'
+    + '<rect x="38.5" y="34" width="4.5" height="3.6" rx="0.8" fill="#0a1f38"/>'
+    + '<circle cx="20" cy="44" r="3.6" fill="#ffffff"/><circle cx="20" cy="44" r="1.5" fill="#0a1f38"/>'
+    + '<circle cx="42" cy="44" r="3.6" fill="#ffffff"/><circle cx="42" cy="44" r="1.5" fill="#0a1f38"/>'
+    + '<rect x="5" y="31" width="5" height="1.8" rx="0.9" fill="#c7d0dc"/>'
+    + '<rect x="3" y="35" width="7" height="1.8" rx="0.9" fill="#c7d0dc" opacity="0.7"/>'
+    + '<rect x="6" y="39" width="4" height="1.8" rx="0.9" fill="#c7d0dc" opacity="0.5"/>'
+    + '<rect x="8" y="52" width="48" height="2.4" rx="1.2" fill="#e8a33d"/>'
+    + '</svg>';
+}
+/* Shared page chrome (branded header + base table/print styles) so every printable
+   document — LR, receipt, and any future one — looks like one consistent, professional
+   document family instead of each screen inventing its own look. */
+function printDocStyle(){
+  return '@page{size:A4;margin:12mm}'
+    + '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:11.5px;color:#111;margin:16px;background:#eef1f5}'
+    + '.doc{border:2px solid #0a1f38;border-radius:10px;overflow:hidden;max-width:800px;margin:0 auto;background:#fff}'
+    + '.r{text-align:right}.muted{color:#6b7a8f;font-style:italic}'
+    + '.head{background:#0a1f38;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px}'
+    + '.head .brand{display:flex;gap:12px;align-items:center}'
+    + '.head h1{margin:0;font-size:18px;letter-spacing:.2px}.head p{margin:3px 0 0;font-size:9.5px;color:#c7d0dc}'
+    + '.num{text-align:right;font-size:11px;line-height:1.5;white-space:nowrap}.num b{color:#e8a33d;font-size:15px}'
+    + 'table{width:100%;border-collapse:collapse}'
+    + 'td,th{border:1px solid #c7d0dc;padding:6px 8px;font-size:10.8px;text-align:left;vertical-align:top}'
+    + 'th{background:#eef1f5;font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:#33455c}'
+    + '.sig{height:60px}'
+    + '.totalsTbl td{border-color:#94a3b8}'
+    + '.grossRow td{background:#fdf1de;font-size:13px}'
+    + '.terms{font-size:8.5px;color:#555;padding:9px 12px;border-top:1px solid #94a3b8;background:#f6f8fa}'
+    + '@media print{ body{background:#fff;margin:0} .doc{border-radius:0;max-width:none} }';
+}
+
+/* ---------- money receipt HTML (for PDF sharing) ---------- */
+export function receiptHtml(db, p){
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inv = byId(db.invoices, p.invoiceId) || {};
+  const br = byId(db.branches || [], inv.branchId) || {};
+  const co = { name: br.entityName || db.company.name, addr: br.addr || db.company.addr, gstin: br.gstin || db.company.gstin };
+  const bal = inv.id ? invOutstanding(db, inv) : 0;
+  return '<html><head><meta charset="utf-8"><title>Receipt ' + esc(p.mrNo || '') + '</title><style>' + printDocStyle() + '</style></head><body><div class="doc">'
+    + '<div class="head"><div class="brand">' + bgtsLogoSvg(46) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + '</p><p>MONEY RECEIPT</p></div></div>'
+    + '<div class="num">Receipt No.<br><b>' + esc(p.mrNo || 'MR') + '</b><br>Date: ' + fmtDate(p.date) + '</div></div>'
+    + '<table><tr><th style="width:35%">Received with thanks from</th><td><b>' + esc(clientName(db, inv.clientId)) + '</b></td></tr>'
+    + '<tr><th>The sum of</th><td><b>' + inr(p.amount) + '</b><br><span style="font-size:10px;color:#555">Rupees ' + esc(numWordsIN(p.amount)) + ' Only</span></td></tr>'
+    + '<tr><th>By</th><td>' + esc(p.mode || '—') + (p.ref ? ' · Ref: ' + esc(p.ref) : '') + '</td></tr>'
+    + '<tr><th>Against Invoice</th><td>' + esc(inv.invNo || '—') + (inv.total ? ' (invoice total ' + inr(inv.total) + ')' : '') + '</td></tr>'
+    + '<tr class="grossRow"><th>Balance after this receipt</th><td><b>' + inr(bal) + '</b></td></tr></table>'
+    + '<table><tr><th style="width:50%">Receiver Signature</th><th>For ' + esc(co.name) + '</th></tr><tr><td class="sig"></td><td class="sig"></td></tr></table>'
+    + '<div class="terms">Subject to realisation of the instrument/transfer. This is a system-generated receipt from BGTS-OS.</div></div></body></html>';
 }
 
 /* ---------- LR document HTML (full v2 format, for PDF sharing) ---------- */
@@ -950,44 +991,9 @@ export function lrHtml(db, l){
   if (Number(ch.belowCh)) chg += '<tr><td>Below ' + esc(ch.belowPct || '') + '%</td><td class="r">' + inr(ch.belowCh) + '</td></tr>';
   LR_CHG.forEach(c => { if (Number(ch[c[0]])) chg += '<tr><td>' + c[1] + '</td><td class="r">' + inr(ch[c[0]]) + '</td></tr>'; });
   if (!chg) chg = '<tr><td class="muted">No charge lines entered.</td><td class="r">—</td></tr>';
-  /* Brand mark — same truck/BGTS glyph used across the app, as inline SVG so it prints
-     crisply on its own standalone page (this document opens outside the app shell, so
-     it can't reuse the app's own View-based <Logo/> component). */
-  const logo = '<svg width="46" height="46" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">'
-    + '<defs><linearGradient id="bglg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d4d84"/><stop offset="1" stop-color="#0a1f38"/></linearGradient></defs>'
-    + '<rect width="64" height="64" rx="14" fill="url(#bglg)"/>'
-    + '<rect x="2" y="2" width="60" height="60" rx="12" fill="none" stroke="#e8a33d" stroke-width="1.6" opacity="0.85"/>'
-    + '<text x="32" y="22" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="12.5" font-weight="800" fill="#ffffff" letter-spacing="1.5">BGTS</text>'
-    + '<rect x="13" y="29" width="23" height="12" rx="2" fill="#e8a33d"/>'
-    + '<path d="M36 32 h8.5 l5 5.5 v3.5 h-13.5 z" fill="#e8a33d"/>'
-    + '<rect x="38.5" y="34" width="4.5" height="3.6" rx="0.8" fill="#0a1f38"/>'
-    + '<circle cx="20" cy="44" r="3.6" fill="#ffffff"/><circle cx="20" cy="44" r="1.5" fill="#0a1f38"/>'
-    + '<circle cx="42" cy="44" r="3.6" fill="#ffffff"/><circle cx="42" cy="44" r="1.5" fill="#0a1f38"/>'
-    + '<rect x="5" y="31" width="5" height="1.8" rx="0.9" fill="#c7d0dc"/>'
-    + '<rect x="3" y="35" width="7" height="1.8" rx="0.9" fill="#c7d0dc" opacity="0.7"/>'
-    + '<rect x="6" y="39" width="4" height="1.8" rx="0.9" fill="#c7d0dc" opacity="0.5"/>'
-    + '<rect x="8" y="52" width="48" height="2.4" rx="1.2" fill="#e8a33d"/>'
-    + '</svg>';
-  return '<html><head><meta charset="utf-8"><title>LR ' + esc(l.lrNo) + '</title><style>'
-    + '@page{size:A4;margin:12mm}'
-    + '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-    + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:11.5px;color:#111;margin:16px;background:#eef1f5}'
-    + '.doc{border:2px solid #0a1f38;border-radius:10px;overflow:hidden;max-width:800px;margin:0 auto;background:#fff}'
-    + '.r{text-align:right}.muted{color:#6b7a8f;font-style:italic}'
-    + '.head{background:#0a1f38;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px}'
-    + '.head .brand{display:flex;gap:12px;align-items:center}'
-    + '.head h1{margin:0;font-size:18px;letter-spacing:.2px}.head p{margin:3px 0 0;font-size:9.5px;color:#c7d0dc}'
-    + '.num{text-align:right;font-size:11px;line-height:1.5;white-space:nowrap}.num b{color:#e8a33d;font-size:15px}'
-    + 'table{width:100%;border-collapse:collapse}'
-    + 'td,th{border:1px solid #c7d0dc;padding:6px 8px;font-size:10.8px;text-align:left;vertical-align:top}'
-    + 'th{background:#eef1f5;font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:#33455c}'
-    + '.sig{height:60px}'
-    + '.totalsTbl td{border-color:#94a3b8}'
-    + '.grossRow td{background:#fdf1de;font-size:13px}'
-    + '.terms{font-size:8.5px;color:#555;padding:9px 12px;border-top:1px solid #94a3b8;background:#f6f8fa}'
-    + '@media print{ body{background:#fff;margin:0} .doc{border-radius:0;max-width:none} }'
+  return '<html><head><meta charset="utf-8"><title>LR ' + esc(l.lrNo) + '</title><style>' + printDocStyle()
     + '</style></head><body><div class="doc">'
-    + '<div class="head"><div class="brand">' + logo + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + (co.phone ? ' · Ph: ' + esc(co.phone) : '') + '</p>'
+    + '<div class="head"><div class="brand">' + bgtsLogoSvg(46) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + (co.phone ? ' · Ph: ' + esc(co.phone) : '') + '</p>'
     + '<p>CONSIGNMENT NOTE / LORRY RECEIPT — AT OWNER\'S RISK' + (l.lrType === 'DUMMY' ? ' — <b>DUMMY</b>' : '') + '</p></div></div>'
     + '<div class="num">LR No.<br><b>' + esc(l.lrNo) + '</b><br>Date: ' + fmtDate(l.date) + '<br>' + esc(l.lrType) + '</div></div>'
     + '<table><tr><th>Truck No</th><th>From</th><th>To</th><th>Booking Branch</th><th>To Branch</th><th>Lorry Type</th></tr>'

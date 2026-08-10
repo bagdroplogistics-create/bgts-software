@@ -9,7 +9,7 @@ import {
   invOutstanding, clientName, receiptHtml, csvString, todayISO
 } from '../logic';
 
-export default function BankingScreen() {
+export default function BankingScreen({ navigation }) {
   const { db, update } = useStore();
   const [paste, setPaste] = useState('');
   const [form, setForm] = useState(null);
@@ -65,6 +65,9 @@ export default function BankingScreen() {
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad} keyboardShouldPersistTaps="handled">
+      <View style={{ marginBottom: 4 }}>
+        <Btn small tone="ghost" label="← Accounting" onPress={() => navigation.navigate('Accounting')} />
+      </View>
       <Card title="Import Bank Statement (credits → match → receipt)">
         <Text style={{ fontSize: 11.5, color: C.mut, marginBottom: 10 }}>
           Only CREDIT rows are taken (inward payments); duplicates auto-skip so overlapping periods are safe. Columns: date, narration, ref/UTR, debit, credit (or amount + Dr/Cr).
