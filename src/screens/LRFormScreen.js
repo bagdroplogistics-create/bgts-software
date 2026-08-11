@@ -99,8 +99,11 @@ function TruckNoField({ v, set, db }) {
   const [open, setOpen] = useState(false);
   const list = db.truckMaster || [];
   const q = String(v || '').replace(/\s/g, '').toUpperCase();
+  /* Wait for at least 3 characters before matching — a 1-2 character query
+     (e.g. just "1") matches almost every truck number and dumps the whole
+     list in the picker, which isn't a useful narrowing. */
   const suggestions = useMemo(() => (
-    q ? list.filter(t => String(t.truckNo || '').replace(/\s/g, '').toUpperCase().indexOf(q) >= 0).slice(0, 30) : []
+    q.length >= 3 ? list.filter(t => String(t.truckNo || '').replace(/\s/g, '').toUpperCase().indexOf(q) >= 0).slice(0, 15) : []
   ), [list, q]);
   const match = useMemo(() => findTruckMaster(db, v), [db.truckMaster, v]);
   const boxStyle = {
