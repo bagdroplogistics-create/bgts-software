@@ -9,9 +9,23 @@ import { downloadFile, readPickedFile } from '../fileIO';
 const FIELDS = [['name', 'Company Name'], ['gstin', 'GSTIN'], ['addr', 'Address'], ['phone', 'Phone'], ['email', 'Email'], ['lrPrefix', 'LR Number Prefix']];
 
 export default function SettingsScreen() {
-  const { db, update, replace } = useStore();
+  const { db, update, replace, syncState, migrateToDatabase, usingSharedDb } = useStore();
   const [co, setCo] = useState({ ...db.company });
   const [paste, setPaste] = useState('');
+  const [migrating, setMigrating] = useState(false);
+
+  const syncToDatabase = () => {
+    if (migrating) return;
+    confirmDo(
+      'Push all data currently on this device to the shared database? Safe to run more than once — existing records are updated in place, not duplicated.',
+      async () => {
+        setMigrating(true);
+        try { await migrateToDatabase(); alert('Synced', 'This device\'s data has been written to the shared database. Reload the app to start reading from it.'); }
+        catch (e) { alert('Sync error', String(e.message || e)); }
+        setMigrating(false);
+      }
+    );
+  };
 
   const saveCompany = () => {
     update(d => { FIELDS.forEach(f => { d.company[f[0]] = co[f[0]] || ''; }); });
@@ -63,9 +77,18 @@ export default function SettingsScreen() {
         <Btn label="Save Profile" tone="amber" onPress={saveCompany} />
       </Card>
 
+      <Card title="Shared Database">
+        <Text style={{ fontSize: 12, color: C.mut, marginBottom: 10 }}>
+          {usingSharedDb
+            ? 'This device is reading and writing the shared Supabase database — changes here are visible to every other signed-in device. ' + (syncState === 'saving' ? 'Syncing…' : syncState === 'error' ? 'Last sync failed — see the alert for details.' : 'Up to date.')
+            : 'This device is still on local storage only — its data has not been pushed to the shared database yet. Run this once from the device that has your real data.'}
+        </Text>
+        {!usingSharedDb ? <Btn label={migrating ? 'Syncing…' : '⇪ Sync This Device to Database'} tone="amber" onPress={syncToDatabase} /> : null}
+      </Card>
+
       <Card title="Data & Backup">
         <Text style={{ fontSize: 12, color: C.mut, marginBottom: 10 }}>
-          Data lives on this device (AsyncStorage). Export a JSON backup regularly — it is your off-device safety copy until the hosted multi-user backend is built.
+          Export a JSON backup regularly regardless of whether you're on the shared database or local storage — it's your off-device safety copy either way.
         </Text>
         <View style={[S.wrapRow]}>
           <Btn label="⬇ Export Backup (JSON)" onPress={exportBackup} />
@@ -83,7 +106,7 @@ export default function SettingsScreen() {
 
       <Card title="About This Build">
         <Text style={{ fontSize: 12, color: C.mut }}>
-          BGTS-OS Mobile v1.0 (React Native / Expo) — same data model and modules as the web build: Bookings, LR/CN with PDF share, Masters, Owned & Hired Fleet, Renewals, Contracts/Tenders rate engine, Accounting, Reports, WhatsApp/Email triggers. The hosted multi-user backend (shared database, logins, e-way bill API, Zoho Books sync) is the Phase 1 server build in BGTS_TMS_System_Design.md.
+          BGTS-OS Mobile v1.0 (React Native / Expo) — same data model and modules as the web build: Bookings, LR/CN with PDF share, Masters, Owned & Hired Fleet, Renewals, Contracts/Tenders rate engine, Accounting, Reports, WhatsApp/Email triggers. Backed by a shared Supabase database with sign-in — see the Shared Database card above. E-way bill API and Zoho Books sync remain a future phase.
         </Text>
       </Card>
     </ScrollView>

@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { NavigationContainer, DefaultTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, View, Text, Pressable, useWindowDimensions, ScrollView } from 'react-native';
+import { Platform, View, Text, Pressable, useWindowDimensions, ScrollView, ActivityIndicator } from 'react-native';
 import { StoreProvider } from './src/store';
+import { AuthProvider, useAuth } from './src/AuthProvider';
+import LoginScreen from './src/screens/LoginScreen';
 import { C, Logo, AlertHost } from './src/ui';
 
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -208,6 +210,7 @@ function WebTopbar({ routeName }) {
   const title = TITLES[routeName] || routeName;
   const now = new Date();
   const date = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const { session, signOut } = useAuth();
 
   return (
     <View style={{
@@ -223,7 +226,13 @@ function WebTopbar({ routeName }) {
       <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: C.amber }} />
       <Text style={{ fontSize: 18, fontWeight: '800', color: C.navy }}>{title}</Text>
       <View style={{ flex: 1 }} />
-      <Text style={{ fontSize: 12, color: C.mut }}>{date}</Text>
+      <Text style={{ fontSize: 12, color: C.mut, marginRight: 14 }}>{date}</Text>
+      {session ? (
+        <Pressable onPress={signOut} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 11.5, color: C.mut }}>{session.user?.email}</Text>
+          <Text style={{ fontSize: 11.5, color: C.navy2, fontWeight: '700' }}>· Sign out</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -299,7 +308,12 @@ function MobileShell() {
   );
 }
 
-export default function App() {
+/* Gates the whole app behind a Supabase session — this is the one approved UI
+   addition needed for Row Level Security to mean anything (every table in
+   supabase/migrations/0003_rls.sql requires an authenticated user). Nothing
+   below this point (StoreProvider, navigation, all 22 screens) changes:
+   AppContent renders exactly what App() used to render unconditionally. */
+function AppContent() {
   const navigationRef = useNavigationContainerRef();
   const [routeName, setRouteName] = useState('Dashboard');
   const syncRoute = () => setRouteName(navigationRef.current?.getCurrentRoute()?.name || 'Dashboard');
@@ -322,5 +336,25 @@ export default function App() {
         <AlertHost />
       </NavigationContainer>
     </StoreProvider>
+  );
+}
+
+function AuthGate() {
+  const { session, loading } = useAuth();
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.navy, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={C.amber} />
+      </View>
+    );
+  }
+  return session ? <AppContent /> : <LoginScreen />;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
   );
 }
