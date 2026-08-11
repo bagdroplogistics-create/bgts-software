@@ -25,42 +25,48 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: C.navy, alignItems: 'center', justifyContent: 'center', padding: 24 }}
     >
-      <View style={{ width: '100%', maxWidth: 360 }}>
-        <View style={{ alignItems: 'center', marginBottom: 28 }}>
-          <Logo size={56} />
-          <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 14 }}>BGTS-OS</Text>
-          <Text style={{ color: C.line2, fontSize: 11, marginTop: 2, textAlign: 'center' }}>
-            BARODA GOODS TRANSPORT SERVICE PVT. LTD. · EST. 1950
-          </Text>
-        </View>
+      <View style={{ width: '100%', maxWidth: 440 }}>
+        <View
+          style={{
+            backgroundColor: '#fff', borderRadius: 18, padding: 36,
+            shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.18, shadowRadius: 28, elevation: 8
+          }}
+        >
+          <View style={{ alignItems: 'center', marginBottom: 26 }}>
+            <Logo size={92} />
+            <Text style={{ color: C.mut, fontSize: 11, marginTop: 12, textAlign: 'center', letterSpacing: 0.3 }}>
+              BARODA GOODS TRANSPORT SERVICE PVT. LTD. · EST. 1950
+            </Text>
+          </View>
 
-        <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 20 }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: C.navy, marginBottom: 14 }}>Sign in</Text>
+          <View style={{ height: 1, backgroundColor: C.line, marginBottom: 22 }} />
 
-          <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.mut, marginBottom: 4 }}>Email</Text>
+          <Text style={{ fontSize: 16, fontWeight: '800', color: C.navy, marginBottom: 18 }}>Sign in</Text>
+
+          <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.mut, marginBottom: 5 }}>Email</Text>
           <TextInput
             value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address"
             placeholder="you@bgts.in" placeholderTextColor={C.line2}
-            style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, fontSize: 13, marginBottom: 12, backgroundColor: '#fff' }}
+            style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 11, fontSize: 13, marginBottom: 16, backgroundColor: '#fff' }}
           />
 
-          <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.mut, marginBottom: 4 }}>Password</Text>
+          <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.mut, marginBottom: 5 }}>Password</Text>
           <TextInput
             value={password} onChangeText={setPassword} secureTextEntry
             placeholder="••••••••" placeholderTextColor={C.line2}
             onSubmitEditing={submit}
-            style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, fontSize: 13, marginBottom: 14, backgroundColor: '#fff' }}
+            style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 11, fontSize: 13, marginBottom: 18, backgroundColor: '#fff' }}
           />
 
-          {authError ? <Text style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{authError}</Text> : null}
+          {authError ? <Text style={{ color: C.red, fontSize: 12, marginBottom: 14 }}>{authError}</Text> : null}
 
           {busy ? (
-            <View style={{ paddingVertical: 10, alignItems: 'center' }}><ActivityIndicator color={C.navy} /></View>
+            <View style={{ paddingVertical: 12, alignItems: 'center' }}><ActivityIndicator color={C.navy} /></View>
           ) : (
-            <Btn label="Sign In" tone="amber" onPress={submit} style={{ alignSelf: 'stretch', alignItems: 'center' }} />
+            <Btn label="Sign In" tone="amber" onPress={submit} style={{ alignSelf: 'stretch', alignItems: 'center', paddingVertical: 12 }} />
           )}
 
-          <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 14, textAlign: 'center' }}>
+          <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 18, textAlign: 'center' }}>
             Accounts are created by your administrator in the Supabase dashboard — there is no self sign-up.
           </Text>
         </View>
