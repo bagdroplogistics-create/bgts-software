@@ -139,8 +139,7 @@ function WebSidebar({ navigationRef, routeName }) {
         paddingHorizontal: compact ? 8 : 14,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(255,255,255,0.12)',
-        alignItems: 'center',
-        justifyContent: 'center'
+        alignItems: 'flex-start'
       }}>
         {/* White card behind the logo — the logo's gray/charcoal wordmark has
             poor contrast directly on the dark navy sidebar, so it sits on its
@@ -154,6 +153,11 @@ function WebSidebar({ navigationRef, routeName }) {
         }}>
           <Logo size={compact ? 26 : 42} />
         </View>
+        {!compact ? (
+          <Text style={{ color: C.line2, fontSize: 10.5, fontWeight: '700', marginTop: 8, textAlign: 'left' }}>
+            Baroda Goods Transport Service Pvt. Ltd.
+          </Text>
+        ) : null}
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 8 }}>
