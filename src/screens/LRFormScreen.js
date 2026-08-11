@@ -135,6 +135,13 @@ function Party({ label, p, setP, clients }) {
    percentage after picking a slab. */
 const GST_SLAB_PCT = { 'Exempt (RCM)': 0, '0%': 0, '5%': 5, '12%': 12, '18%': 18 };
 
+/* To Branch destination list — company's serviced locations. */
+const TO_BRANCH_OPTIONS = [
+  'VADODARA', 'BARODA STN', 'DADAR STATION', 'DELHI STATION', 'GOA', 'AHMEDABAD', 'ANAND',
+  'RAJKOT', 'MUMBAI CST', 'JHANOR', 'WANAKBORI', 'DAHEJ', 'EKTANAGAR', 'GURGAON',
+  'BHAVNAGAR', 'GANDHINAGAR', 'NADIAD', 'Lunawada,Mahisagar.', 'Dehradoon Uttarakhand', 'RAJPUR (CHATRAL)'
+].map(name => ({ v: name, l: name }));
+
 export default function LRFormScreen({ navigation, route }) {
   const { db, update } = useStore();
   const params = route.params || {};
@@ -322,7 +329,10 @@ export default function LRFormScreen({ navigation, route }) {
           <Fld l="Truck No *" v={f.truckNo} set={set('truckNo')} />
           <Fld l="LR No *" v={f.lrNo} set={set('lrNo')} />
           <Fld l="Date *" v={f.date} set={set('date')} />
-          <Fld l="To Branch" v={f.toBranch} set={set('toBranch')} />
+          <View style={{ marginBottom: 10 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 4 }}>To Branch</Text>
+            <PickerField value={f.toBranch} onChange={set('toBranch')} placeholder="— select destination —" options={TO_BRANCH_OPTIONS} />
+          </View>
         </Grid>
         <Chips l="Booking Branch" v={f.bookingBranch} set={set('bookingBranch')} opts={(db.branches || []).map(b => b.name)} />
         <Grid min={220}>
