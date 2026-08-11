@@ -123,11 +123,16 @@ function WebSidebar({ navigationRef, routeName }) {
     <View style={{
       width: sidebarWidth,
       backgroundColor: C.navy,
-      height: '100%',
       borderRightWidth: 1,
       borderRightColor: C.navy2,
       flexShrink: 0,
-      ...(Platform.OS === 'web' ? { overflow: 'hidden' } : {})
+      /* Sticky, not just tall: pins the logo/nav rail to the viewport so it no
+         longer scrolls away with long page content (the dashboard's tall list
+         of cards used to drag the whole sidebar — including the logo header —
+         off-screen). position:'sticky' + top:0 + a viewport-height box is the
+         standard fix and doesn't depend on getting nested flex/overflow
+         containers exactly right the way an overflow:hidden approach does. */
+      ...(Platform.OS === 'web' ? { position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' } : { minHeight: '100%' })
     }}>
       <View style={{
         paddingVertical: 16,
@@ -242,9 +247,9 @@ function WebTopbar({ routeName }) {
 
 function WebShell({ navigationRef, routeName }) {
   return (
-    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: C.bg, ...(Platform.OS === 'web' ? { height: '100vh', overflow: 'hidden' } : {}) }}>
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: C.bg, ...(Platform.OS === 'web' ? { minHeight: '100vh' } : {}) }}>
       <WebSidebar navigationRef={navigationRef} routeName={routeName} />
-      <View style={{ flex: 1, minWidth: 0, ...(Platform.OS === 'web' ? { height: '100%', overflowY: 'auto' } : {}) }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <WebTopbar routeName={routeName} />
         <Stack.Navigator screenOptions={{
           headerShown: false,
