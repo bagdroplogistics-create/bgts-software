@@ -198,12 +198,15 @@ export default function LRFormScreen({ navigation, route }) {
     return { aw, cw };
   }, [f.goods]);
 
-  /* Email notification: reuses the app's existing mailto:-link pattern (the same
-     approach the WA/Email "remind" buttons already use elsewhere) — this is a
-     client-only app with no backend/SMTP, so this opens a pre-filled compose
-     window addressed to info@bgts.in immediately after a successful save. Only
-     fires for a brand-new LR (not on edits), and only after the save succeeded. */
-  const emailNewLR = (rec) => {
+  /* Email notification on new-LR save. Sends automatically via a Vercel
+     serverless function (api/notify-lr.js, Gmail SMTP server-side — see that
+     file for the required env vars) so info@bgts.in gets the email without
+     anyone having to click Send. If that call fails for any reason (env vars
+     not added yet, function unreachable, etc.) this falls back to the old
+     mailto:-link compose-window approach so the notification still has a
+     path to go out, just manually. Only fires for a brand-new LR (not on
+     edits), and only after the save succeeded. */
+  const emailNewLR = async (rec) => {
     const goodsDesc = (rec.goods || []).map(g => g.desc).filter(Boolean).join(', ') || '—';
     const gstTotal = (Number(rec.igstAmt) || 0) + (Number(rec.cgstAmt) || 0) + (Number(rec.sgstAmt) || 0);
     const body = 'A new LR has been created in BGTS-OS.\n\n'
@@ -221,8 +224,24 @@ export default function LRFormScreen({ navigation, route }) {
       + 'GST: ' + inr(gstTotal) + '\n'
       + 'Gross Amount: ' + inr(rec.gross) + '\n\n'
       + '— Sent automatically by BGTS-OS';
-    Linking.openURL(mailLink('info@bgts.in', 'New LR Created — ' + rec.lrNo, body))
-      .catch(() => alert('Email not sent', 'Could not open your mail app to notify info@bgts.in. The LR itself was saved successfully.'));
+    const subject = 'New LR Created — ' + rec.lrNo;
+    try {
+      const res = await fetch('/api/notify-lr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, text: body })
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || ('HTTP ' + res.status));
+      }
+      /* sent automatically — nothing further needed */
+    } catch (e) {
+      /* Fall back to the manual mailto: draft so the notification isn't lost,
+         and let the user know the automatic path didn't work this time. */
+      Linking.openURL(mailLink('info@bgts.in', subject, body)).catch(() => {});
+      alert('Auto-email not sent', 'Could not send the notification automatically (' + String(e.message || e) + '). Opened a mail draft instead — the LR itself was saved successfully either way.');
+    }
   };
 
   const save = (andPrint) => {
