@@ -125,7 +125,7 @@ function WebSidebar({ navigationRef, routeName }) {
       backgroundColor: C.navy,
       minHeight: '100%',
       borderRightWidth: 1,
-      borderRightColor: '#102c4d',
+      borderRightColor: C.navy2,
       flexShrink: 0
     }}>
       <View style={{
@@ -137,12 +137,14 @@ function WebSidebar({ navigationRef, routeName }) {
         alignItems: 'center',
         gap: 10
       }}>
-        <Logo size={40} />
+        {/* Compact rail (<860px) has ~44px of usable width — a smaller height
+            keeps the logo's natural aspect ratio from overflowing that slot. */}
+        <Logo size={compact ? 24 : 40} />
         {!compact ? (
           <View style={{ flex: 1 }}>
             <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>BGTS-OS</Text>
-            <Text style={{ color: '#c7d0dc', fontSize: 9, lineHeight: 12 }}>BARODA GOODS TRANSPORT</Text>
-            <Text style={{ color: '#c7d0dc', fontSize: 9, lineHeight: 12 }}>SERVICE PVT. LTD. · EST. 1950</Text>
+            <Text style={{ color: C.line2, fontSize: 9, lineHeight: 12 }}>BARODA GOODS TRANSPORT</Text>
+            <Text style={{ color: C.line2, fontSize: 9, lineHeight: 12 }}>SERVICE PVT. LTD. · EST. 1950</Text>
           </View>
         ) : null}
       </View>
@@ -152,7 +154,7 @@ function WebSidebar({ navigationRef, routeName }) {
           <View key={group.title} style={{ marginBottom: 6 }}>
             {!compact ? (
               <Text style={{
-                color: '#6b7a8f',
+                color: C.mut,
                 fontSize: 9.5,
                 fontWeight: '800',
                 letterSpacing: 1.1,
@@ -174,7 +176,7 @@ function WebSidebar({ navigationRef, routeName }) {
                     marginRight: compact ? 0 : 8,
                     borderLeftWidth: 3,
                     borderLeftColor: active ? C.amber : 'transparent',
-                    backgroundColor: active ? 'rgba(232,163,61,0.12)' : (hovered ? 'rgba(255,255,255,0.06)' : 'transparent'),
+                    backgroundColor: active ? 'rgba(226,116,56,0.14)' : (hovered ? 'rgba(255,255,255,0.06)' : 'transparent'),
                     borderTopRightRadius: 8,
                     borderBottomRightRadius: 8,
                     flexDirection: 'row',
@@ -183,9 +185,9 @@ function WebSidebar({ navigationRef, routeName }) {
                     gap: 10
                   })}
                 >
-                  <Text style={{ width: 18, textAlign: 'center', color: active ? C.amber : '#c7d0dc', fontSize: 16 }}>{icon}</Text>
+                  <Text style={{ width: 18, textAlign: 'center', color: active ? C.amber : C.line2, fontSize: 16 }}>{icon}</Text>
                   {!compact ? (
-                    <Text style={{ color: active ? C.amber : '#c7d0dc', fontSize: 13, fontWeight: active ? '700' : '500' }}>
+                    <Text style={{ color: active ? C.amber : C.line2, fontSize: 13, fontWeight: active ? '700' : '500' }}>
                       {label}
                     </Text>
                   ) : null}
@@ -198,8 +200,8 @@ function WebSidebar({ navigationRef, routeName }) {
 
       {!compact ? (
         <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}>
-          <Text style={{ color: '#6b7a8f', fontSize: 10 }}>v1.0 · Phase 1 Build</Text>
-          <Text style={{ color: '#6b7a8f', fontSize: 10 }}>Confidential — Internal Use</Text>
+          <Text style={{ color: C.mut, fontSize: 10 }}>v1.0 · Phase 1 Build</Text>
+          <Text style={{ color: C.mut, fontSize: 10 }}>Confidential — Internal Use</Text>
         </View>
       ) : null}
     </View>

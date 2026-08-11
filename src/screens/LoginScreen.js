@@ -29,7 +29,7 @@ export default function LoginScreen() {
         <View style={{ alignItems: 'center', marginBottom: 28 }}>
           <Logo size={56} />
           <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 14 }}>BGTS-OS</Text>
-          <Text style={{ color: '#c7d0dc', fontSize: 11, marginTop: 2, textAlign: 'center' }}>
+          <Text style={{ color: C.line2, fontSize: 11, marginTop: 2, textAlign: 'center' }}>
             BARODA GOODS TRANSPORT SERVICE PVT. LTD. · EST. 1950
           </Text>
         </View>

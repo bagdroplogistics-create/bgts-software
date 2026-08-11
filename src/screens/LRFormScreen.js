@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, Linking } from 're
 import { useStore } from '../store';
 import { C, S, Card, Btn, DatePicker, PickerField, alert } from '../ui';
 import { printHtml } from '../fileIO';
+import { getLogoDataUri } from '../logoAsset';
 import {
   uid, inr, fmtDate, todayISO, byId, blankLR, computeLR, clientName, vendorName, mailLink,
   truckToVehicleId, lrHireBalance, convertInquiryToLRDraft, lrHtml,
@@ -299,7 +300,8 @@ export default function LRFormScreen({ navigation, route }) {
       savedRec = rec;
     });
     if (andPrint && savedRec) {
-      printHtml(lrHtml(db, savedRec), savedRec.lrNo)
+      getLogoDataUri()
+        .then(logoUri => printHtml(lrHtml(db, savedRec, logoUri), savedRec.lrNo))
         .catch(e => alert('PDF error', String(e.message || e)));
     }
     if (isNew && savedRec) emailNewLR(savedRec);

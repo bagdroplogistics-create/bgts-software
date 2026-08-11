@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { C, S, Card, Kpi, Badge, Btn, Empty, ModalForm, Table, alert } from '../ui';
 import { uid, inr, fmtDate, todayISO, daysSince, byId, sum, pad, invPaid, invOutstanding, waLink, receiptHtml } from '../logic';
 import { printHtml } from '../fileIO';
+import { getLogoDataUri } from '../logoAsset';
 
 const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -48,7 +49,8 @@ export default function CompanyScreen({ route, navigation }) {
 
   const printReceipt = async (p) => {
     try {
-      await printHtml(receiptHtml(db, p), p.mrNo);
+      const logoUri = await getLogoDataUri();
+      await printHtml(receiptHtml(db, p, logoUri), p.mrNo);
     } catch (e) { alert('Error', String(e.message || e)); }
   };
 

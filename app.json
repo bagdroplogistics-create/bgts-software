@@ -5,9 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#0a1f38",
+    "backgroundColor": "#2b2b2f",
+    "icon": "./assets/icon.png",
     "splash": {
-      "backgroundColor": "#0a1f38",
+      "image": "./assets/splash.png",
+      "backgroundColor": "#ffffff",
       "resizeMode": "contain"
     },
     "ios": {
@@ -17,8 +19,12 @@
     "android": {
       "package": "com.bgts.os",
       "adaptiveIcon": {
-        "backgroundColor": "#0a1f38"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
       }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     },
     "platforms": [
       "ios",

@@ -903,59 +903,58 @@ export function waBookingMsg(db, b){
   return m;
 }
 
-/* Brand mark shared by every printable document (LR, receipt, and any future one) —
-   inline SVG so it prints crisply on its own standalone page, since these documents
-   open outside the app shell and can't reuse the app's own View-based <Logo/>. */
-function bgtsLogoSvg(size){
-  size = size || 46;
-  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">'
-    + '<defs><linearGradient id="bglg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d4d84"/><stop offset="1" stop-color="#0a1f38"/></linearGradient></defs>'
-    + '<rect width="64" height="64" rx="14" fill="url(#bglg)"/>'
-    + '<rect x="2" y="2" width="60" height="60" rx="12" fill="none" stroke="#e8a33d" stroke-width="1.6" opacity="0.85"/>'
-    + '<text x="32" y="22" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="12.5" font-weight="800" fill="#ffffff" letter-spacing="1.5">BGTS</text>'
-    + '<rect x="13" y="29" width="23" height="12" rx="2" fill="#e8a33d"/>'
-    + '<path d="M36 32 h8.5 l5 5.5 v3.5 h-13.5 z" fill="#e8a33d"/>'
-    + '<rect x="38.5" y="34" width="4.5" height="3.6" rx="0.8" fill="#0a1f38"/>'
-    + '<circle cx="20" cy="44" r="3.6" fill="#ffffff"/><circle cx="20" cy="44" r="1.5" fill="#0a1f38"/>'
-    + '<circle cx="42" cy="44" r="3.6" fill="#ffffff"/><circle cx="42" cy="44" r="1.5" fill="#0a1f38"/>'
-    + '<rect x="5" y="31" width="5" height="1.8" rx="0.9" fill="#c7d0dc"/>'
-    + '<rect x="3" y="35" width="7" height="1.8" rx="0.9" fill="#c7d0dc" opacity="0.7"/>'
-    + '<rect x="6" y="39" width="4" height="1.8" rx="0.9" fill="#c7d0dc" opacity="0.5"/>'
-    + '<rect x="8" y="52" width="48" height="2.4" rx="1.2" fill="#e8a33d"/>'
-    + '</svg>';
+/* Brand mark shared by every printable document (LR, receipt, and any future
+   one). `logoUri` is a data: URI resolved at call time via
+   src/logoAsset.js's getLogoDataUri() (screens pass it in — see
+   LRFormScreen.js/AccountingScreen.js), since this file is plain JS with no
+   React Native/expo-asset imports. Falls back to a plain text "BGTS-OS" mark
+   if the caller didn't pass one (asset failed to load, or an older call site
+   hasn't been updated) so a print action never breaks over a missing logo.
+   Landscape artwork — sized by height only, width follows the logo's own
+   aspect ratio, so it's never stretched. */
+function bgtsLogoImg(logoUri, height){
+  height = height || 40;
+  if (!logoUri) return '<div style="color:#fff;font-weight:800;font-size:' + Math.round(height * 0.4) + 'px;letter-spacing:.5px">BGTS-OS</div>';
+  return '<img src="' + logoUri + '" alt="BGTS" style="height:' + height + 'px;width:auto;display:block" />';
 }
 /* Shared page chrome (branded header + base table/print styles) so every printable
    document — LR, receipt, and any future one — looks like one consistent, professional
    document family instead of each screen inventing its own look. */
 function printDocStyle(){
+  /* Brand palette, matching src/ui.js's C object exactly (this file is plain
+     JS with no React Native imports, so the values are duplicated here
+     rather than imported, to avoid a circular import with ui.js). */
   return '@page{size:A4;margin:12mm}'
     + '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-    + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:11.5px;color:#111;margin:16px;background:#eef1f5}'
-    + '.doc{border:2px solid #0a1f38;border-radius:10px;overflow:hidden;max-width:800px;margin:0 auto;background:#fff}'
-    + '.r{text-align:right}.muted{color:#6b7a8f;font-style:italic}'
-    + '.head{background:#0a1f38;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px}'
+    + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:11.5px;color:#111;margin:16px;background:#ececed}'
+    + '.doc{border:2px solid #2b2b2f;border-radius:10px;overflow:hidden;max-width:800px;margin:0 auto;background:#fff}'
+    + '.r{text-align:right}.muted{color:#71717a;font-style:italic}'
+    + '.head{background:#2b2b2f;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:3px solid #e27438}'
     + '.head .brand{display:flex;gap:12px;align-items:center}'
-    + '.head h1{margin:0;font-size:18px;letter-spacing:.2px}.head p{margin:3px 0 0;font-size:9.5px;color:#c7d0dc}'
-    + '.num{text-align:right;font-size:11px;line-height:1.5;white-space:nowrap}.num b{color:#e8a33d;font-size:15px}'
+    + '.head h1{margin:0;font-size:18px;letter-spacing:.2px}.head p{margin:3px 0 0;font-size:9.5px;color:#d4d4d8}'
+    + '.num{text-align:right;font-size:11px;line-height:1.5;white-space:nowrap}.num b{color:#f6d048;font-size:15px}'
     + 'table{width:100%;border-collapse:collapse}'
-    + 'td,th{border:1px solid #c7d0dc;padding:6px 8px;font-size:10.8px;text-align:left;vertical-align:top}'
-    + 'th{background:#eef1f5;font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:#33455c}'
+    + 'td,th{border:1px solid #d4d4d8;padding:6px 8px;font-size:10.8px;text-align:left;vertical-align:top}'
+    + 'th{background:#ececed;font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:#302f33}'
     + '.sig{height:60px}'
-    + '.totalsTbl td{border-color:#94a3b8}'
-    + '.grossRow td{background:#fdf1de;font-size:13px}'
-    + '.terms{font-size:8.5px;color:#555;padding:9px 12px;border-top:1px solid #94a3b8;background:#f6f8fa}'
+    + '.totalsTbl td{border-color:#a1a1aa}'
+    + '.grossRow td{background:#fbe9de;font-size:13px}'
+    + '.terms{font-size:8.5px;color:#555;padding:9px 12px;border-top:1px solid #a1a1aa;background:#f7f7f7}'
     + '@media print{ body{background:#fff;margin:0} .doc{border-radius:0;max-width:none} }';
 }
 
 /* ---------- money receipt HTML (for PDF sharing) ---------- */
-export function receiptHtml(db, p){
+/* logoUri: optional data: URI from src/logoAsset.js's getLogoDataUri() —
+   pass it if you have it (screens await it before calling this), omit it and
+   the header falls back to a plain text mark instead of failing. */
+export function receiptHtml(db, p, logoUri){
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const inv = byId(db.invoices, p.invoiceId) || {};
   const br = byId(db.branches || [], inv.branchId) || {};
   const co = { name: br.entityName || db.company.name, addr: br.addr || db.company.addr, gstin: br.gstin || db.company.gstin };
   const bal = inv.id ? invOutstanding(db, inv) : 0;
   return '<html><head><meta charset="utf-8"><title>Receipt ' + esc(p.mrNo || '') + '</title><style>' + printDocStyle() + '</style></head><body><div class="doc">'
-    + '<div class="head"><div class="brand">' + bgtsLogoSvg(46) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + '</p><p>MONEY RECEIPT</p></div></div>'
+    + '<div class="head"><div class="brand">' + bgtsLogoImg(logoUri, 40) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + '</p><p>MONEY RECEIPT</p></div></div>'
     + '<div class="num">Receipt No.<br><b>' + esc(p.mrNo || 'MR') + '</b><br>Date: ' + fmtDate(p.date) + '</div></div>'
     + '<table><tr><th style="width:35%">Received with thanks from</th><td><b>' + esc(clientName(db, inv.clientId)) + '</b></td></tr>'
     + '<tr><th>The sum of</th><td><b>' + inr(p.amount) + '</b><br><span style="font-size:10px;color:#555">Rupees ' + esc(numWordsIN(p.amount)) + ' Only</span></td></tr>'
@@ -967,7 +966,9 @@ export function receiptHtml(db, p){
 }
 
 /* ---------- LR document HTML (full v2 format, for PDF sharing) ---------- */
-export function lrHtml(db, l){
+/* logoUri: optional data: URI from src/logoAsset.js's getLogoDataUri() — see
+   the same note on receiptHtml() above. */
+export function lrHtml(db, l, logoUri){
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const br = byId(db.branches || [], l.branchId) || {};
   const co = { name: br.entityName || db.company.name, addr: br.addr || db.company.addr, gstin: br.gstin || db.company.gstin, phone: br.phone || db.company.phone };
@@ -993,7 +994,7 @@ export function lrHtml(db, l){
   if (!chg) chg = '<tr><td class="muted">No charge lines entered.</td><td class="r">—</td></tr>';
   return '<html><head><meta charset="utf-8"><title>LR ' + esc(l.lrNo) + '</title><style>' + printDocStyle()
     + '</style></head><body><div class="doc">'
-    + '<div class="head"><div class="brand">' + bgtsLogoSvg(46) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + (co.phone ? ' · Ph: ' + esc(co.phone) : '') + '</p>'
+    + '<div class="head"><div class="brand">' + bgtsLogoImg(logoUri, 40) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + (co.phone ? ' · Ph: ' + esc(co.phone) : '') + '</p>'
     + '<p>CONSIGNMENT NOTE / LORRY RECEIPT — AT OWNER\'S RISK' + (l.lrType === 'DUMMY' ? ' — <b>DUMMY</b>' : '') + '</p></div></div>'
     + '<div class="num">LR No.<br><b>' + esc(l.lrNo) + '</b><br>Date: ' + fmtDate(l.date) + '<br>' + esc(l.lrType) + '</div></div>'
     + '<table><tr><th>Truck No</th><th>From</th><th>To</th><th>Booking Branch</th><th>To Branch</th><th>Lorry Type</th></tr>'

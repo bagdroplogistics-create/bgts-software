@@ -4,6 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, Table, alert } from '../ui';
 import { downloadFile, readPickedFile, printHtml } from '../fileIO';
+import { getLogoDataUri } from '../logoAsset';
 import {
   inr, fmtDate, byId, parseCSV, importBankAoa, bankSuggest, matchBankTxn,
   invOutstanding, clientName, receiptHtml, csvString, todayISO
@@ -49,7 +50,8 @@ export default function BankingScreen({ navigation }) {
   };
   const shareReceipt = async (p) => {
     try {
-      await printHtml(receiptHtml(db, p), p.mrNo);
+      const logoUri = await getLogoDataUri();
+      await printHtml(receiptHtml(db, p, logoUri), p.mrNo);
     } catch (e) { alert('Error', String(e.message || e)); }
   };
 

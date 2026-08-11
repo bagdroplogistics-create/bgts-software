@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Linking, TextInput, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
 import { downloadFile, printHtml } from '../fileIO';
+import { getLogoDataUri } from '../logoAsset';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert, PickerField, DatePicker } from '../ui';
 import {
   uid, inr, sum, fmtDate, todayISO, addDaysISO, daysSince, byId, removeById,
@@ -140,7 +141,8 @@ export default function AccountingScreen({ navigation }) {
 
   const printReceipt = async (p) => {
     try {
-      await printHtml(receiptHtml(db, p), p.mrNo);
+      const logoUri = await getLogoDataUri();
+      await printHtml(receiptHtml(db, p, logoUri), p.mrNo);
     } catch (e) { alert('Error', String(e.message || e)); }
   };
 

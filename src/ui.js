@@ -1,14 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, useWindowDimensions, Image } from 'react-native';
 import { fmtDate } from './logic';
 
+/* BGTS brand palette — sampled directly from the official logo artwork
+   (assets/bgts-logo.png): charcoal wordmark #606060, and the paper-plane
+   gradient #f6d048 (yellow) -> #e27438 (orange) -> #c4322d (red). Every key
+   below keeps its OLD name (navy/amber/etc.) even though the values are now
+   charcoal/orange — that's deliberate, so every screen that already
+   references C.navy or C.amber picks up the new brand colors automatically
+   without needing to be touched individually. Functional status colors
+   (green/purple/teal/wa) are left as-is since they carry meaning (paid,
+   WhatsApp, etc.), not brand identity. */
 export const C = {
-  navy: '#0a1f38', navy2: '#153a66', navy3: '#1d4d84',
-  amber: '#e8a33d', amberD: '#cf8c28',
-  bg: '#f6f8fa', line: '#eef1f5', line2: '#c7d0dc',
-  mut: '#6b7a8f', txt: '#33455c',
-  green: '#1e8a5f', red: '#c14343', purple: '#7a5ea8', teal: '#2596a5', wa: '#25d366'
+  navy: '#2b2b2f', navy2: '#3d3d42', navy3: '#4d4d54',
+  amber: '#e27438', amberD: '#c15f28',
+  bg: '#f7f7f7', line: '#ececed', line2: '#d4d4d8',
+  mut: '#71717a', txt: '#302f33',
+  yellow: '#f6d048',
+  green: '#1e8a5f', red: '#c4322d', purple: '#7a5ea8', teal: '#2596a5', wa: '#25d366'
 };
+
+/* Actual source-image aspect ratio (width/height) of assets/bgts-logo.png —
+   used so <Logo/> can be sized by height alone and scale correctly without
+   ever stretching or cropping the artwork. */
+const LOGO_ASPECT = 1629 / 978;
 
 export const S = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
@@ -23,21 +38,21 @@ export const S = StyleSheet.create({
   empty: { padding: 20, textAlign: 'center', color: C.mut, fontSize: 13 }
 });
 
-/* BGTS logo mark — pure Views/Text, no SVG dependency */
+/* Official BGTS logo — the real artwork (assets/bgts-logo.png), never redrawn.
+   `size` is treated as the rendered HEIGHT; width follows automatically via
+   LOGO_ASPECT so the mark is never stretched or distorted, and resizeMode
+   "contain" guarantees it's never cropped either. Callers that need it to sit
+   in a fixed-width slot (e.g. a collapsed sidebar rail) should pass a smaller
+   `size` rather than trying to force a width. */
 export function Logo({ size }) {
-  const s = size || 44;
+  const h = size || 44;
   return (
-    <View style={{
-      width: s, height: s, borderRadius: s * 0.22, backgroundColor: C.navy,
-      borderWidth: 1.5, borderColor: C.amber, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
-    }}>
-      <Text style={{ color: '#fff', fontWeight: '800', fontSize: s * 0.26, letterSpacing: 1 }}>BGTS</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: s * 0.04 }}>
-        <View style={{ width: s * 0.30, height: s * 0.14, backgroundColor: C.amber, borderRadius: 2 }} />
-        <View style={{ width: s * 0.14, height: s * 0.10, backgroundColor: C.amber, borderRadius: 2, marginLeft: 1 }} />
-      </View>
-      <View style={{ position: 'absolute', bottom: s * 0.08, width: s * 0.7, height: 2, backgroundColor: C.amber, borderRadius: 1 }} />
-    </View>
+    <Image
+      source={require('../assets/bgts-logo.png')}
+      resizeMode="contain"
+      style={{ height: h, aspectRatio: LOGO_ASPECT }}
+      accessibilityLabel="BGTS — Baroda Goods Transport Service"
+    />
   );
 }
 
@@ -76,7 +91,7 @@ export function Kpi({ label, value, sub, tone }) {
 }
 
 const BADGE_TONES = {
-  navy: { bg: '#e8edf7', fg: C.navy3 }, green: { bg: '#e7f3ea', fg: C.green },
+  navy: { bg: '#ececed', fg: C.navy3 }, green: { bg: '#e7f3ea', fg: C.green },
   red: { bg: '#fbe9e9', fg: C.red }, amber: { bg: '#fdf1de', fg: C.amberD },
   purple: { bg: '#f3eefb', fg: C.purple }, teal: { bg: '#e2f2f4', fg: C.teal }
 };

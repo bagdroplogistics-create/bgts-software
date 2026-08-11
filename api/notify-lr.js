@@ -46,6 +46,36 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  /* Fetch the single source-of-truth logo (public/bgts-logo.png, deployed
+     alongside this function) from this same deployment's own origin, and
+     embed it as an inline CID attachment rather than a remote <img src>
+     URL — CID-embedded images render immediately in most mail clients
+     without the "click to show images" prompt that external image URLs
+     trigger. Built from the request's own host so this works on preview
+     deployments and custom domains alike, not just one hardcoded URL. If
+     the fetch fails for any reason, the email still sends — just without
+     the logo — rather than failing the whole notification over a decorative
+     image. */
+  let logoAttachment = null;
+  try {
+    const origin = (req.headers['x-forwarded-proto'] || 'https') + '://' + req.headers.host;
+    const logoResp = await fetch(origin + '/bgts-logo.png');
+    if (logoResp.ok) {
+      const buf = Buffer.from(await logoResp.arrayBuffer());
+      logoAttachment = { filename: 'bgts-logo.png', content: buf, cid: 'bgtslogo' };
+    }
+  } catch (e) { /* logo is decorative — proceed without it */ }
+
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = ''
+    + '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #d4d4d8;border-radius:10px;overflow:hidden">'
+    + '<div style="background:#2b2b2f;border-top:3px solid #e27438;padding:16px 20px">'
+    + (logoAttachment ? '<img src="cid:bgtslogo" alt="BGTS" style="height:32px;width:auto;display:block" />' : '<div style="color:#fff;font-weight:800;font-size:16px;letter-spacing:.5px">BGTS-OS</div>')
+    + '</div>'
+    + '<div style="padding:20px;color:#302f33;font-size:13.5px;line-height:1.6;white-space:pre-line">' + esc(text) + '</div>'
+    + '<div style="padding:12px 20px;border-top:1px solid #ececed;background:#f7f7f7;color:#71717a;font-size:10.5px">Sent automatically by BGTS-OS — Baroda Goods Transport Service Pvt. Ltd.</div>'
+    + '</div>';
+
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -55,7 +85,9 @@ module.exports = async function handler(req, res) {
       from: 'BGTS-OS <' + GMAIL_USER + '>',
       to: NOTIFY_TO,
       subject: String(subject),
-      text: String(text)
+      text: String(text),
+      html,
+      attachments: logoAttachment ? [logoAttachment] : []
     });
     res.status(200).json({ ok: true });
   } catch (e) {

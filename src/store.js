@@ -141,9 +141,9 @@ export function StoreProvider({ children }) {
 
   if (!db) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0a1f38', alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: '#e8a33d', fontSize: 24, fontWeight: '800', marginBottom: 12 }}>BGTS-OS</Text>
-        <ActivityIndicator color="#e8a33d" />
+      <View style={{ flex: 1, backgroundColor: '#2b2b2f', alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#e27438', fontSize: 24, fontWeight: '800', marginBottom: 12 }}>BGTS-OS</Text>
+        <ActivityIndicator color="#e27438" />
       </View>
     );
   }

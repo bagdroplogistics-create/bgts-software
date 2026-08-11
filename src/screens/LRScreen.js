@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert, PickerField, DatePicker } from '../ui';
 import { downloadFile, printHtml } from '../fileIO';
+import { getLogoDataUri } from '../logoAsset';
 import {
   uid, inr, fmtDate, todayISO, byId, removeById, lrHtml, vendorName, csvString,
   lrHireBalance, lrTripExpTotal, truckToVehicleId, TRIP_EXP_CATS, sum
@@ -66,7 +67,8 @@ export default function LRScreen({ navigation }) {
 
   const sharePdf = async (l) => {
     try {
-      await printHtml(lrHtml(db, l), l.lrNo);
+      const logoUri = await getLogoDataUri();
+      await printHtml(lrHtml(db, l, logoUri), l.lrNo);
     } catch (e) {
       alert('PDF error', String(e.message || e));
     }

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, Linking } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, statusTone, Table, alert } from '../ui';
 import { printHtml } from '../fileIO';
+import { getLogoDataUri } from '../logoAsset';
 import {
   uid, inr, todayISO, fmtDate, byId, removeById, clientName, vehicleReg,
   findContractRate, waLink, waBookingMsg, lrHtml
@@ -104,7 +105,8 @@ export default function BookingsScreen({ navigation }) {
     const l = db.lrs.find(x => x.bookingId === b.id);
     if (!l) { alert('Generate the LR first.'); return; }
     try {
-      await printHtml(lrHtml(db, l), l.lrNo);
+      const logoUri = await getLogoDataUri();
+      await printHtml(lrHtml(db, l, logoUri), l.lrNo);
     } catch (e) { alert('PDF error', String(e.message || e)); }
   };
 
