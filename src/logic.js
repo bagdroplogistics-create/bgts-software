@@ -161,7 +161,7 @@ export function lhcStatus(l){
 /* ---------- database ---------- */
 export function blankDB(){
   return {
-    company: { name: 'Baroda Goods Transport Service Pvt. Ltd.', addr: 'Vadodara, Gujarat, India', gstin: '', phone: '', email: '', lrPrefix: 'BGTS/26-27/' },
+    company: { name: 'Baroda Goods Transport Service Pvt. Ltd.', addr: 'Vadodara, Gujarat, India', gstin: '', phone: '', email: '', lrPrefix: 'BRD/' },
     seq: { lr: 1, inv: 1, bk: 1, lhc: 1 },
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
