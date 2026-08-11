@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
@@ -7,9 +7,10 @@ import { uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks 
 const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['routes', 'Routes'], ['branches', 'Branches']];
 const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
 
-export default function MastersScreen() {
+export default function MastersScreen({ navigation, route }) {
   const { db, update } = useStore();
-  const [tab, setTab] = useState('clients');
+  const params = (route && route.params) || {};
+  const [tab, setTab] = useState(params.tab || 'clients');
   const [form, setForm] = useState(null);
 
   /* ----- field configs ----- */
@@ -19,15 +20,32 @@ export default function MastersScreen() {
     { key: 'phone', label: 'WhatsApp Phone (with 91)', value: c && c.phone, hint: 'e.g. 919825012345' },
     { key: 'email', label: 'Email', value: c && c.email },
     { key: 'creditDays', label: 'Credit Period (days)', type: 'number', value: c ? c.creditDays : 30 },
+    { key: 'creditLimit', label: 'Credit Limit (₹)', type: 'number', value: c ? c.creditLimit : 0, hint: '0 = no limit' },
     { key: 'addr', label: 'Address / City', value: c && c.addr }
   ];
   const vehicleFields = (v) => [
     { key: 'regNo', label: 'Registration No.', required: true, value: v && v.regNo },
     { key: 'make', label: 'Make / Model', value: v && v.make },
+    { key: 'model', label: 'Model / Variant', value: v && v.model },
     { key: 'type', label: 'Body / Type', value: v && v.type, hint: 'e.g. Open Body 18ft — must match contract rate lines' },
     { key: 'owned', label: 'Ownership', type: 'select', required: true, value: v ? (v.owned ? 'yes' : 'no') : 'yes', options: [{ v: 'yes', l: 'Owned by BGTS' }, { v: 'no', l: 'Empanelled / Market' }] },
+    { key: 'status', label: 'Status', type: 'select', value: (v && v.status) || 'Active', options: ['Active', 'In Workshop', 'Idle', 'Sold', 'Scrapped'].map(x => ({ v: x, l: x })) },
     { key: 'gvw', label: 'GVW (kg)', value: v && v.gvw },
-    { key: 'driverId', label: 'Default Driver', type: 'select', value: v && v.driverId, options: db.drivers.map(d => ({ v: d.id, l: d.name })) }
+    { key: 'capacityTons', label: 'Load Capacity (Tons)', type: 'number', value: v && v.capacityTons },
+    { key: 'fuelType', label: 'Fuel Type', type: 'select', value: v && v.fuelType, options: ['Diesel', 'CNG', 'Electric', 'Petrol'].map(x => ({ v: x, l: x })) },
+    { key: 'yearOfMfg', label: 'Year of Manufacture', type: 'number', value: v && v.yearOfMfg },
+    { key: 'chassisNo', label: 'Chassis No.', value: v && v.chassisNo },
+    { key: 'engineNo', label: 'Engine No.', value: v && v.engineNo },
+    { key: 'rcNo', label: 'RC No.', value: v && v.rcNo },
+    { key: 'odometerKm', label: 'Odometer Reading (km)', type: 'number', value: v && v.odometerKm },
+    { key: 'driverId', label: 'Default Driver', type: 'select', value: v && v.driverId, options: db.drivers.map(d => ({ v: d.id, l: d.name })) },
+    { key: 'purchaseDate', label: 'Purchase Date', type: 'date', value: v && v.purchaseDate },
+    { key: 'purchasePrice', label: 'Purchase Price (₹)', type: 'number', value: v && v.purchasePrice },
+    { key: 'financier', label: 'Financier', value: v && v.financier },
+    { key: 'loanAmount', label: 'Loan Amount (₹)', type: 'number', value: v && v.loanAmount },
+    { key: 'emiAmount', label: 'EMI Amount (₹)', type: 'number', value: v && v.emiAmount },
+    { key: 'emiStartDate', label: 'EMI Start Date', type: 'date', value: v && v.emiStartDate },
+    { key: 'emiTenureMonths', label: 'EMI Tenure (months)', type: 'number', value: v && v.emiTenureMonths }
   ];
   const driverFields = (d) => [
     { key: 'name', label: 'Driver Name', required: true, value: d && d.name },
@@ -67,7 +85,15 @@ export default function MastersScreen() {
   /* ----- add/edit dispatch ----- */
   const add = () => {
     if (tab === 'clients') setForm({ title: 'Add Client', fields: clientFields(null), onSubmit: v => update(d => d.clients.push({ ...v, id: uid('c') })) });
-    else if (tab === 'vehicles') setForm({ title: 'Add Vehicle', fields: vehicleFields(null), onSubmit: v => update(d => d.vehicles.push({ id: uid('v'), regNo: v.regNo, make: v.make, type: v.type, owned: v.owned === 'yes', gvw: v.gvw, driverId: v.driverId })) });
+    else if (tab === 'vehicles') setForm({
+      title: 'Add Vehicle', fields: vehicleFields(null),
+      onSubmit: v => update(d => d.vehicles.push({
+        id: uid('v'), regNo: v.regNo, make: v.make, model: v.model, type: v.type, owned: v.owned === 'yes', status: v.status || 'Active',
+        gvw: v.gvw, capacityTons: v.capacityTons, fuelType: v.fuelType, yearOfMfg: v.yearOfMfg, chassisNo: v.chassisNo, engineNo: v.engineNo,
+        rcNo: v.rcNo, odometerKm: v.odometerKm, driverId: v.driverId, purchaseDate: v.purchaseDate, purchasePrice: v.purchasePrice,
+        financier: v.financier, loanAmount: v.loanAmount, emiAmount: v.emiAmount, emiStartDate: v.emiStartDate, emiTenureMonths: v.emiTenureMonths
+      }))
+    });
     else if (tab === 'trucks') setForm({
       title: 'Add Truck', fields: truckFields(null),
       onSubmit: v => update(d => {
@@ -82,7 +108,18 @@ export default function MastersScreen() {
   };
   const editBranch = (bb) => setForm({ title: 'Edit ' + bb.name, fields: branchFields(bb), onSubmit: v => update(d => { const x = byId(d.branches, bb.id); if (x) { Object.keys(v).forEach(k => { x[k] = v[k]; }); x.name = String(x.name).toUpperCase(); } }) });
   const editClient = (c) => setForm({ title: 'Edit Client', fields: clientFields(c), onSubmit: v => update(d => { const x = byId(d.clients, c.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
-  const editVehicle = (vv) => setForm({ title: 'Edit Vehicle', fields: vehicleFields(vv), onSubmit: v => update(d => { const x = byId(d.vehicles, vv.id); if (x) { x.regNo = v.regNo; x.make = v.make; x.type = v.type; x.owned = v.owned === 'yes'; x.gvw = v.gvw; x.driverId = v.driverId; } }) });
+  const editVehicle = (vv) => setForm({
+    title: 'Edit Vehicle', fields: vehicleFields(vv),
+    onSubmit: v => update(d => {
+      const x = byId(d.vehicles, vv.id);
+      if (x) {
+        x.regNo = v.regNo; x.make = v.make; x.model = v.model; x.type = v.type; x.owned = v.owned === 'yes'; x.status = v.status || 'Active';
+        x.gvw = v.gvw; x.capacityTons = v.capacityTons; x.fuelType = v.fuelType; x.yearOfMfg = v.yearOfMfg; x.chassisNo = v.chassisNo; x.engineNo = v.engineNo;
+        x.rcNo = v.rcNo; x.odometerKm = v.odometerKm; x.driverId = v.driverId; x.purchaseDate = v.purchaseDate; x.purchasePrice = v.purchasePrice;
+        x.financier = v.financier; x.loanAmount = v.loanAmount; x.emiAmount = v.emiAmount; x.emiStartDate = v.emiStartDate; x.emiTenureMonths = v.emiTenureMonths;
+      }
+    })
+  });
   const editTruck = (t) => setForm({
     title: 'Edit ' + (t.code || t.truckNo), fields: truckFields(t),
     onSubmit: v => update(d => {
@@ -96,6 +133,19 @@ export default function MastersScreen() {
   });
   const editDriver = (dd) => setForm({ title: 'Edit Driver', fields: driverFields(dd), onSubmit: v => update(d => { const x = byId(d.drivers, dd.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendor = (vv) => setForm({ title: 'Edit Vendor', fields: vendorFields(vv), onSubmit: v => update(d => { const x = byId(d.vendors, vv.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
+
+  /* Arriving from VehicleDetailScreen's "Edit Vehicle" button — jump straight
+     into the edit form for that vehicle, then clear the param so navigating
+     back here later doesn't reopen it. */
+  useEffect(() => {
+    if (params.tab) setTab(params.tab);
+    if (params.editVehicleId) {
+      const veh = byId(db.vehicles, params.editVehicleId);
+      if (veh) editVehicle(veh);
+      if (navigation && navigation.setParams) navigation.setParams({ editVehicleId: undefined });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.editVehicleId]);
 
   const rowActions = (onEdit, onDel) => (
     <View style={S.wrapRow}>
@@ -159,7 +209,13 @@ export default function MastersScreen() {
                 owned: <Badge text={v.owned ? 'OWNED' : 'EMPANELLED'} tone={v.owned ? 'navy' : 'purple'} />,
                 gvw: v.gvw || '—',
                 driver: driverName(db, v.driverId),
-                actions: rowActions(() => editVehicle(v), () => confirmDo('Delete vehicle?', () => update(d => removeById(d.vehicles, v.id))))
+                actions: (
+                  <View style={S.wrapRow}>
+                    <Btn small tone="ghost" label="View" onPress={() => navigation.navigate('VehicleDetail', { vehicleId: v.id })} />
+                    <Btn small tone="ghost" label="Edit" onPress={() => editVehicle(v)} />
+                    <Btn small tone="red" label="✕" onPress={() => confirmDo('Delete vehicle?', () => update(d => removeById(d.vehicles, v.id)))} />
+                  </View>
+                )
               }))}
             />
           ))}

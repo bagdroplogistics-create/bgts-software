@@ -87,8 +87,14 @@ const bool = v => !!v;
          'd' date optional, 'fk' nullable foreign key, 'b' boolean
    ============================================================ */
 const FLAT = {
-  clients: { table: 'clients', fields: [['name','name','s'],['gstin','gstin','s'],['phone','phone','s'],['email','email','s'],['creditDays','credit_days','nr'],['addr','addr','s']] },
-  vehicles: { table: 'vehicles', fields: [['regNo','reg_no','s'],['make','make','s'],['type','type','s'],['owned','owned','b'],['gvw','gvw','s'],['driverId','driver_id','fk']] },
+  clients: { table: 'clients', fields: [['name','name','s'],['gstin','gstin','s'],['phone','phone','s'],['email','email','s'],['creditDays','credit_days','nr'],['addr','addr','s'],['creditLimit','credit_limit','nr']] },
+  vehicles: { table: 'vehicles', fields: [
+    ['regNo','reg_no','s'],['make','make','s'],['type','type','s'],['owned','owned','b'],['gvw','gvw','s'],['driverId','driver_id','fk'],
+    ['model','model','s'],['status','status','s'],['capacityTons','capacity_tons','no'],['fuelType','fuel_type','s'],['yearOfMfg','year_of_mfg','no'],
+    ['chassisNo','chassis_no','s'],['engineNo','engine_no','s'],['rcNo','rc_no','s'],['odometerKm','odometer_km','no'],
+    ['purchaseDate','purchase_date','d'],['purchasePrice','purchase_price','no'],['financier','financier','s'],['loanAmount','loan_amount','no'],
+    ['emiAmount','emi_amount','no'],['emiStartDate','emi_start_date','d'],['emiTenureMonths','emi_tenure_months','no']
+  ] },
   drivers: { table: 'drivers', fields: [['name','name','s'],['phone','phone','s'],['licNo','lic_no','s'],['licExpiry','lic_expiry','d']] },
   vendors: { table: 'vendors', fields: [['name','name','s'],['phone','phone','s'],['city','city','s'],['rating','rating','s']] },
   routes: { table: 'routes', fields: [['origin','origin','s'],['destination','destination','s'],['km','km','no']] },
@@ -102,7 +108,11 @@ const FLAT = {
     ['status','status','s'],['lrNo','lr_no','s'],['ewayBill','eway_bill','s'],['podReceived','pod_received','b'],
     ['invoiceId','invoice_id','fk']
   ] },
-  expenses: { table: 'expenses', fields: [['vehicleId','vehicle_id','fk'],['lrId','lr_id','fk'],['date','date','s'],['category','category','s'],['amount','amount','nr'],['litres','litres','no'],['notes','notes','s']] },
+  expenses: { table: 'expenses', fields: [
+    ['vehicleId','vehicle_id','fk'],['lrId','lr_id','fk'],['date','date','s'],['category','category','s'],['amount','amount','nr'],['litres','litres','no'],['notes','notes','s'],
+    ['odometerAtService','odometer_at_service','no'],['serviceType','service_type','s'],['vendor','vendor','s'],['partsReplaced','parts_replaced','s'],
+    ['nextServiceDueKm','next_service_due_km','no'],['nextServiceDueDate','next_service_due_date','d'],['warrantyUntil','warranty_until','d']
+  ] },
   renewals: { table: 'renewals', fields: [['vehicleId','vehicle_id','fk'],['docType','doc_type','s'],['ref','ref','s'],['expiry','expiry','d']] },
   payments: { table: 'payments', fields: [['mrNo','mr_no','s'],['invoiceId','invoice_id','fk'],['date','date','s'],['amount','amount','nr'],['mode','mode','s'],['ref','ref','s']] },
   advances: { table: 'advances', fields: [['driverId','driver_id','fk'],['date','date','s'],['amount','amount','nr'],['purpose','purpose','s'],['settledAmount','settled_amount','nr'],['settledAt','settled_at','d']] },
@@ -119,7 +129,16 @@ const FLAT = {
   truckMaster: { table: 'truck_master', fields: [
     ['code','code','s'],['truckNo','truck_no','s'],['ownerName','owner_name','s'],['contactNo','contact_no','s'],
     ['panCard','pan_card','b'],['rcNo','rc_no','b'],['createdBy','created_by','s']
-  ] }
+  ] },
+  lenders: { table: 'lenders', fields: [
+    ['name','name','s'],['type','type','s'],['sanctionedAmount','sanctioned_amount','no'],['outstandingAmount','outstanding_amount','no'],
+    ['interestRate','interest_rate','no'],['emiAmount','emi_amount','no'],['nextDueDate','next_due_date','d'],['tenureMonths','tenure_months','no'],['notes','notes','s']
+  ] },
+  fixedExp: { table: 'fixed_exp', fields: [
+    ['head','head','s'],['category','category','s'],['amount','amount','no'],['linkedVehicleId','linked_vehicle_id','fk'],
+    ['frequency','frequency','s'],['active','active','b'],['notes','notes','s']
+  ] },
+  auditLog: { table: 'audit_log', fields: [['ts','ts','s'],['action','action','s'],['details','details','s']] }
 };
 
 function toRow(rec, def) {
@@ -451,17 +470,18 @@ export async function pullDb() {
   const [
     seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog
   ] = await Promise.all([
     pullSeq(), pullFlat(FLAT.clients), pullFlat(FLAT.vehicles), pullFlat(FLAT.drivers), pullFlat(FLAT.vendors),
     pullFlat(FLAT.routes), pullFlat(FLAT.branches), pullContracts(), pullFlat(FLAT.bookings), pullFlat(FLAT.expenses),
     pullFlat(FLAT.renewals), pullInvoices(), pullFlat(FLAT.payments), pullLRs(), pullLHCs(), pullFlat(FLAT.advances),
-    pullFlat(FLAT.acctExp), pullFlat(FLAT.inquiries), pullFlat(FLAT.bankTxns), pullBillingBackup(), pullFlat(FLAT.truckMaster)
+    pullFlat(FLAT.acctExp), pullFlat(FLAT.inquiries), pullFlat(FLAT.bankTxns), pullBillingBackup(), pullFlat(FLAT.truckMaster),
+    pullFlat(FLAT.lenders), pullFlat(FLAT.fixedExp), pullFlat(FLAT.auditLog)
   ]);
   return {
     company, seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster, regSeeded: true, pdfRecon: '2026-08-07'
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, regSeeded: true, pdfRecon: '2026-08-07'
   };
 }
 
@@ -491,6 +511,9 @@ export async function seedIfEmpty(db) {
   await syncFlat('inquiries', FLAT.inquiries, [], db.inquiries);
   await syncFlat('bankTxns', FLAT.bankTxns, [], db.bankTxns);
   await syncFlat('truckMaster', FLAT.truckMaster, [], db.truckMaster);
+  await syncFlat('lenders', FLAT.lenders, [], db.lenders);
+  await syncFlat('fixedExp', FLAT.fixedExp, [], db.fixedExp); // after vehicles: fixedExp.linked_vehicle_id is a FK
+  await syncFlat('auditLog', FLAT.auditLog, [], db.auditLog);
   await seedBillingBackupIfEmpty(db.billingBackup);
 }
 
@@ -526,5 +549,8 @@ export async function pushDb(prevDb, nextDb) {
   await syncFlat('inquiries', FLAT.inquiries, prevDb.inquiries, nextDb.inquiries);
   await syncFlat('bankTxns', FLAT.bankTxns, prevDb.bankTxns, nextDb.bankTxns);
   await syncFlat('truckMaster', FLAT.truckMaster, prevDb.truckMaster, nextDb.truckMaster);
+  await syncFlat('lenders', FLAT.lenders, prevDb.lenders, nextDb.lenders);
+  await syncFlat('fixedExp', FLAT.fixedExp, prevDb.fixedExp, nextDb.fixedExp);
+  await syncFlat('auditLog', FLAT.auditLog, prevDb.auditLog, nextDb.auditLog);
   // billingBackup is intentionally not synced here — see seedBillingBackupIfEmpty.
 }

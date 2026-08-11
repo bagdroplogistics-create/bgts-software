@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
-import { uid, inr, sum, fmtDate, todayISO, vehicleReg, removeById } from '../logic';
+import { inr, sum, fmtDate, vehicleReg, removeById, expenseFields, pushExpense } from '../logic';
 
 export default function FleetScreen() {
   const { db, update } = useStore();
@@ -13,17 +13,8 @@ export default function FleetScreen() {
     if (!owned.length) { alert('No vehicles', 'Add an owned vehicle in Masters first.'); return; }
     setForm({
       title: 'Add Fleet Expense',
-      fields: [
-        { key: 'vehicleId', label: 'Vehicle', type: 'select', required: true, options: owned.map(v => ({ v: v.id, l: v.regNo })) },
-        { key: 'date', label: 'Date', type: 'date', required: true, value: todayISO() },
-        { key: 'category', label: 'Category', type: 'select', required: true, value: 'Fuel', options: ['Fuel', 'Maintenance', 'Toll/FASTag', 'Driver Salary/Bhatta', 'Tyres', 'Insurance/Permit', 'EMI/Finance', 'Other'].map(x => ({ v: x, l: x })) },
-        { key: 'amount', label: 'Amount ₹', type: 'number', required: true },
-        { key: 'litres', label: 'Litres (fuel only)', type: 'number' },
-        { key: 'notes', label: 'Notes', type: 'multiline' }
-      ],
-      onSubmit: (v) => update(d => {
-        d.expenses.push({ id: uid('e'), vehicleId: v.vehicleId, date: v.date, category: v.category, amount: Number(v.amount) || 0, litres: v.litres, notes: v.notes });
-      })
+      fields: expenseFields(owned),
+      onSubmit: (v) => update(d => pushExpense(d, v))
     });
   };
 

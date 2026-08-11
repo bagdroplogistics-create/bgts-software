@@ -165,7 +165,8 @@ export function blankDB(){
     seq: { lr: 1, inv: 1, bk: 1, lhc: 1 },
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
-    lrs: [], lhcs: [], advances: [], acctExp: [], inquiries: [], bankTxns: [], billingBackup: [], truckMaster: []
+    lrs: [], lhcs: [], advances: [], acctExp: [], inquiries: [], bankTxns: [], billingBackup: [], truckMaster: [],
+    lenders: [], fixedExp: [], auditLog: []
   };
 }
 
@@ -273,6 +274,10 @@ export function migrate(db){
   if (!db.bankTxns) db.bankTxns = [];
   if (!db.billingBackup) db.billingBackup = [];
   if (!db.truckMaster) db.truckMaster = [];
+  if (!db.lenders) db.lenders = [];
+  if (!db.fixedExp) db.fixedExp = [];
+  if (!db.auditLog) db.auditLog = [];
+  db.clients.forEach(c => { if (c.creditLimit === undefined) c.creditLimit = 0; });
   ensureBillingBackup(db);
   if (!db.seq.lhc) db.seq.lhc = 1;
   if (!db.seq.inq) db.seq.inq = 1;
@@ -315,6 +320,144 @@ export function seedSample(db){ /* no dummy data — fleet, branches, register i
 /* ---------- finance ---------- */
 export function invPaid(db, inv){ return sum(db.payments.filter(p => p.invoiceId === inv.id), p => p.amount); }
 export function invOutstanding(db, inv){ return (Number(inv.total) || 0) - invPaid(db, inv); }
+
+/* ---------- credit control ---------- */
+export function clientExposure(db, clientId){
+  return sum(db.invoices.filter(i => i.clientId === clientId), i => invOutstanding(db, i));
+}
+/* creditGuard: pure check, no UI. limit<=0 means "no limit set" (always ok).
+   newAmount is the amount about to be added to exposure (e.g. a new invoice total). */
+export function creditGuard(db, clientId, newAmount){
+  const c = byId(db.clients, clientId);
+  const limit = c ? (Number(c.creditLimit) || 0) : 0;
+  const exposure = clientExposure(db, clientId);
+  const projected = exposure + (Number(newAmount) || 0);
+  if (limit > 0 && projected > limit){
+    return {
+      ok: false, exposure, limit, projected,
+      message: 'Credit limit for ' + (c ? c.name : 'this client') + ' is ' + inr(limit) + '. Current exposure ' + inr(exposure) + ' + this amount ' + inr(Number(newAmount) || 0) + ' = ' + inr(projected) + ' — over limit.'
+    };
+  }
+  return { ok: true, exposure, limit, projected };
+}
+
+/* ---------- audit trail (append-only) ---------- */
+export function logAudit(db, action, details){
+  if (!db.auditLog) db.auditLog = [];
+  db.auditLog.push({ id: uid('al'), ts: new Date().toISOString(), action, details: details || '' });
+}
+
+/* ---------- monthly fixed expenses ---------- */
+export function fixedExpAmount(db, fe){
+  if (fe.category === 'Vehicle EMI' && fe.linkedVehicleId){
+    const v = byId(db.vehicles, fe.linkedVehicleId);
+    return v ? (Number(v.emiAmount) || 0) : 0;
+  }
+  return Number(fe.amount) || 0;
+}
+
+/* ---------- vehicle detail: EMI, TCO, service history, due-soon ----------
+   Document expiry (Insurance/Permit/Fitness/PUC/Road Tax) is tracked via the
+   existing db.renewals[] module (see RenewalsScreen.js) rather than new flat
+   per-vehicle expiry fields, so there is only one expiry-tracking system. */
+export function vehicleEmiOutstanding(v){
+  v = v || {};
+  const emi = Number(v.emiAmount) || 0, tenure = Number(v.emiTenureMonths) || 0;
+  if (!emi || !tenure || !v.emiStartDate) return { elapsed: 0, remaining: tenure, outstanding: 0 };
+  const start = new Date(v.emiStartDate); const now = new Date();
+  let elapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  if (elapsed < 0) elapsed = 0;
+  const remaining = Math.max(0, tenure - elapsed);
+  return { elapsed, remaining, outstanding: emi * remaining };
+}
+
+/* Reuses FleetScreen's existing expense categories ('Maintenance','Tyres') as the
+   maintenance/service-record subset, instead of introducing a new taxonomy. */
+export const MAINT_CATS = ['Maintenance', 'Tyres'];
+export function isMaintCat(cat){ return MAINT_CATS.indexOf(cat) >= 0; }
+
+export function vehicleServiceRecords(db, vehicleId){
+  return db.expenses.filter(e => e.vehicleId === vehicleId && isMaintCat(e.category))
+    .slice().sort((a, b) => (a.date || '') < (b.date || '') ? 1 : -1);
+}
+
+export function vehicleTCO(db, v){
+  const purchase = Number(v.purchasePrice) || 0;
+  const emi = vehicleEmiOutstanding(v);
+  const emiPaidToDate = (Number(v.emiAmount) || 0) * emi.elapsed;
+  const allExpenses = sum(db.expenses.filter(e => e.vehicleId === v.id), e => e.amount);
+  return { purchase, emiPaidToDate, allExpenses, total: purchase + emiPaidToDate + allExpenses };
+}
+
+/* Due-soon: next-service km within 1000km of current odometer, next-service date
+   within 30 days, or any db.renewals document for this vehicle expiring within
+   30 days (including already expired). */
+export function vehicleDueSoon(db, v){
+  const reasons = [];
+  const recs = vehicleServiceRecords(db, v.id);
+  const odo = Number(v.odometerKm) || 0;
+  recs.forEach(r => {
+    if (r.nextServiceDueKm){
+      const diff = Number(r.nextServiceDueKm) - odo;
+      if (diff <= 1000) reasons.push('Service due at ' + r.nextServiceDueKm + ' km (odo ' + odo + ' km)');
+    }
+    if (r.nextServiceDueDate){
+      const d = daysTo(r.nextServiceDueDate);
+      if (d != null && d <= 30) reasons.push('Service due ' + fmtDate(r.nextServiceDueDate) + (d < 0 ? ' (OVERDUE)' : ''));
+    }
+  });
+  (db.renewals || []).filter(r => r.vehicleId === v.id).forEach(r => {
+    const d = daysTo(r.expiry);
+    if (d != null && d <= 30) reasons.push(r.docType + ' expiry ' + fmtDate(r.expiry) + (d < 0 ? ' (EXPIRED)' : ' due soon'));
+  });
+  return reasons;
+}
+
+/* ---------- fleet expense form (shared by FleetScreen's log and
+   VehicleDetailScreen's "+ Add Service/Expense", so there is one field
+   definition and one push function for this entity, not two). The
+   service/maintenance-only fields are optional and always shown — ModalForm
+   fields are fixed when the form opens (no reactivity to another field's live
+   value), so rather than change that shared component these are simply left
+   blank/harmless for non-maintenance categories instead of being hidden. */
+export const EXPENSE_CATS = ['Fuel', 'Maintenance', 'Toll/FASTag', 'Driver Salary/Bhatta', 'Tyres', 'Insurance/Permit', 'EMI/Finance', 'Other'];
+export const SERVICE_TYPES = ['Scheduled Service', 'Breakdown Repair', 'Tyre Replacement', 'Accident Repair', 'Other'];
+
+export function expenseFields(vehicles, opts){
+  opts = opts || {};
+  return [
+    { key: 'vehicleId', label: 'Vehicle', type: 'select', required: true, value: opts.vehicleId, options: (vehicles || []).map(v => ({ v: v.id, l: v.regNo })) },
+    { key: 'date', label: 'Date', type: 'date', required: true, value: opts.date || todayISO() },
+    { key: 'category', label: 'Category', type: 'select', required: true, value: opts.category || 'Fuel', options: EXPENSE_CATS.map(x => ({ v: x, l: x })) },
+    { key: 'amount', label: 'Amount ₹', type: 'number', required: true, value: opts.amount },
+    { key: 'litres', label: 'Litres (fuel only)', type: 'number', value: opts.litres },
+    { key: 'odometerAtService', label: 'Odometer at Service (km)', type: 'number', hint: 'Maintenance / Tyres records only', value: opts.odometerAtService },
+    { key: 'serviceType', label: 'Service Type', type: 'select', hint: 'Maintenance / Tyres records only', value: opts.serviceType, options: SERVICE_TYPES.map(x => ({ v: x, l: x })) },
+    { key: 'vendor', label: 'Vendor / Workshop', hint: 'Maintenance / Tyres records only', value: opts.vendor },
+    { key: 'partsReplaced', label: 'Parts Replaced', hint: 'Maintenance / Tyres records only', value: opts.partsReplaced },
+    { key: 'nextServiceDueKm', label: 'Next Service Due (km)', type: 'number', hint: 'Maintenance / Tyres records only', value: opts.nextServiceDueKm },
+    { key: 'nextServiceDueDate', label: 'Next Service Due Date', type: 'date', hint: 'Maintenance / Tyres records only', value: opts.nextServiceDueDate },
+    { key: 'warrantyUntil', label: 'Warranty Until', type: 'date', hint: 'Maintenance / Tyres records only', value: opts.warrantyUntil },
+    { key: 'notes', label: 'Notes', type: 'multiline', value: opts.notes }
+  ];
+}
+
+export function pushExpense(db, v){
+  db.expenses.push({
+    id: uid('e'), vehicleId: v.vehicleId, date: v.date, category: v.category, amount: Number(v.amount) || 0, litres: v.litres, notes: v.notes,
+    odometerAtService: v.odometerAtService, serviceType: v.serviceType, vendor: v.vendor, partsReplaced: v.partsReplaced,
+    nextServiceDueKm: v.nextServiceDueKm, nextServiceDueDate: v.nextServiceDueDate, warrantyUntil: v.warrantyUntil
+  });
+}
+
+export function fleetDueSoonList(db){
+  const out = [];
+  db.vehicles.filter(v => v.owned).forEach(v => {
+    const reasons = vehicleDueSoon(db, v);
+    if (reasons.length) out.push({ v, reasons });
+  });
+  return out;
+}
 
 /* ---------- contract rate engine ---------- */
 export function findContractRate(db, clientId, origin, destination, vehicleType){

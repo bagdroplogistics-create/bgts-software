@@ -29,6 +29,7 @@ import ContractsScreen from './src/screens/ContractsScreen';
 import AccountingScreen from './src/screens/AccountingScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import MastersScreen from './src/screens/MastersScreen';
+import VehicleDetailScreen from './src/screens/VehicleDetailScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -281,6 +282,7 @@ function WebShell({ navigationRef, routeName }) {
           <Stack.Screen name="Accounting" component={AccountingScreen} />
           <Stack.Screen name="Reports" component={ReportsScreen} />
           <Stack.Screen name="Masters" component={MastersScreen} />
+          <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Vehicle Detail' }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings & Backup' }} />
         </Stack.Navigator>
       </View>
@@ -316,6 +318,7 @@ function MobileShell() {
       <Stack.Screen name="Accounting" component={AccountingScreen} />
       <Stack.Screen name="Reports" component={ReportsScreen} />
       <Stack.Screen name="Masters" component={MastersScreen} />
+      <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Vehicle Detail' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings & Backup' }} />
     </Stack.Navigator>
   );

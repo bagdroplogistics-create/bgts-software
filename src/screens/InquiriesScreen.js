@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, alert, Table } from '../ui';
-import { uid, inr, fmtDate, todayISO, byId, removeById, branchName, vehicleReg, vendorName, inqPartyName } from '../logic';
+import { uid, inr, fmtDate, todayISO, byId, removeById, branchName, vehicleReg, vendorName, inqPartyName, clientName, creditGuard, logAudit } from '../logic';
 
 const FILTERS = ['ACTIVE', 'OPEN', 'CONFIRMED', 'CONVERTED', 'LOST', 'ALL'];
 
@@ -71,32 +71,43 @@ export default function InquiriesScreen({ navigation }) {
       alert('Client required', 'Select an Existing Client on this inquiry before converting to a booking (Edit → Existing Client). New parties must first be added under Masters → Clients.');
       return;
     }
-    let savedBooking = null, inqNo = q.inqNo;
-    update(d => {
-      const x = byId(d.inquiries, q.id); if (!x) return;
-      const b = {
-        id: uid('b'), bkNo: 'BK-' + String(d.seq.bk).padStart(4, '0'), date: todayISO(), branchId: x.branchId || (d.branches[0] || {}).id,
-        clientId: x.clientId, origin: x.fromPlace || '', destination: x.toPlace || '', mode: 'Road', vehicleType: x.vehicleType || '',
-        cargo: x.cargo || '', weightMT: x.weightMT || '', freight: Number(x.rateQuoted) || 0, rateSource: 'From confirmed inquiry ' + x.inqNo,
-        assignType: x.assignType || '', vehicleId: x.assignType === 'Owned' ? x.assignedVehicleId : '',
-        hiredVendorId: x.assignType === 'Hired' ? x.assignedVendorId : '', hiredVehicleNo: x.assignType === 'Hired' ? x.assignedTruckNo : '',
-        hireCost: 0, driverId: '', status: x.assignType ? 'Vehicle Assigned' : 'Booked', lrNo: '', ewayBill: '', podReceived: false, invoiceId: ''
-      };
-      d.seq.bk++; d.bookings.push(b);
-      x.status = 'CONVERTED'; x.bookingId = b.id;
-      inqNo = x.inqNo;
-      savedBooking = b;
-    });
-    if (savedBooking) {
-      alert(
-        'Booking created',
-        'Booking ' + savedBooking.bkNo + ' created from ' + inqNo + '.\n\nCreate the LR now and feed the pending details?',
-        [
-          { text: 'Go to Bookings', style: 'cancel', onPress: () => navigation.navigate('Bookings') },
-          { text: 'Create LR now', onPress: () => navigation.navigate('LRForm', { bookingId: savedBooking.id }) }
-        ]
-      );
-    }
+    const freight = Number(q.rateQuoted) || 0;
+    const cg = creditGuard(db, q.clientId, freight);
+    const doConvert = () => {
+      let savedBooking = null, inqNo = q.inqNo;
+      update(d => {
+        const x = byId(d.inquiries, q.id); if (!x) return;
+        const b = {
+          id: uid('b'), bkNo: 'BK-' + String(d.seq.bk).padStart(4, '0'), date: todayISO(), branchId: x.branchId || (d.branches[0] || {}).id,
+          clientId: x.clientId, origin: x.fromPlace || '', destination: x.toPlace || '', mode: 'Road', vehicleType: x.vehicleType || '',
+          cargo: x.cargo || '', weightMT: x.weightMT || '', freight: Number(x.rateQuoted) || 0, rateSource: 'From confirmed inquiry ' + x.inqNo,
+          assignType: x.assignType || '', vehicleId: x.assignType === 'Owned' ? x.assignedVehicleId : '',
+          hiredVendorId: x.assignType === 'Hired' ? x.assignedVendorId : '', hiredVehicleNo: x.assignType === 'Hired' ? x.assignedTruckNo : '',
+          hireCost: 0, driverId: '', status: x.assignType ? 'Vehicle Assigned' : 'Booked', lrNo: '', ewayBill: '', podReceived: false, invoiceId: ''
+        };
+        d.seq.bk++; d.bookings.push(b);
+        x.status = 'CONVERTED'; x.bookingId = b.id;
+        inqNo = x.inqNo;
+        savedBooking = b;
+        if (!cg.ok) logAudit(d, 'creditlimit.override', 'Client ' + clientName(d, x.clientId) + ' exposure ' + inr(cg.exposure) + ' + this ' + inr(freight) + ' — override converting inquiry ' + inqNo + ' to a booking.');
+      });
+      if (savedBooking) {
+        alert(
+          'Booking created',
+          'Booking ' + savedBooking.bkNo + ' created from ' + inqNo + '.\n\nCreate the LR now and feed the pending details?',
+          [
+            { text: 'Go to Bookings', style: 'cancel', onPress: () => navigation.navigate('Bookings') },
+            { text: 'Create LR now', onPress: () => navigation.navigate('LRForm', { bookingId: savedBooking.id }) }
+          ]
+        );
+      }
+    };
+    if (!cg.ok) {
+      alert('Credit Limit Warning', cg.message + '\n\nProceed anyway and create this booking?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Proceed Anyway', style: 'destructive', onPress: doConvert }
+      ]);
+    } else doConvert();
   };
 
   const inquiryRow = (q) => ({
