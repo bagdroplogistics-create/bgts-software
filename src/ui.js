@@ -47,11 +47,19 @@ export const S = StyleSheet.create({
    `size` rather than trying to force a width. */
 export function Logo({ size }) {
   const h = size || 44;
+  /* Explicit width (derived from LOGO_ASPECT) instead of relying on the
+     `aspectRatio` style alone — on the deployed web build, Image with only
+     `height` + `aspectRatio` was failing to compute a width at all and
+     falling back to the source PNG's raw pixel width (800px), which then
+     blew out the whole sidebar header's height. Computing width ourselves
+     sidesteps that entirely and is equally safe against stretching/cropping
+     since both dimensions are still derived from the same real aspect ratio. */
+  const w = Math.round(h * LOGO_ASPECT);
   return (
     <Image
       source={require('../assets/bgts-logo.png')}
       resizeMode="contain"
-      style={{ height: h, aspectRatio: LOGO_ASPECT }}
+      style={{ height: h, width: w }}
       accessibilityLabel="BGTS — Baroda Goods Transport Service"
     />
   );
