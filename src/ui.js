@@ -4,16 +4,17 @@ import { fmtDate } from './logic';
 
 /* BGTS brand palette — sampled directly from the official logo artwork
    (assets/bgts-logo.png): charcoal wordmark #606060, and the paper-plane
-   gradient #f6d048 (yellow) -> #e27438 (orange) -> #c4322d (red). Every key
-   below keeps its OLD name (navy/amber/etc.) even though the values are now
-   charcoal/orange — that's deliberate, so every screen that already
-   references C.navy or C.amber picks up the new brand colors automatically
-   without needing to be touched individually. Functional status colors
-   (green/purple/teal/wa) are left as-is since they carry meaning (paid,
-   WhatsApp, etc.), not brand identity. */
+   gradient #f6d048 (yellow) -> #e27438 (orange) -> #c4322d (red). The primary
+   accent (C.amber/C.amberD) is keyed to the logo's YELLOW, not the orange —
+   every key below keeps its OLD name (navy/amber/etc.) even though the value
+   is yellow, that's deliberate, so every screen that already references
+   C.navy or C.amber picks up the brand accent automatically without needing
+   to be touched individually. Functional status colors (green/purple/teal/wa)
+   are left as-is since they carry meaning (paid, WhatsApp, etc.), not brand
+   identity. */
 export const C = {
   navy: '#2b2b2f', navy2: '#3d3d42', navy3: '#4d4d54',
-  amber: '#e27438', amberD: '#c15f28',
+  amber: '#f6d048', amberD: '#ac9232',
   bg: '#f7f7f7', line: '#ececed', line2: '#d4d4d8',
   mut: '#71717a', txt: '#302f33',
   yellow: '#f6d048',

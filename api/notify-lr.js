@@ -69,7 +69,7 @@ module.exports = async function handler(req, res) {
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const html = ''
     + '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #d4d4d8;border-radius:10px;overflow:hidden">'
-    + '<div style="background:#2b2b2f;border-top:3px solid #e27438;padding:16px 20px">'
+    + '<div style="background:#2b2b2f;border-top:3px solid #f6d048;padding:16px 20px">'
     + (logoAttachment ? '<img src="cid:bgtslogo" alt="BGTS" style="height:32px;width:auto;display:block" />' : '<div style="color:#fff;font-weight:800;font-size:16px;letter-spacing:.5px">BGTS-OS</div>')
     + '</div>'
     + '<div style="padding:20px;color:#302f33;font-size:13.5px;line-height:1.6;white-space:pre-line">' + esc(text) + '</div>'

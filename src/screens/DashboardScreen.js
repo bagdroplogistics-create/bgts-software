@@ -161,7 +161,7 @@ export default function DashboardScreen({ navigation }) {
   const mmBuckets = {};
   db.lrs.forEach(l => { const k = String(l.date || '').slice(0, 7); if (!k) return; mmBuckets[k] = (mmBuckets[k] || 0) + (Number(l.gross) || 0); });
   const mmKeys = Object.keys(mmBuckets).sort();
-  const PIE_COLORS = ['#4d4d54', '#e27438', '#1e8a5f', '#7a5ea8', '#2596a5', '#c4322d', '#1c1c1f', '#c15f28', '#3d3d42', '#5750a8', '#a1a1aa', '#d4d4d8'];
+  const PIE_COLORS = ['#4d4d54', '#f6d048', '#1e8a5f', '#7a5ea8', '#2596a5', '#c4322d', '#1c1c1f', '#ac9232', '#3d3d42', '#5750a8', '#a1a1aa', '#d4d4d8'];
   const pieSegs = [];
   if (mmKeys.length > 12) {
     const recentKeys = mmKeys.slice(-11);

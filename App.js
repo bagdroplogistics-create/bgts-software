@@ -123,10 +123,11 @@ function WebSidebar({ navigationRef, routeName }) {
     <View style={{
       width: sidebarWidth,
       backgroundColor: C.navy,
-      minHeight: '100%',
+      height: '100%',
       borderRightWidth: 1,
       borderRightColor: C.navy2,
-      flexShrink: 0
+      flexShrink: 0,
+      ...(Platform.OS === 'web' ? { overflow: 'hidden' } : {})
     }}>
       <View style={{
         paddingVertical: 16,
@@ -176,7 +177,7 @@ function WebSidebar({ navigationRef, routeName }) {
                     marginRight: compact ? 0 : 8,
                     borderLeftWidth: 3,
                     borderLeftColor: active ? C.amber : 'transparent',
-                    backgroundColor: active ? 'rgba(226,116,56,0.14)' : (hovered ? 'rgba(255,255,255,0.06)' : 'transparent'),
+                    backgroundColor: active ? 'rgba(246,208,72,0.16)' : (hovered ? 'rgba(255,255,255,0.06)' : 'transparent'),
                     borderTopRightRadius: 8,
                     borderBottomRightRadius: 8,
                     flexDirection: 'row',
@@ -241,9 +242,9 @@ function WebTopbar({ routeName }) {
 
 function WebShell({ navigationRef, routeName }) {
   return (
-    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: C.bg, ...(Platform.OS === 'web' ? { minHeight: '100vh' } : {}) }}>
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: C.bg, ...(Platform.OS === 'web' ? { height: '100vh', overflow: 'hidden' } : {}) }}>
       <WebSidebar navigationRef={navigationRef} routeName={routeName} />
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <View style={{ flex: 1, minWidth: 0, ...(Platform.OS === 'web' ? { height: '100%', overflowY: 'auto' } : {}) }}>
         <WebTopbar routeName={routeName} />
         <Stack.Navigator screenOptions={{
           headerShown: false,

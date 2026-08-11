@@ -929,7 +929,7 @@ function printDocStyle(){
     + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:11.5px;color:#111;margin:16px;background:#ececed}'
     + '.doc{border:2px solid #2b2b2f;border-radius:10px;overflow:hidden;max-width:800px;margin:0 auto;background:#fff}'
     + '.r{text-align:right}.muted{color:#71717a;font-style:italic}'
-    + '.head{background:#2b2b2f;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:3px solid #e27438}'
+    + '.head{background:#2b2b2f;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:3px solid #f6d048}'
     + '.head .brand{display:flex;gap:12px;align-items:center}'
     + '.head h1{margin:0;font-size:18px;letter-spacing:.2px}.head p{margin:3px 0 0;font-size:9.5px;color:#d4d4d8}'
     + '.num{text-align:right;font-size:11px;line-height:1.5;white-space:nowrap}.num b{color:#f6d048;font-size:15px}'
