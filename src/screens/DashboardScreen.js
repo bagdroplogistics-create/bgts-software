@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Badge, Btn, Empty, Logo, Table, RenewalsTable } from '../ui';
+import { C, S, Card, Badge, Btn, Empty, Table, RenewalsTable } from '../ui';
 import {
   inr, sum, pad, todayISO, invOutstanding, invPaid, riskFlags, allRenewalItems,
   fmtDate, daysSince, daysTo, lrHireBalance, clientName, vehicleReg, vendorName, ageingBuckets
@@ -186,14 +186,6 @@ export default function DashboardScreen({ navigation }) {
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
-      <View style={[S.row, { marginBottom: 12, gap: 12 }]}>
-        <Logo size={46} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: C.navy }}>Baroda Goods Transport Service</Text>
-          <Text style={{ fontSize: 10.5, color: C.mut, letterSpacing: 0.4 }}>EST. 1950 · VADODARA · ROAD · RAIL · AIR</Text>
-        </View>
-      </View>
-
       {/* ---- period selector ---- */}
       <View style={[S.wrapRow, { marginBottom: 14 }]}>
         <Text style={{ fontSize: 11, fontWeight: '800', color: C.mut, textTransform: 'uppercase' }}>Period:</Text>

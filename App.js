@@ -135,24 +135,25 @@ function WebSidebar({ navigationRef, routeName }) {
       ...(Platform.OS === 'web' ? { position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' } : { minHeight: '100%' })
     }}>
       <View style={{
-        paddingVertical: 16,
-        paddingHorizontal: compact ? 10 : 14,
+        paddingVertical: 14,
+        paddingHorizontal: compact ? 8 : 14,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(255,255,255,0.12)',
-        flexDirection: 'row',
         alignItems: 'center',
-        gap: 10
+        justifyContent: 'center'
       }}>
-        {/* Compact rail (<860px) has ~44px of usable width — a smaller height
-            keeps the logo's natural aspect ratio from overflowing that slot. */}
-        <Logo size={compact ? 24 : 40} />
-        {!compact ? (
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>BGTS-OS</Text>
-            <Text style={{ color: C.line2, fontSize: 9, lineHeight: 12 }}>BARODA GOODS TRANSPORT</Text>
-            <Text style={{ color: C.line2, fontSize: 9, lineHeight: 12 }}>SERVICE PVT. LTD. · EST. 1950</Text>
-          </View>
-        ) : null}
+        {/* White card behind the logo — the logo's gray/charcoal wordmark has
+            poor contrast directly on the dark navy sidebar, so it sits on its
+            own white plate with breathing room instead. Compact rail (<860px)
+            gets a smaller logo + tighter padding so it still fits the ~64px rail. */}
+        <View style={{
+          backgroundColor: '#fff',
+          borderRadius: 10,
+          paddingVertical: compact ? 6 : 10,
+          paddingHorizontal: compact ? 8 : 16
+        }}>
+          <Logo size={compact ? 26 : 42} />
+        </View>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 8 }}>
