@@ -118,12 +118,6 @@ function TruckNoField({ v, set, db }) {
         onFocus={() => setOpen(true)}
         placeholderTextColor={C.line2} style={boxStyle}
       />
-      {match ? (
-        <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 4 }}>
-          {(match.code ? match.code + ' · ' : '') + (match.ownerName || 'owner not on file') + (match.contactNo ? ' · ' + match.contactNo : '')
-            + ' · PAN ' + (match.panCard ? '✓' : '✕') + ' · RC ' + (match.rcNo ? '✓' : '✕')}
-        </Text>
-      ) : (String(v || '').trim() ? <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 4 }}>Not on file in Truck Master.</Text> : null)}
 
       <Modal visible={showDropdown} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(10,31,56,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
