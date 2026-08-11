@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Linking, Modal } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Btn, DatePicker, PickerField, alert } from '../ui';
 import { printHtml } from '../fileIO';
@@ -84,17 +84,23 @@ function Fld({ l, v, set, num, multi }) {
 
 /* Same box as Fld, but looks up db.truckMaster as the user types — matching
    ANYWHERE inside the truck number, not just an exact/whole match, so typing
-   just the last 4 digits (e.g. "1577") surfaces "GJ06BY1577" etc. in a
-   dropdown below the field. Tapping a suggestion fills the full truck number
-   in; the "on file" line underneath then shows owner/contact/PAN/RC status
-   for whatever's actually in the field. Read-only lookup only — doesn't add
-   any new field to the LR record itself, just surfaces Masters -> Trucks. */
+   just the last 4 digits (e.g. "1577") surfaces "GJ06BY1577" etc. Suggestions
+   render in a centered Modal (same mechanism PickerField/ModalForm already
+   use elsewhere in this app) rather than an inline absolutely-positioned
+   dropdown — RN Web nests every View as position:relative by default, which
+   trapped an inline dropdown's z-index under its own form row instead of
+   floating above the fields below it. A Modal renders through its own
+   top-level overlay, so it's always on top regardless of the surrounding
+   layout. Tapping a suggestion fills the full truck number in; the "on
+   file" line underneath then shows owner/contact/PAN/RC status for
+   whatever's actually in the field. Read-only lookup only — doesn't add any
+   new field to the LR record itself, just surfaces Masters -> Trucks. */
 function TruckNoField({ v, set, db }) {
   const [open, setOpen] = useState(false);
   const list = db.truckMaster || [];
   const q = String(v || '').replace(/\s/g, '').toUpperCase();
   const suggestions = useMemo(() => (
-    q ? list.filter(t => String(t.truckNo || '').replace(/\s/g, '').toUpperCase().indexOf(q) >= 0).slice(0, 8) : []
+    q ? list.filter(t => String(t.truckNo || '').replace(/\s/g, '').toUpperCase().indexOf(q) >= 0).slice(0, 30) : []
   ), [list, q]);
   const match = useMemo(() => findTruckMaster(db, v), [db.truckMaster, v]);
   const boxStyle = {
@@ -104,37 +110,39 @@ function TruckNoField({ v, set, db }) {
   const pick = (t) => { set(t.truckNo); setOpen(false); };
   const showDropdown = open && !match && suggestions.length > 0;
   return (
-    <View style={{ marginBottom: 10, position: 'relative', zIndex: showDropdown ? 20 : 1 }}>
+    <View style={{ marginBottom: 10 }}>
       <Text style={{ fontSize: 10, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 4 }}>Truck No *</Text>
       <TextInput
         value={v == null ? '' : String(v)}
         onChangeText={t => { set(t); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholderTextColor={C.line2} style={boxStyle}
       />
-      {showDropdown ? (
-        <View style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 2, backgroundColor: '#fff',
-          borderWidth: 1, borderColor: C.line2, borderRadius: 8, overflow: 'hidden',
-          shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6
-        }}>
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 220 }}>
-            {suggestions.map(t => (
-              <TouchableOpacity key={t.id} onPress={() => pick(t)} style={{ paddingVertical: 9, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: C.line }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>{t.truckNo}</Text>
-                <Text style={{ fontSize: 10.5, color: C.mut }}>{(t.code ? t.code + ' · ' : '') + (t.ownerName || 'owner not on file')}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
       {match ? (
         <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 4 }}>
           {(match.code ? match.code + ' · ' : '') + (match.ownerName || 'owner not on file') + (match.contactNo ? ' · ' + match.contactNo : '')
             + ' · PAN ' + (match.panCard ? '✓' : '✕') + ' · RC ' + (match.rcNo ? '✓' : '✕')}
         </Text>
       ) : (String(v || '').trim() ? <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 4 }}>Not on file in Truck Master.</Text> : null)}
+
+      <Modal visible={showDropdown} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(10,31,56,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <TouchableOpacity accessible={false} activeOpacity={1} onPress={() => setOpen(false)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+          <View style={{ backgroundColor: '#fff', borderRadius: 12, width: '100%', maxWidth: 380, maxHeight: '65%', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10 }}>
+            <View style={{ padding: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: C.line }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '800', color: C.navy }}>Matching trucks — tap to fill</Text>
+            </View>
+            <ScrollView style={{ maxHeight: 340 }} keyboardShouldPersistTaps="handled">
+              {suggestions.map(t => (
+                <TouchableOpacity key={t.id} onPress={() => pick(t)} style={{ paddingVertical: 11, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.line }}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.navy }}>{t.truckNo}</Text>
+                  <Text style={{ fontSize: 11, color: C.mut }}>{(t.code ? t.code + ' · ' : '') + (t.ownerName || 'owner not on file')}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
