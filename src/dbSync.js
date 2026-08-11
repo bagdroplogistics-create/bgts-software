@@ -115,6 +115,10 @@ const FLAT = {
     ['rateQuoted','rate_quoted','no'],['ownershipPref','ownership_pref','s'],['notes','notes','s'],['assignType','assign_type','s'],
     ['assignedVehicleId','assigned_vehicle_id','fk'],['assignedVendorId','assigned_vendor_id','fk'],['assignedTruckNo','assigned_truck_no','s'],
     ['bookingId','booking_id','fk'],['lrId','lr_id','fk']
+  ] },
+  truckMaster: { table: 'truck_master', fields: [
+    ['code','code','s'],['truckNo','truck_no','s'],['ownerName','owner_name','s'],['contactNo','contact_no','s'],
+    ['panCard','pan_card','b'],['rcNo','rc_no','b'],['createdBy','created_by','s']
   ] }
 };
 
@@ -447,17 +451,17 @@ export async function pullDb() {
   const [
     seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster
   ] = await Promise.all([
     pullSeq(), pullFlat(FLAT.clients), pullFlat(FLAT.vehicles), pullFlat(FLAT.drivers), pullFlat(FLAT.vendors),
     pullFlat(FLAT.routes), pullFlat(FLAT.branches), pullContracts(), pullFlat(FLAT.bookings), pullFlat(FLAT.expenses),
     pullFlat(FLAT.renewals), pullInvoices(), pullFlat(FLAT.payments), pullLRs(), pullLHCs(), pullFlat(FLAT.advances),
-    pullFlat(FLAT.acctExp), pullFlat(FLAT.inquiries), pullFlat(FLAT.bankTxns), pullBillingBackup()
+    pullFlat(FLAT.acctExp), pullFlat(FLAT.inquiries), pullFlat(FLAT.bankTxns), pullBillingBackup(), pullFlat(FLAT.truckMaster)
   ]);
   return {
     company, seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, regSeeded: true, pdfRecon: '2026-08-07'
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, regSeeded: true, pdfRecon: '2026-08-07'
   };
 }
 
@@ -486,6 +490,7 @@ export async function seedIfEmpty(db) {
   await syncFlat('acctExp', FLAT.acctExp, [], db.acctExp);
   await syncFlat('inquiries', FLAT.inquiries, [], db.inquiries);
   await syncFlat('bankTxns', FLAT.bankTxns, [], db.bankTxns);
+  await syncFlat('truckMaster', FLAT.truckMaster, [], db.truckMaster);
   await seedBillingBackupIfEmpty(db.billingBackup);
 }
 
@@ -520,5 +525,6 @@ export async function pushDb(prevDb, nextDb) {
   await syncFlat('acctExp', FLAT.acctExp, prevDb.acctExp, nextDb.acctExp);
   await syncFlat('inquiries', FLAT.inquiries, prevDb.inquiries, nextDb.inquiries);
   await syncFlat('bankTxns', FLAT.bankTxns, prevDb.bankTxns, nextDb.bankTxns);
+  await syncFlat('truckMaster', FLAT.truckMaster, prevDb.truckMaster, nextDb.truckMaster);
   // billingBackup is intentionally not synced here — see seedBillingBackupIfEmpty.
 }

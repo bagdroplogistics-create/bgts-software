@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
-import { uid, fmtDate, daysTo, driverName, byId, removeById } from '../logic';
+import { uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks } from '../logic';
 
-const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['routes', 'Routes'], ['branches', 'Branches']];
-const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', drivers: '+ Add Driver', vendors: '+ Add Vendor', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
+const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['routes', 'Routes'], ['branches', 'Branches']];
+const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
 
 export default function MastersScreen() {
   const { db, update } = useStore();
@@ -41,6 +41,15 @@ export default function MastersScreen() {
     { key: 'city', label: 'City', value: v && v.city },
     { key: 'rating', label: 'Rating', type: 'select', value: (v && v.rating) || 'B', options: ['A', 'B', 'C'].map(x => ({ v: x, l: x })) }
   ];
+  const truckFields = (t) => [
+    { key: 'code', label: 'Code', value: t && t.code, hint: 'e.g. TRUCK-0123' },
+    { key: 'truckNo', label: 'Truck No.', required: true, value: t && t.truckNo },
+    { key: 'ownerName', label: 'Owner Name', value: t && t.ownerName },
+    { key: 'contactNo', label: 'Contact No.', value: t && t.contactNo },
+    { key: 'panCard', label: 'PAN Card on File', type: 'select', value: t ? (t.panCard ? 'yes' : 'no') : 'no', options: [{ v: 'yes', l: 'Yes' }, { v: 'no', l: 'No' }] },
+    { key: 'rcNo', label: 'RC No. on File', type: 'select', value: t ? (t.rcNo ? 'yes' : 'no') : 'no', options: [{ v: 'yes', l: 'Yes' }, { v: 'no', l: 'No' }] },
+    { key: 'createdBy', label: 'Created By', value: t && t.createdBy }
+  ];
   const routeFields = () => [
     { key: 'origin', label: 'Origin', required: true },
     { key: 'destination', label: 'Destination', required: true },
@@ -59,6 +68,13 @@ export default function MastersScreen() {
   const add = () => {
     if (tab === 'clients') setForm({ title: 'Add Client', fields: clientFields(null), onSubmit: v => update(d => d.clients.push({ ...v, id: uid('c') })) });
     else if (tab === 'vehicles') setForm({ title: 'Add Vehicle', fields: vehicleFields(null), onSubmit: v => update(d => d.vehicles.push({ id: uid('v'), regNo: v.regNo, make: v.make, type: v.type, owned: v.owned === 'yes', gvw: v.gvw, driverId: v.driverId })) });
+    else if (tab === 'trucks') setForm({
+      title: 'Add Truck', fields: truckFields(null),
+      onSubmit: v => update(d => {
+        d.truckMaster = d.truckMaster || [];
+        d.truckMaster.push({ id: uid('tm'), code: v.code, truckNo: v.truckNo, ownerName: v.ownerName, contactNo: v.contactNo, panCard: v.panCard === 'yes', rcNo: v.rcNo === 'yes', createdBy: v.createdBy });
+      })
+    });
     else if (tab === 'drivers') setForm({ title: 'Add Driver', fields: driverFields(null), onSubmit: v => update(d => d.drivers.push({ ...v, id: uid('d') })) });
     else if (tab === 'vendors') setForm({ title: 'Add Vendor', fields: vendorFields(null), onSubmit: v => update(d => d.vendors.push({ ...v, id: uid('ve') })) });
     else if (tab === 'branches') setForm({ title: 'Add Branch / Entity', fields: branchFields(null), onSubmit: v => update(d => d.branches.push({ ...v, id: uid('br'), name: String(v.name).toUpperCase() })) });
@@ -67,6 +83,17 @@ export default function MastersScreen() {
   const editBranch = (bb) => setForm({ title: 'Edit ' + bb.name, fields: branchFields(bb), onSubmit: v => update(d => { const x = byId(d.branches, bb.id); if (x) { Object.keys(v).forEach(k => { x[k] = v[k]; }); x.name = String(x.name).toUpperCase(); } }) });
   const editClient = (c) => setForm({ title: 'Edit Client', fields: clientFields(c), onSubmit: v => update(d => { const x = byId(d.clients, c.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVehicle = (vv) => setForm({ title: 'Edit Vehicle', fields: vehicleFields(vv), onSubmit: v => update(d => { const x = byId(d.vehicles, vv.id); if (x) { x.regNo = v.regNo; x.make = v.make; x.type = v.type; x.owned = v.owned === 'yes'; x.gvw = v.gvw; x.driverId = v.driverId; } }) });
+  const editTruck = (t) => setForm({
+    title: 'Edit ' + (t.code || t.truckNo), fields: truckFields(t),
+    onSubmit: v => update(d => {
+      const x = byId(d.truckMaster, t.id);
+      if (x) { x.code = v.code; x.truckNo = v.truckNo; x.ownerName = v.ownerName; x.contactNo = v.contactNo; x.panCard = v.panCard === 'yes'; x.rcNo = v.rcNo === 'yes'; x.createdBy = v.createdBy; }
+    })
+  });
+  const doImportLegacyTrucks = () => update(d => {
+    const added = importLegacyTrucks(d);
+    setTimeout(() => alert('Truck list imported', added + ' truck(s) added' + (added < 121 ? ', ' + (121 - added) + ' already on file (skipped).' : '.')), 100);
+  });
   const editDriver = (dd) => setForm({ title: 'Edit Driver', fields: driverFields(dd), onSubmit: v => update(d => { const x = byId(d.drivers, dd.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendor = (vv) => setForm({ title: 'Edit Vendor', fields: vendorFields(vv), onSubmit: v => update(d => { const x = byId(d.vendors, vv.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
 
@@ -89,6 +116,7 @@ export default function MastersScreen() {
           </TouchableOpacity>
         ))}
         <View style={{ flex: 1 }} />
+        {tab === 'trucks' ? <Btn small tone="ghost" label="Import Legacy Truck List" onPress={doImportLegacyTrucks} /> : null}
         <Btn small label={ADD_LABEL[tab] || '+ Add'} tone="amber" onPress={add} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
@@ -132,6 +160,30 @@ export default function MastersScreen() {
                 gvw: v.gvw || '—',
                 driver: driverName(db, v.driverId),
                 actions: rowActions(() => editVehicle(v), () => confirmDo('Delete vehicle?', () => update(d => removeById(d.vehicles, v.id))))
+              }))}
+            />
+          ))}
+          {tab === 'trucks' && (!(db.truckMaster || []).length ? <Empty text="No trucks yet. Add one, or use “Import Legacy Truck List” above." /> : (
+            <Table
+              cols={[
+                { key: 'code', label: 'Code', width: 100 },
+                { key: 'truckNo', label: 'Truck No', width: 130 },
+                { key: 'ownerName', label: 'Owner Name', width: 150 },
+                { key: 'contactNo', label: 'Contact No', width: 120 },
+                { key: 'panCard', label: 'PAN Card', width: 90 },
+                { key: 'rcNo', label: 'RC No', width: 90 },
+                { key: 'createdBy', label: 'Created By', width: 120 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={db.truckMaster.map(t => ({
+                code: t.code || '—',
+                truckNo: <Text style={{ fontWeight: '700', color: C.navy }}>{t.truckNo}</Text>,
+                ownerName: t.ownerName || '—',
+                contactNo: t.contactNo || '—',
+                panCard: <Badge text={t.panCard ? 'YES' : 'NO'} tone={t.panCard ? 'green' : 'red'} />,
+                rcNo: <Badge text={t.rcNo ? 'YES' : 'NO'} tone={t.rcNo ? 'green' : 'red'} />,
+                createdBy: t.createdBy || '—',
+                actions: rowActions(() => editTruck(t), () => confirmDo('Delete truck ' + (t.truckNo || t.code) + '?', () => update(d => removeById(d.truckMaster, t.id))))
               }))}
             />
           ))}

@@ -6,7 +6,7 @@ import { printHtml } from '../fileIO';
 import { getLogoDataUri } from '../logoAsset';
 import {
   uid, inr, fmtDate, todayISO, byId, blankLR, computeLR, clientName, vendorName, mailLink,
-  truckToVehicleId, lrHireBalance, convertInquiryToLRDraft, lrHtml,
+  truckToVehicleId, lrHireBalance, convertInquiryToLRDraft, lrHtml, findTruckMaster,
   LR_CHG, PKG_TYPES, EXP_HEADS
 } from '../logic';
 
@@ -78,6 +78,30 @@ function Fld({ l, v, set, num, multi }) {
         <TextInput value={v == null ? '' : String(v)} onChangeText={set} multiline={!!multi}
           placeholderTextColor={C.line2} style={boxStyle} />
       )}
+    </View>
+  );
+}
+
+/* Same box as Fld, but looks up db.truckMaster by truck number as the user
+   types and shows whatever's on file (owner, contact, PAN/RC status) right
+   underneath — read-only, informational only. Doesn't add any new field to
+   the LR record itself; it just surfaces what Masters -> Trucks already has. */
+function TruckNoField({ v, set, db }) {
+  const match = useMemo(() => findTruckMaster(db, v), [db.truckMaster, v]);
+  const boxStyle = {
+    borderWidth: 1, borderColor: C.line2, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7,
+    fontSize: 13, color: C.txt, backgroundColor: '#fff', width: '100%'
+  };
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Text style={{ fontSize: 10, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 4 }}>Truck No *</Text>
+      <TextInput value={v == null ? '' : String(v)} onChangeText={set} placeholderTextColor={C.line2} style={boxStyle} />
+      {match ? (
+        <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 4 }}>
+          {(match.code ? match.code + ' · ' : '') + (match.ownerName || 'owner not on file') + (match.contactNo ? ' · ' + match.contactNo : '')
+            + ' · PAN ' + (match.panCard ? '✓' : '✕') + ' · RC ' + (match.rcNo ? '✓' : '✕')}
+        </Text>
+      ) : (String(v || '').trim() ? <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 4 }}>Not on file in Truck Master.</Text> : null)}
     </View>
   );
 }
@@ -326,7 +350,7 @@ export default function LRFormScreen({ navigation, route }) {
           Owned → add trip expenses against this LR later. Hired → hire advance & balance tracked below (internal — never prints on the LR).
         </Text>
         <Grid min={200}>
-          <Fld l="Truck No *" v={f.truckNo} set={set('truckNo')} />
+          <TruckNoField v={f.truckNo} set={set('truckNo')} db={db} />
           <Fld l="LR No *" v={f.lrNo} set={set('lrNo')} />
           <Fld l="Date *" v={f.date} set={set('date')} />
           <View style={{ marginBottom: 10 }}>

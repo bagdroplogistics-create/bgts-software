@@ -165,8 +165,81 @@ export function blankDB(){
     seq: { lr: 1, inv: 1, bk: 1, lhc: 1 },
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
-    lrs: [], lhcs: [], advances: [], acctExp: [], inquiries: [], bankTxns: [], billingBackup: []
+    lrs: [], lhcs: [], advances: [], acctExp: [], inquiries: [], bankTxns: [], billingBackup: [], truckMaster: []
   };
+}
+
+/* ---------- Truck Master — directory of every truck dealt with (owned or
+   market/hired), independent of db.vehicles (BGTS's own owned fleet). Used
+   to auto-fetch owner/contact/document details by truck number on the LR
+   form. Match is whitespace/case-insensitive, same normalization used by
+   truckToVehicleId() above so "GJ 06 AX 9856" and "GJ06AX9856" both hit. */
+export function findTruckMaster(db, truckNo){
+  const key = String(truckNo || '').replace(/\s/g, '').toUpperCase();
+  if (!key) return null;
+  return (db.truckMaster || []).find(t => String(t.truckNo || '').replace(/\s/g, '').toUpperCase() === key) || null;
+}
+
+/* One-click import of the company's existing legacy truck list (from the
+   old system's "View Truck Details" register) into db.truckMaster. Skips
+   any truck number already present so it's safe to run more than once.
+   Owner Name / Contact No / Created By were blank in the source register and
+   PAN Card / RC No were both unset for every row — left blank/false here too,
+   editable afterwards from Masters -> Trucks. */
+export const LEGACY_TRUCKS = [
+  ['TRUCK-0095', 'GJ 05 CU 5443'], ['TRUCK-0047', 'GJ 06 AV 3379'], ['TRUCK-0067', 'GJ16 AU 8942'],
+  ['TRUCK-0013', '12263'], ['TRUCK-0007', '12927'], ['TRUCK-0003', '12928'], ['TRUCK-0018', '12928 R1'],
+  ['TRUCK-0015', '1394'], ['TRUCK-0010', '19020'], ['TRUCK-0017', '22414'], ['TRUCK-0048', '2262'],
+  ['TRUCK-0005', '22953'], ['TRUCK-0008', '6890'], ['TRUCK-0056', 'BR 01 GP 0638'], ['TRUCK-0055', 'CG 04 HT - 5099'],
+  ['TRUCK-0052', 'CG04JC9794'], ['TRUCK-0091', 'CG07CA6035'], ['TRUCK-0045', 'CG07CT 3726'], ['TRUCK-0046', 'CG22G-9878'],
+  ['TRUCK-0012', 'GJ 03 AZ 9306'], ['TRUCK-0110', 'GJ 06 AX 5887'], ['TRUCK-0079', 'GJ 06 AX 9856'],
+  ['TRUCK-0035', 'GJ 06 AY 4675'], ['TRUCK-0039', 'GJ 06 BV 9753'], ['TRUCK-0051', 'GJ 06 TT 8765'],
+  ['TRUCK-0088', 'GJ 06AX8587'], ['TRUCK-0102', 'GJ 11 VV 7670'], ['TRUCK-0101', 'GJ 12 AZ 8550'],
+  ['TRUCK-0093', 'GJ 15 AV 1124'], ['TRUCK-0037', 'GJ 15YY 7763'], ['TRUCK-0080', 'GJ 16 AU 6858'],
+  ['TRUCK-0097', 'GJ 17 XX 1820'], ['TRUCK-0118', 'GJ 21V 6875'], ['TRUCK-0112', 'GJ 27 TF 9204'],
+  ['TRUCK-0020', 'GJ 34 T 2262'], ['TRUCK-0025', 'GJ-06-BX-7185'], ['TRUCK-0113', 'GJ01DY9338'],
+  ['TRUCK-0075', 'GJ01ET.3585'], ['TRUCK-0096', 'GJ01ET5958'], ['TRUCK-0119', 'GJ03 BZ 1224'],
+  ['TRUCK-0030', 'GJ03AX9201'], ['TRUCK-0086', 'GJ03BW1843'], ['TRUCK-0062', 'GJ03BY5293'],
+  ['TRUCK-0076', 'GJ03BZ3298'], ['TRUCK-0044', 'GJ04AT7264'], ['TRUCK-0057', 'GJ06AT8828'],
+  ['TRUCK-0089', 'GJ06AX8511'], ['TRUCK-0031', 'GJ06AX8637'], ['TRUCK-0042', 'GJ06AX9856'],
+  ['TRUCK-0121', 'GJ06AY4675'], ['TRUCK-0014', 'GJ06AZ4223'], ['TRUCK-0029', 'GJ06BT7526'],
+  ['TRUCK-0059', 'GJ06BT7974'], ['TRUCK-0115', 'GJ06BT9525'], ['TRUCK-0077', 'GJ06BV 7599'],
+  ['TRUCK-0100', 'GJ06BV4834'], ['TRUCK-0038', 'GJ06BV7189'], ['TRUCK-0084', 'GJ06BX3536'],
+  ['TRUCK-0049', 'GJ06BX5307'], ['TRUCK-0082', 'GJ06BX9987'], ['TRUCK-0094', 'GJ06BY0945'],
+  ['TRUCK-0040', 'GJ06BY1577'], ['TRUCK-0072', 'GJ06Y8009'], ['TRUCK-0001', 'GJ06ZZ1394'],
+  ['TRUCK-0023', 'GJ07YZ8661'], ['TRUCK-0092', 'GJ07YZ9640'], ['TRUCK-0016', 'GJ1234'],
+  ['TRUCK-0085', 'GJ15AT3352'], ['TRUCK-0041', 'GJ15AV1543'], ['TRUCK-0098', 'GJ16 AW7467'],
+  ['TRUCK-0111', 'GJ16AB4707'], ['TRUCK-0066', 'GJ16AU 8784-'], ['TRUCK-0021', 'GJ16AU 8942'],
+  ['TRUCK-0019', 'GJ16AU 8942.'], ['TRUCK-0108', 'GJ16AU1973'], ['TRUCK-0033', 'GJ16AU8942'],
+  ['TRUCK-0032', 'GJ16AW-0776'], ['TRUCK-0069', 'GJ16AW4072'], ['TRUCK-0078', 'GJ16W9725'],
+  ['TRUCK-0022', 'GJ17XX1820'], ['TRUCK-0074', 'GJ18AZ1642'], ['TRUCK-0006', 'GJ19X6890'],
+  ['TRUCK-0004', 'GJ20AA1234'], ['TRUCK-0063', 'GJ21V9039'], ['TRUCK-0081', 'GJ23AT6958'],
+  ['TRUCK-0122', 'GJ27TF9204'], ['TRUCK-0114', 'GJ31T7938'], ['TRUCK-0011', 'GJO4X7074'],
+  ['TRUCK-0024', 'GND25CM000004'], ['TRUCK-0117', 'HR 46E 5635'], ['TRUCK-0099', 'HR61F4078'],
+  ['TRUCK-0104', 'HR74C 5302'], ['TRUCK-0065', 'KA 01 AJ 9767'], ['TRUCK-0061', 'KA22AA1646'],
+  ['TRUCK-0107', 'MH 48 AG 1806'], ['TRUCK-0027', 'MH 48 BM 9506'], ['TRUCK-0050', 'MH04LE3262'],
+  ['TRUCK-0070', 'MH43CE4881'], ['TRUCK-0120', 'MH48AG1806'], ['TRUCK-0009', 'MH48BM2805'],
+  ['TRUCK-0028', 'MH48BM3928'], ['TRUCK-0034', 'MH48BM9506'], ['TRUCK-0116', 'MH48DQ0196'],
+  ['TRUCK-0071', 'MP15HA8944'], ['TRUCK-0054', 'NL01AJ3359'], ['TRUCK-0103', 'PB 08 EE 2813'],
+  ['TRUCK-0036', 'PB11CQ0904'], ['TRUCK-0087', 'RJ 14 GR 8247'], ['TRUCK-0073', 'RJ 27 GB 5312'],
+  ['TRUCK-0064', 'RJ 27 GE 1395'], ['TRUCK-0090', 'RJ07GD8205'], ['TRUCK-0026', 'RJ14GN1717'],
+  ['TRUCK-0058', 'RJ27GC0876'], ['TRUCK-0109', 'RJ27GC1327'], ['TRUCK-0060', 'RJ27GD6328'],
+  ['TRUCK-0053', 'RJ27GF1327'], ['TRUCK-0106', 'UP 45 BT 7004'], ['TRUCK-0068', 'UP 77 AT 2930'],
+  ['TRUCK-0105', 'UP45BT7004'], ['TRUCK-0043', 'UP74T1456'], ['TRUCK-0083', 'UP93BT7838']
+];
+export function importLegacyTrucks(db){
+  db.truckMaster = db.truckMaster || [];
+  const have = {};
+  db.truckMaster.forEach(t => { have[String(t.truckNo || '').replace(/\s/g, '').toUpperCase()] = true; });
+  let added = 0;
+  LEGACY_TRUCKS.forEach(([code, truckNo]) => {
+    const key = truckNo.replace(/\s/g, '').toUpperCase();
+    if (have[key]) return;
+    have[key] = true;
+    db.truckMaster.push({ id: uid('tm'), code, truckNo, ownerName: '', contactNo: '', panCard: false, rcNo: false, createdBy: '' });
+    added++;
+  });
+  return added;
 }
 
 export function blankLR(){
@@ -199,6 +272,7 @@ export function migrate(db){
   if (!db.inquiries) db.inquiries = [];
   if (!db.bankTxns) db.bankTxns = [];
   if (!db.billingBackup) db.billingBackup = [];
+  if (!db.truckMaster) db.truckMaster = [];
   ensureBillingBackup(db);
   if (!db.seq.lhc) db.seq.lhc = 1;
   if (!db.seq.inq) db.seq.inq = 1;
