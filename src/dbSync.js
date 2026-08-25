@@ -138,7 +138,11 @@ const FLAT = {
     ['head','head','s'],['category','category','s'],['amount','amount','no'],['linkedVehicleId','linked_vehicle_id','fk'],
     ['frequency','frequency','s'],['active','active','b'],['notes','notes','s']
   ] },
-  auditLog: { table: 'audit_log', fields: [['ts','ts','s'],['action','action','s'],['details','details','s']] }
+  auditLog: { table: 'audit_log', fields: [['ts','ts','s'],['action','action','s'],['details','details','s']] },
+  vendorDirectory: { table: 'vendor_directory', fields: [
+    ['srNo','sr_no','nr'],['vendorCode','vendor_code','s'],['name','name','s'],['contactNo','contact_no','s'],
+    ['panCard','pan_card','s'],['gst','gst','s'],['type','type','s'],['createdBy','created_by','s']
+  ] }
 };
 
 function toRow(rec, def) {
@@ -396,6 +400,84 @@ async function pullLRs() {
 }
 
 /* ============================================================
+   bills (Bill / Invoice module) — flat fields on bills, plus:
+     bill_lines     (lines[], replace-all, sort_order preserves array order)
+     bill_charges   (1:1 LR Charges block)
+     bill_payments  (additions[]/deductions[] sharing one table via `kind`)
+   Independent of LRs — bill_lines.lr_id is a nullable read-only reference
+   into lrs, never written back to. Vendor is a reference into
+   vendor_directory (the ATTrans-imported register), not vendors.
+   ============================================================ */
+const BILL_DEF = { table: 'bills', fields: [
+  ['invoiceNo','invoice_no','s'],['vendorId','vendor_id','fk'],['date','date','s'],['poNo','po_no','s'],['poDate','po_date','d'],
+  ['sgstPct','sgst_pct','nr'],['cgstPct','cgst_pct','nr'],['igstPct','igst_pct','nr'],['roundOff','round_off','nr'],['advanceReceive','advance_receive','nr'],
+  ['bank','bank','s'],['remark','remark','s'],['subject','subject','s'],
+  ['totalAmount','total_amount','nr'],['totalAddition','total_addition','nr'],['totalDeduction','total_deduction','nr'],
+  ['grossAmount','gross_amount','nr'],['sgstAmt','sgst_amt','nr'],['cgstAmt','cgst_amt','nr'],['igstAmt','igst_amt','nr'],
+  ['netAmount','net_amount','nr'],['balanceAmount','balance_amount','nr']
+] };
+const BILL_CHARGE_KEYS = ['hamali','loading','unloading','rtoChallan','varai','lrCharges','detention','otherAdd','dockCharges','extraDelivery'];
+const BILL_CHARGE_COLS = { hamali: 'hamali', loading: 'loading', unloading: 'unloading', rtoChallan: 'rto_challan', varai: 'varai', lrCharges: 'lr_charges', detention: 'detention', otherAdd: 'other_add', dockCharges: 'dock_charges', extraDelivery: 'extra_delivery' };
+
+async function syncBills(prevArr, nextArr) {
+  const { changed, deletedIds } = diffById(prevArr, nextArr);
+  for (const b of changed) {
+    await upsert('bills', [toRow(b, BILL_DEF)]);
+
+    await replaceChildren('bill_lines', 'bill_id', b.id, (b.lines || []).map((l, i) => ({
+      bill_id: b.id, sort_order: i, lr_id: fk(l.lrId), status: s(l.status), lr_no: s(l.lrNo), date: dateOpt(l.date),
+      from_place: s(l.from), to_place: s(l.to), weight: numOpt(l.weight), pcs: numOpt(l.pcs), rate: numOpt(l.rate),
+      amount: numReq(l.amount), other_charges: numReq(l.otherCharges), remark: s(l.remark)
+    })));
+
+    const ch = b.charges || {};
+    const chargeRow = { bill_id: b.id };
+    BILL_CHARGE_KEYS.forEach(k => { chargeRow[BILL_CHARGE_COLS[k]] = numReq(ch[k]); });
+    await upsert('bill_charges', [chargeRow]);
+
+    const payRows = [
+      ...(b.additions || []).map((a, i) => ({ bill_id: b.id, kind: 'addition', sort_order: i, type: s(a.type), amount: numReq(a.amount) })),
+      ...(b.deductions || []).map((a, i) => ({ bill_id: b.id, kind: 'deduction', sort_order: i, type: s(a.type), amount: numReq(a.amount) }))
+    ];
+    await replaceChildren('bill_payments', 'bill_id', b.id, payRows);
+  }
+  if (deletedIds.length) await del('bills', deletedIds); // children cascade-delete
+}
+async function pullBills() {
+  const [rows, lines, charges, payments] = await Promise.all([
+    fetchAll('bills'), fetchAll('bill_lines'), fetchAll('bill_charges'), fetchAll('bill_payments')
+  ]);
+  const linesByBill = byKey(lines, 'bill_id');
+  const chargeByBill = {}; charges.forEach(c => { chargeByBill[c.bill_id] = c; });
+  const payByBill = byKey(payments, 'bill_id');
+
+  return rows.map(r => {
+    const rec = fromRow(r, BILL_DEF);
+
+    rec.lines = (linesByBill[r.id] || []).slice().sort((a, b2) => a.sort_order - b2.sort_order).map(l => ({
+      id: l.id, lrId: l.lr_id || '', status: l.status || '', lrNo: l.lr_no || '', date: l.date || '',
+      from: l.from_place || '', to: l.to_place || '', weight: l.weight == null ? '' : String(l.weight),
+      pcs: l.pcs == null ? '' : String(l.pcs), rate: l.rate == null ? '' : String(l.rate),
+      amount: l.amount == null ? '' : String(l.amount), otherCharges: l.other_charges == null ? '' : String(l.other_charges),
+      remark: l.remark || ''
+    }));
+
+    const chRow = chargeByBill[r.id] || {};
+    const charges2 = {};
+    BILL_CHARGE_KEYS.forEach(k => { charges2[k] = chRow[BILL_CHARGE_COLS[k]] == null ? '' : String(chRow[BILL_CHARGE_COLS[k]]); });
+    rec.charges = charges2;
+
+    const pays = payByBill[r.id] || [];
+    rec.additions = pays.filter(p => p.kind === 'addition').sort((a, b2) => a.sort_order - b2.sort_order)
+      .map(p => ({ id: p.id, type: p.type || '', amount: p.amount == null ? '' : String(p.amount) }));
+    rec.deductions = pays.filter(p => p.kind === 'deduction').sort((a, b2) => a.sort_order - b2.sort_order)
+      .map(p => ({ id: p.id, type: p.type || '', amount: p.amount == null ? '' : String(p.amount) }));
+
+    return rec;
+  });
+}
+
+/* ============================================================
    billing backup — one-time seed only, app never mutates it after
    ensureBillingBackup() runs once in logic.js's migrate().
    ============================================================ */
@@ -470,18 +552,18 @@ export async function pullDb() {
   const [
     seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills
   ] = await Promise.all([
     pullSeq(), pullFlat(FLAT.clients), pullFlat(FLAT.vehicles), pullFlat(FLAT.drivers), pullFlat(FLAT.vendors),
     pullFlat(FLAT.routes), pullFlat(FLAT.branches), pullContracts(), pullFlat(FLAT.bookings), pullFlat(FLAT.expenses),
     pullFlat(FLAT.renewals), pullInvoices(), pullFlat(FLAT.payments), pullLRs(), pullLHCs(), pullFlat(FLAT.advances),
     pullFlat(FLAT.acctExp), pullFlat(FLAT.inquiries), pullFlat(FLAT.bankTxns), pullBillingBackup(), pullFlat(FLAT.truckMaster),
-    pullFlat(FLAT.lenders), pullFlat(FLAT.fixedExp), pullFlat(FLAT.auditLog)
+    pullFlat(FLAT.lenders), pullFlat(FLAT.fixedExp), pullFlat(FLAT.auditLog), pullFlat(FLAT.vendorDirectory), pullBills()
   ]);
   return {
     company, seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, regSeeded: true, pdfRecon: '2026-08-07'
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, regSeeded: true, pdfRecon: '2026-08-07'
   };
 }
 
@@ -514,6 +596,8 @@ export async function seedIfEmpty(db) {
   await syncFlat('lenders', FLAT.lenders, [], db.lenders);
   await syncFlat('fixedExp', FLAT.fixedExp, [], db.fixedExp); // after vehicles: fixedExp.linked_vehicle_id is a FK
   await syncFlat('auditLog', FLAT.auditLog, [], db.auditLog);
+  await syncFlat('vendorDirectory', FLAT.vendorDirectory, [], db.vendorDirectory);
+  await syncBills([], db.bills); // after lrs (bill_lines.lr_id fk) and vendorDirectory (bills.vendor_id fk)
   await seedBillingBackupIfEmpty(db.billingBackup);
 }
 
@@ -552,5 +636,7 @@ export async function pushDb(prevDb, nextDb) {
   await syncFlat('lenders', FLAT.lenders, prevDb.lenders, nextDb.lenders);
   await syncFlat('fixedExp', FLAT.fixedExp, prevDb.fixedExp, nextDb.fixedExp);
   await syncFlat('auditLog', FLAT.auditLog, prevDb.auditLog, nextDb.auditLog);
+  await syncFlat('vendorDirectory', FLAT.vendorDirectory, prevDb.vendorDirectory, nextDb.vendorDirectory);
+  await syncBills(prevDb.bills, nextDb.bills);
   // billingBackup is intentionally not synced here — see seedBillingBackupIfEmpty.
 }

@@ -166,7 +166,7 @@ export function blankDB(){
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
     lrs: [], lhcs: [], advances: [], acctExp: [], inquiries: [], bankTxns: [], billingBackup: [], truckMaster: [],
-    lenders: [], fixedExp: [], auditLog: []
+    lenders: [], fixedExp: [], auditLog: [], vendorDirectory: [], bills: []
   };
 }
 
@@ -243,6 +243,347 @@ export function importLegacyTrucks(db){
   return added;
 }
 
+/* ---------- Vendor Directory — imported wholesale from the company's ATTrans
+   "View Vendor Details" register (235 rows, screenshots dated 2026-08-11).
+   Kept as its own standalone directory, separate from db.vendors (the
+   operational vendor list already wired into Bookings/LHC/hired-vehicle
+   assignment), since this ATTrans register uses its own Vendor Code scheme,
+   PAN/GST/Type/Created By columns that don't exist on db.vendors, and is a
+   reference/lookup list rather than a list of vendors actively assigned to
+   live bookings. Row shape: [srNo, vendorCode, name, contactNo, panCard, gst,
+   type, createdBy] — srNo is the ATTrans "SR NO." column, preserved as-is for
+   traceability back to the source register (not renumbered).
+   Known data-quality notes carried over as-is from the source (not
+   transcription errors — verified by re-reading the screenshots):
+     - Row 1 (V-0072) and row 235 (V-0099) have blank names in the source.
+     - Several vendor codes repeat across BRD/DDR/AHD/etc. branch-suffix
+       variants of the same person (e.g. V-0035, V-0046, V-0039) — this
+       matches the source register's own convention, not a duplicate entry.
+     - SR NO. 220 and 221 were each listed twice in a row in the source
+       table (identical data both times); only included once each here.
+     - Row 101 and row 135 (V-0065, "MR VIRENDRA MANDERA") are an exact
+       duplicate row in the source. */
+export const LEGACY_VENDORS = [
+  [1, "V-0072", "", "", "", "", "AGENT", ""],
+  [2, "V-0100", "MR. SAURABH BAFNA", "", "", "", "VENDOR", "DEVELOPER"],
+  [3, "V-0101", "MR. SAURABH BAFNA(DDR)", "", "", "", "VENDOR", ""],
+  [4, "V-0130", "PURNA GORADIA", "", "", "", "VENDOR", ""],
+  [5, "V-0177", "VINDI VAK PUMP PVT. LTD", "", "", "", "VENDOR", ""],
+  [6, "V-0139", "AADHAR EQUIPMENTS PVT LTD", "", "AABCA9507G", "24AABCA9507G1ZX", "VENDOR", "DEVELOPER"],
+  [7, "V-0083", "ADITYA SHAH", "", "", "", "VENDOR", ""],
+  [8, "V-0107", "ADROIT STRUCTURAL ENGINEERS PVT LTD", "", "AADCA0403B", "24AADCA0403B1ZS", "VENDOR", "DEVELOPER"],
+  [9, "V-0184", "AIR POWER SERVICES", "", "ACDPP5579Q", "24ACDPP5579Q1ZS", "VENDOR", "DEVELOPER"],
+  [10, "V-0195", "AIR POWER SERVICES", "", "ACDPP5579Q", "24ACDPP5579Q1ZS", "VENDOR", "DEVELOPER"],
+  [11, "V-0217", "AKSHAR ROADLINES", "9377766352", "", "", "AGENT", "DEVELOPER"],
+  [12, "V-0211", "AMAL LIMITED", "", "AAACA1041J", "24AAACA1041J1ZA", "VENDOR", "DEVELOPER"],
+  [13, "V-0147", "AMTECH ELECTRONICS (INDIA) LTD.", "", "AABCA2793A", "24AABCA2793A1Z7", "VENDOR", "DEVELOPER"],
+  [14, "V-0194", "ANTICORROSION INDIA PVT LTD", "", "", "", "VENDOR", "DEVELOPER"],
+  [15, "V-0112", "ARCELI LIFESCIENCE PRIVATE LIMITED", "", "AASCA1911H", "05AASCA1911H1ZU", "VENDOR", "DEVELOPER"],
+  [16, "V-0214", "ARCH ELECTRICAL", "", "AFLPR1236H", "27AFLPR1236H2ZA", "VENDOR", "DEVELOPER"],
+  [17, "V-0151", "ARIHANT FABRICATORS", "", "ACKPM4863F", "24ACKPM4863F1ZI", "VENDOR", "DEVELOPER"],
+  [18, "V-0114", "ASKON HYGIENE PRODUCTS PRIVATE LIMITED", "", "AAFCA1595C", "27AAFCA1595C1ZV", "VENDOR", "DEVELOPER"],
+  [19, "V-0152", "ASSASSOCITED ROAD CARRIERS LIMITED", "", "", "", "VENDOR", ""],
+  [20, "V-0210", "ASSOCIATED ROAD CARRIERS LIMITED", "", "AACCA4861C", "24AACCA4861C2Z4", "VENDOR", "DEVELOPER"],
+  [21, "V-0208", "BARODA IND. ELECTRICALS PRO. PVT. LTD.", "", "AACCB0826G", "24AACCB0826G1Z7", "VENDOR", "DEVELOPER"],
+  [22, "V-0207", "BASE METAL CHEMICALS", "", "AABFB7166P", "24AABFB7166P1Z4", "VENDOR", "DEVELOPER"],
+  [23, "V-0027", "BHANU COSPACK PRIVATE LTD", "", "", "24AAJCB3408R1ZD", "VENDOR", ""],
+  [24, "V-0097", "BLISS GVS PHARMA LIMITED", "", "AABCB1382J", "24AABCB1382J2ZV", "VENDOR", "DEVELOPER"],
+  [25, "V-0098", "BLISS GVS PHARMA LTD", "", "AABCB1382J", "27AABCB1382J1ZQ", "VENDOR", "DEVELOPER"],
+  [26, "V-0157", "BOLTRACK ENGINEERS", "", "BHRPR1728R", "24BHRPR1728R1ZG", "VENDOR", "DEVELOPER"],
+  [27, "V-0206", "BRAZEWELL ENGINEERS C/O ACPL TRANSPORT", "", "", "", "VENDOR", ""],
+  [28, "V-0113", "CHEMVAC PROCESS", "", "AJFPN5535K", "27AJFPN5535K1ZV", "VENDOR", "DEVELOPER"],
+  [29, "V-0069", "CLARUS CORPORATION", "", "", "24ACTPP2392K2ZY", "VENDOR", "DEVELOPER"],
+  [30, "V-0062", "COLOURIFIC AGENCY", "", "", "", "VENDOR", ""],
+  [31, "V-0055", "DECORATIVE PLYWOOD & HARDWARE CO", "", "", "", "VENDOR", ""],
+  [32, "V-0212", "DEEPAK NITRITE LIMITED", "", "AAACD7468A", "24AAACD7468A1ZZ", "VENDOR", "DEVELOPER"],
+  [33, "V-0002", "DEEPAK SHAH ( BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [34, "V-0003", "DEEPAK SHAH (DDR)", "", "", "", "VENDOR", ""],
+  [35, "V-0043", "DENORA INDIA LTD", "", "", "30AAACT2583N1Z9", "VENDOR", "DEVELOPER"],
+  [36, "V-0006", "DEVELOPER", "", "", "", "VENDOR", ""],
+  [37, "V-0125", "DHANLAXMI AUTOMOBILES", "", "", "", "VENDOR", ""],
+  [38, "V-0070", "DHARMESHNANDINI PATEL", "", "", "", "VENDOR", ""],
+  [39, "V-0176", "DRM FILTER TECHNOLOGY PVT LTD", "", "", "", "VENDOR", ""],
+  [40, "V-0140", "DUNGSAM CEMENT CORPORATION LIMITED", "", "", "", "VENDOR", "DEVELOPER"],
+  [41, "V-0137", "DYNA MECH ENGINEERING", "", "AATFD7793A", "24AATFD7793A1Z6", "VENDOR", "DEVELOPER"],
+  [42, "V-0159", "ELECTRONICS AND QUALITY DEVELOPMENT CENTRE", "", "AAATE0718R", "24AAATE0718R1ZL", "VENDOR", "DEVELOPER"],
+  [43, "V-0083", "ELESHBHAI SHAH", "", "", "", "VENDOR", ""],
+  [44, "V-0141", "ESI SERVICES INDIA LLP", "", "AADFE5775H", "24AADFE5775H1ZD", "VENDOR", "DEVELOPER"],
+  [45, "V-0144", "ESI SERVICES INDIA LLP", "", "AADFE5775H", "24AADFE5775H1ZD", "VENDOR", "DEVELOPER"],
+  [46, "V-0143", "ESI SERVICES INDIA LLP CO BOLTRACK ENGINEERS", "", "", "", "VENDOR", "DEVELOPER"],
+  [47, "V-0142", "ESI SERVICES INDIA LLP CO SHREE CEMENT LTD", "", "", "", "VENDOR", "DEVELOPER"],
+  [48, "V-0118", "FABWEL ENGINEERING CORPORATION", "", "AAAFF4348Q", "24AAAFF4348Q1Z5", "VENDOR", "DEVELOPER"],
+  [49, "V-0148", "FLEXATHERM EXPANLLOW PVT LTD", "", "", "", "VENDOR", "DEVELOPER"],
+  [50, "V-0191", "G DALABHAI ROADWAYS", "", "", "", "VENDOR", ""],
+  [51, "V-0209", "GALIAKOTWALA ENGINEERING CO PVT LTD", "", "AAACG5701D", "24AAACG5701D1ZA", "VENDOR", "DEVELOPER"],
+  [52, "V-0001", "GUJARAT ALKALIES & CHEMICALS LTD", "", "AAACG8897M", "24AAACG8897M1ZX", "VENDOR", ""],
+  [53, "V-0044", "GUJARAT ALKALIES & CHEMICALS LTD DAHEJ", "", "", "24AAACG8896M1ZX", "VENDOR", ""],
+  [54, "V-0073", "GUJARAT STATE ELECTRICITY CORP LTD BHAVNAGAR", "", "", "24AAACG6864F1ZO", "VENDOR", "DEVELOPER"],
+  [55, "V-0001", "GUJARAT STATE ELECTRICITY CORP LTD WANAKBORI", "", "AAACG6864F", "24AAACG6864F1ZO", "VENDOR", ""],
+  [56, "V-0087", "GUJARAT STATE ELECTRICITY CORPORATION LIMITED GANDHINAGAR", "", "AAACG6864F", "24AAACG6864F1ZO", "VENDOR", "DEVELOPER"],
+  [57, "V-0030", "HITEN SHAH", "", "", "", "VENDOR", ""],
+  [58, "V-0219", "HYDRODYNE TEIKOKU (INDIA) PVT LTD.C/O ACPL TRANSPORT", "", "", "", "VENDOR", ""],
+  [59, "V-0145", "JAGAT PANWAR", "", "", "", "AGENT", "DEVELOPER"],
+  [60, "V-0110", "JAGDISH FOOD ZONE PRIVATE LIMITED", "", "AADCJ0793M", "24AADCJ0793M1ZB", "VENDOR", "DEVELOPER"],
+  [61, "V-0108", "JAYESH BHARWAD", "", "", "", "AGENT", "DEVELOPER"],
+  [62, "V-0121", "JAYHIND ROADWAYS (DAHEJ)", "", "", "", "AGENT", "DEVELOPER"],
+  [63, "V-0042", "JAYSHREE SHAH (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [64, "V-0045", "JAYSHREE SHAH (DDR)", "", "", "", "VENDOR", ""],
+  [65, "V-0128", "JIYA KAUNDAL", "", "", "", "AGENT", "DEVELOPER"],
+  [66, "V-0119", "JWSS", "", "", "", "VENDOR", "DEVELOPER"],
+  [67, "V-0104", "K M PATEL", "", "", "", "VENDOR", "DEVELOPER"],
+  [68, "V-0216", "KABRA EXPRESS LOGISTICS PRIVATE LIMITED", "", "AAGCK6871L", "24AAGCK6871L1Z2", "VENDOR", "DEVELOPER"],
+  [69, "V-0134", "LALJI MULJI TRANSPORT CO", "", "", "", "VENDOR", ""],
+  [70, "V-0136", "LATA PARMAR", "", "", "", "VENDOR", ""],
+  [71, "V-0124", "M/S MICRON ENGINEERS", "", "AAFFM6432P", "24AAFFM6432P1ZY", "VENDOR", "DEVELOPER"],
+  [72, "V-0190", "M/S SHAKTI TYRE SERVICES", "", "", "", "VENDOR", "DEVELOPER"],
+  [73, "V-0158", "M/S USHTA INFINITY CONSTRUCTION COMPANY PRIVATE LIMITED (SAMBALPUR)", "", "AAACI9029G", "21AAACI9029G1ZV", "VENDOR", "DEVELOPER"],
+  [74, "V-0127", "MANOJ PATNI", "", "", "", "AGENT", "DEVELOPER"],
+  [75, "V-0105", "MANVI PRODUCTIONS", "", "GGTPS9570J", "27GGTPS9570J1Z4", "VENDOR", "DEVELOPER"],
+  [76, "V-0170", "MET HEAT ENGINEERS PVT LTD", "", "", "", "VENDOR", ""],
+  [77, "V-0116", "MITESHBHAI", "", "", "", "AGENT", ""],
+  [78, "V-0007", "MITESHBHAI MUMBAI", "", "", "", "AGENT", "DEVELOPER"],
+  [79, "V-0056", "MOHIT AGRAWAL (DDR)", "", "", "", "VENDOR", ""],
+  [80, "V-0077", "MR ADVAIT SARFARE", "", "", "", "VENDOR", ""],
+  [81, "V-0089", "MR AMISH BHAVSAR (DDR)", "", "", "", "VENDOR", ""],
+  [82, "V-0048", "MR ANMOL PATEL (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [83, "V-0051", "MR ANMOL PATEL (DDR)", "", "", "", "VENDOR", ""],
+  [84, "V-0036", "MR ASHOK PATEL (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [85, "V-0034", "MR DEVENDRA PATEL", "", "", "", "VENDOR", ""],
+  [86, "V-0081", "MR DILIPBHAI SHAH ( BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [87, "V-0082", "MR DILPBHAI (DDR)", "", "", "", "VENDOR", ""],
+  [88, "V-0012", "MR GAUTAM AMIN (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [89, "V-0067", "MR KUNAL SHAH ( BRD)", "7490026134", "", "", "VENDOR", "DEVELOPER"],
+  [90, "V-0068", "MR KUNAL SHAH (DDR)", "", "", "", "VENDOR", ""],
+  [91, "V-0033", "MR MOUNANG PATEL", "", "", "", "VENDOR", "DEVELOPER"],
+  [92, "V-0053", "MR NITYA PATEL (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [93, "V-0066", "MR PRANAV PATEL BARODA", "", "", "", "VENDOR", ""],
+  [94, "V-0066", "MR PRANAV PATEL DELHI", "", "", "", "VENDOR", ""],
+  [95, "V-0028", "MR RAJIT SHAH (AHD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [96, "V-0032", "MR RISHABH JINGER", "", "", "", "VENDOR", ""],
+  [97, "V-0009", "MR SAMIR VYAS (BRD)", "+1 (714) 936-2055", "", "", "VENDOR", "DEVELOPER"],
+  [98, "V-0008", "MR SAMIR VYAS (DDR)", "", "", "", "VENDOR", ""],
+  [99, "V-0078", "MR SURESH SHAH", "", "", "", "VENDOR", "DEVELOPER"],
+  [100, "V-0047", "MR VASUDEV PATEL (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [101, "V-0065", "MR VIRENDRA MANDERA", "", "", "", "VENDOR", ""],
+  [102, "V-0084", "MR. ADITYA SHAH", "", "", "", "VENDOR", "DEVELOPER"],
+  [103, "V-0088", "MR. AMISH BHAVSAR (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [104, "V-0035", "MR. ASHOK PATEL (BRD)", "", "", "", "VENDOR", ""],
+  [105, "V-0035", "MR. ASHOK PATEL (DDR)", "", "", "", "VENDOR", ""],
+  [106, "V-0014", "MR. CHANDRAVADAN PATEL (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [107, "V-0019", "MR. CHANDRAVARDHAN PATEL (DDR)", "", "", "", "VENDOR", ""],
+  [108, "V-0057", "MR. CHIRAG PATEL", "", "", "", "VENDOR", "DEVELOPER"],
+  [109, "V-0015", "MR. DHANANJAY JOSHI (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [110, "V-0020", "MR. DHANANJAY JOSHI (DDR)", "", "", "", "VENDOR", ""],
+  [111, "V-0017", "MR. GAUTAM AMIN (DDR)", "", "", "", "VENDOR", ""],
+  [112, "V-0133", "MR. MOHAN BARIA", "", "", "", "AGENT", "DEVELOPER"],
+  [113, "V-0086", "MR. MONISH JHAVER (DDR)", "", "", "", "VENDOR", ""],
+  [114, "V-0085", "MR. MONISH JHAVERI", "", "", "", "VENDOR", "DEVELOPER"],
+  [115, "V-0079", "MR. NIKUNJ PATEL ( BRD)", "7575004000", "", "", "VENDOR", "DEVELOPER"],
+  [116, "V-0052", "MR. NITYA PATEL ( DDR)", "", "", "", "VENDOR", ""],
+  [117, "V-0052", "MR. NITYA PATEL (BRD)", "", "", "", "VENDOR", ""],
+  [118, "V-0059", "MR. PARESH PARIKH (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [119, "V-0016", "MR. RAJIT SHAH (AHD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [120, "V-0029", "MR. RAJIT SHAH (BGL)", "", "", "", "VENDOR", ""],
+  [121, "V-0031", "MR. RISHABH JINGER (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [122, "V-0005", "MR. RIYAAZ DHRUV (DDR)", "", "", "", "VENDOR", ""],
+  [123, "V-0005", "MR. RIYAZ DHRUV ( BRD)", "", "", "", "VENDOR", ""],
+  [124, "V-0004", "MR. SAMIR VYAS ( BRD)", "", "", "", "VENDOR", ""],
+  [125, "V-0004", "MR. SAMIR VYAS ( DDR)", "", "", "", "VENDOR", ""],
+  [126, "V-0091", "MR. SAMIR VYAS ( DDR)'", "", "", "", "VENDOR", ""],
+  [127, "V-0008", "MR. SAMIR VYAS (BRD)", "", "", "", "VENDOR", ""],
+  [128, "V-0094", "MR. SNEHAL JAGDISH NAGARSHETH ( DDR)", "", "", "", "VENDOR", ""],
+  [129, "V-0093", "MR. SNEHAL JAGDISH NAGARSHETH (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [130, "V-0092", "MR. SUYASH VAISHNAV", "", "", "", "VENDOR", "DEVELOPER"],
+  [131, "V-0091", "MR. SUYASH VAISHNAV (DDR)", "", "", "", "VENDOR", ""],
+  [132, "V-0050", "MR. VASUDEV PATEL (DDR)", "", "", "", "VENDOR", ""],
+  [133, "V-0090", "MR. VIJAYBHAI THAKKAR", "", "", "", "VENDOR", "DEVELOPER"],
+  [134, "V-0215", "MR. VINAYKANT VARMA", "7208101240", "", "", "VENDOR", "DEVELOPER"],
+  [135, "V-0065", "MR. VIRENDRA MANDERA", "", "", "", "VENDOR", ""],
+  [136, "V-0129", "MRS JHEEL", "", "", "", "VENDOR", "DEVELOPER"],
+  [137, "V-0010", "MRS. KRISHNA PATEL (AND)", "", "", "", "VENDOR", ""],
+  [138, "V-0011", "MRS. KRISHNA PATEL (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [139, "V-0010", "MRS. KRISHNA PATEL (DDR)", "", "", "", "VENDOR", ""],
+  [140, "V-0013", "MRS. MAUSAM PATEL (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [141, "V-0018", "MRS. MAUSAM PATEL (DDR)", "", "", "", "VENDOR", ""],
+  [142, "V-0061", "MRS. PRACHI SHAH ( DDR)", "", "", "", "VENDOR", ""],
+  [143, "V-0060", "MRS. PRACHI SHAH (AHD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [144, "V-0102", "MRS. PRIYABEN GAIKWAD", "", "", "", "VENDOR", ""],
+  [145, "V-0024", "MRS. ROSHANI VYAS", "", "", "", "VENDOR", ""],
+  [146, "V-0023", "MRS. ROSHANI VYAS (BRD)", "", "", "", "VENDOR", "DEVELOPER"],
+  [147, "V-0103", "MUSLIM BHAI (VADODARA)", "", "", "", "VENDOR", "DEVELOPER"],
+  [148, "V-0080", "NIKUNJ PATEL", "", "", "", "VENDOR", ""],
+  [149, "V-0003", "NTPC", "", "", "24AAACN0255D2Z3", "VENDOR", ""],
+  [150, "V-0058", "PAESH PARIKH (DDR)", "", "", "", "VENDOR", ""],
+  [151, "V-0204", "PARAS PIPES", "", "AAFFP3665H", "24AAFFP3665H1Z7", "VENDOR", "DEVELOPER"],
+  [152, "V-0058", "PARESH PARIKH (BRD)", "", "", "", "VENDOR", ""],
+  [153, "V-0193", "PATEL HEATERS & CONTROL PVT.LTD.", "", "AAGCP7970D", "24AAGCP7970D1ZC", "VENDOR", "MEHUL CHAVDA"],
+  [154, "V-0199", "PFG GLASSKEM EQUIPMENTS PRIVATE LIMITED", "", "AAKCP5328H", "24AAKCP5328H1ZC", "VENDOR", "DEVELOPER"],
+  [155, "V-0122", "POLYCOAT ELECTRA SERVICES (INDIA) PRIVATE LIMITED", "", "AADCP2721M", "24AADCP2721M1ZH", "VENDOR", "DEVELOPER"],
+  [156, "V-0220", "POOJA ROADLINES", "9324289700", "", "", "AGENT", "DEVELOPER"],
+  [157, "V-0185", "POWER LINE", "", "AAJPC1759K", "24AAJPC1759K1ZP", "VENDOR", "DEVELOPER"],
+  [158, "V-0123", "POYCOAT ELECTRA SERVICE PVY LTD.", "", "", "", "VENDOR", ""],
+  [159, "V-0154", "PRECISE AUTOMATION AND CONTROL PVT. LTD.", "", "AAECP2646J", "24AAECP2646J1ZE", "VENDOR", "DEVELOPER"],
+  [160, "V-0132", "PRODEV MANUFACTURING COMPANY", "", "AJMPS8948L", "24AJMPS8948L2Z7", "VENDOR", "DEVELOPER"],
+  [161, "V-0180", "PRODEV MANUFACTURING COMPANY", "", "AJMPS8948L", "24AJMPS8948L2Z7", "VENDOR", "ANIL PANDEY"],
+  [162, "V-0076", "RAILWAY BOOKING", "", "", "", "AGENT", "DEVELOPER"],
+  [163, "V-0095", "RAILWAY BOOKING", "", "", "", "AGENT", ""],
+  [164, "V-0025", "RAJKOT MUNICIPAL CORPORATION", "", "", "24AAAALR0138G1ZD", "VENDOR", "DEVELOPER"],
+  [165, "V-0041", "RAKESH PATEL (AND)", "", "", "", "VENDOR", "DEVELOPER"],
+  [166, "V-0192", "RED HOT ELECTRICALS", "", "AAOFR8751K", "06AAOFR8751K1ZI", "VENDOR", "MEHUL CHAVDA"],
+  [167, "V-0200", "RELIABLITY SEALS", "", "", "", "VENDOR", ""],
+  [168, "V-0153", "RELIANCE INDUSTRIES LTD.", "", "AAACR5055K", "24AAACR5055K1ZD", "VENDOR", "DEVELOPER"],
+  [169, "V-0182", "RIHITA CARGO FORWARDERS PVT. LTD.", "", "AADCR5741B", "27AADCR5741B1ZM", "VENDOR", "ANIL PANDEY"],
+  [170, "V-0054", "RITA ENTERPRISES", "", "", "", "VENDOR", ""],
+  [171, "V-0038", "RONAK PAETL (BRD)", "", "", "", "VENDOR", ""],
+  [172, "V-0046", "RONAK PATEL (BRD)", "", "", "", "VENDOR", ""],
+  [173, "V-0046", "RONAK PATEL (DDR)", "", "", "", "VENDOR", ""],
+  [174, "V-0174", "RUPRAJ TECHNICAL SERVICES", "", "AANFR3610C", "24AANFR3610C1ZM", "VENDOR", "DEVELOPER"],
+  [175, "V-0120", "SACHIN INDUSTRIES LIMITED", "", "", "24AAFCS5905E1ZL", "VENDOR", "DEVELOPER"],
+  [176, "V-0030", "SARDAR PATEL EDUCATION TRUST", "", "", "", "VENDOR", ""],
+  [177, "V-0021", "SARDAR SAROVAR HOLIDAY RESORTS LLP", "", "", "24ADRFS2842J1Z0", "VENDOR", "DEVELOPER"],
+  [178, "V-0026", "SHARP PRINTS", "", "", "", "VENDOR", ""],
+  [179, "V-0178", "SHIV INDUSTRIES", "", "AGLPP8758K", "24AGLPP8758K1ZL", "VENDOR", "ANIL PANDEY"],
+  [180, "V-0117", "SHIVAM CARGO", "", "", "", "AGENT", "DEVELOPER"],
+  [181, "V-0022", "SHIVNERI FRESH VEG", "", "", "", "VENDOR", ""],
+  [182, "V-0183", "SHREE ISHAN EQUIPMENT PRIVATE LIMITED", "", "AAACI4131R", "24AAACI4131R1ZH", "VENDOR", "DEVELOPER"],
+  [183, "V-0126", "SHREE RAM RUBTECH PVT LTD", "", "AACCS9776Q", "24AACCS9776Q1ZE", "VENDOR", "DEVELOPER"],
+  [184, "V-0071", "SHREE SHYAM TRAVELS", "", "", "", "AGENT", "DEVELOPER"],
+  [185, "V-0213", "SHREE SULPHURICS P LTD.", "", "AAECS0968E", "24AAECS0968E1ZH", "VENDOR", "DEVELOPER"],
+  [186, "V-0049", "SMITA KORADIYA", "", "", "", "VENDOR", "DEVELOPER"],
+  [187, "V-0203", "STEELCO GUJARAT LIMITED", "", "AADCS0880L", "24AADCS0880L2Z7", "VENDOR", "DEVELOPER"],
+  [188, "V-0111", "SUN PHARMA ADVANCED RESEARCH COMPANY LTD", "", "AAJCS8340R", "24AAJCS8340R1ZN", "VENDOR", "DEVELOPER"],
+  [189, "V-0197", "SUN PHARMACEUTICAL INDUSTRIES LTD (KARAKHADI)", "", "", "24AADCS3124K1ZJ", "VENDOR", "DEVELOPER"],
+  [190, "V-0064", "SUN PHARMACEUTICAL INDUSTRIES LTD GURGAON R&D", "", "AADCS3124K", "06AADCS3124K1ZH", "VENDOR", "DEVELOPER"],
+  [191, "V-0075", "SUNPHARMACEUTICAL INDUSTRIES LTD.", "", "AADCS3124K", "24AADCS3124K1ZJ", "VENDOR", "DEVELOPER"],
+  [192, "V-0115", "SUNPHARMACEUTICAL INDUSTRIES LTD.", "", "AADCS3124K", "24AADCS3124K1ZJ", "VENDOR", "DEVELOPER"],
+  [193, "V-0196", "SUNPHARMACEUTICAL INDUSTRIES LTD.(ANKLESHWAR)", "", "AADCS3124K", "24AADCS3124K1ZJ", "VENDOR", "DEVELOPER"],
+  [194, "V-0164", "SUVIDHI AGENCIES", "", "", "27AHGPG8241C1ZM", "VENDOR", "DEVELOPER"],
+  [195, "V-0074", "TARU MARKETING SERVICE", "", "", "24AKFPM8465J1ZR", "VENDOR", ""],
+  [196, "V-0198", "TECHNO ENGINEERING", "", "", "", "VENDOR", ""],
+  [197, "V-0205", "TECHNO FAB ENGINEERS", "", "AAHFT3966F", "24AAHFT3966F1Z1", "VENDOR", "DEVELOPER"],
+  [198, "V-0006", "TESTING", "", "", "", "VENDOR", ""],
+  [199, "V-0186", "THERMAX LTD.", "", "AAACT3910D", "24AAACT3910D1ZY", "VENDOR", "DEVELOPER"],
+  [200, "V-0187", "USHTA INFINITY CONSTRUCTION CO PVT LTD C/O HINDALCO INDUSTRIES LTD", "", "AAACI9029G", "21AAACI9029G1ZV", "VENDOR", "DEVELOPER"],
+  [201, "V-0202", "USHTA INFINITY CONSTRUCTION CO PVT LTD C/O NAYARA ENERGY LIMITED", "", "AAACE0890P", "24AAACE0890P1ZF", "VENDOR", "DEVELOPER"],
+  [202, "V-0167", "USHTA INFINITY CONSTRUCTION CO PVT LTD GNFC", "", "", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [203, "V-0163", "USHTA INFINITY CONSTRUCTION CO PVT LTD MULDWARKA", "", "", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [204, "V-0166", "USHTA INFINITY CONSTRUCTION CO. PVT LTD NARSINGARH", "", "", "", "VENDOR", "DEVELOPER"],
+  [205, "V-0201", "USHTA INFINITY CONSTRUCTION CO. PVT. LTD C/O MUNDRA", "", "", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [206, "V-0162", "USHTA INFINITY CONSTRUCTION CO. PVT. LTD. C/O", "", "", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [207, "V-0138", "USHTA INFINITY CONSTRUCTION CO.PVT.LTD", "", "AAACI9029G", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [208, "V-0188", "USHTA INFINITY CONSTRUCTION CO.PVT.LTD", "", "AAACI9029G", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [209, "V-0156", "USHTA INFINITY CONSTRUCTION CO.PVT.LTD ( BALODA BAZAAR)", "", "AAACI9029G", "22AAACI9029G1ZT", "VENDOR", "DEVELOPER"],
+  [210, "V-0171", "USHTA INFINITY CONSTRUCTION CO.PVT.LTD (ANKLESHWAR)", "", "AAACI9029G", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [211, "V-0169", "USHTA INFINITY CONSTRUCTION CO.PVT.LTD (SRIHARIKOTA )", "", "", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [212, "V-0175", "USHTA INFINITY CONSTRUCTION CO.PVT.LTD C/O", "", "", "24AAACI9029G1ZP", "VENDOR", ""],
+  [213, "V-0189", "USHTA INFINITY CONSTRUCTION CO.PVT.LTD C/O MEGHMANI ORGANICS LIMITED", "", "AAACI9029G", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [214, "V-0172", "USHTA INFINITY CONSTRUCTION CO.PVT.LTD C/O VADODARA WAREHOUSE", "", "AAACI9029G", "24AAACI9029G1ZP", "VENDOR", "ANIL PANDEY"],
+  [215, "V-0173", "USHTA INFINITY CONSTRUCTION CO.PVT.LTD RAJKOT", "", "AAACI9029G", "24AAACI9029G1ZP", "VENDOR", "DEVELOPER"],
+  [216, "V-0146", "USHTA INFINITY CONSTRUCTION COMPANY PRIVATE LIMITED", "", "AAACI9029G", "09AAACI9029G1ZH", "VENDOR", "DEVELOPER"],
+  [217, "V-0149", "USHTA INFINITY CONSTRUCTION COMPANY PRIVATE LIMITED ( SITAPURAM))", "", "AAACI9029G", "36AAACI9029G1ZK", "VENDOR", "DEVELOPER"],
+  [218, "V-0155", "USHTA INFINITY CONSTRUCTION COMPANY PRIVATE LIMITED ( BHATAPARA)", "", "AAACI9029G", "22AAACI9029G1ZT", "VENDOR", "DEVELOPER"],
+  [219, "V-0150", "USHTA INFINITY CONSTRUCTION COMPANY PRIVATE LIMITED ( SILVASSA)", "", "AAACI9029G", "26AAACI9029G1ZL", "VENDOR", "DEVELOPER"],
+  [220, "V-0168", "USHTA INFINITY CONSTRUCTION COMPANY PRIVATE LIMITED (ASSAM)", "", "", "", "VENDOR", "DEVELOPER"],
+  [221, "V-0161", "USHTA INFINITY CONSTRUCTION COMPANY PRIVATE LIMITED (CHITTORGARH)", "", "AAACI9029G", "08AAACI9029G1ZJ", "VENDOR", "DEVELOPER"],
+  [222, "V-0165", "USHTA INFINITY CONSTRUCTION COMPANY PRIVATE LIMITED UDUPI", "", "AAACI9029G", "29AAACI9029G1ZF", "VENDOR", "DEVELOPER"],
+  [223, "V-0218", "USMAN BHAI", "9725613247", "", "", "AGENT", "DEVELOPER"],
+  [224, "V-0160", "USTHA INFINITY CONSTRUCTION CO PVT LTD (NARSINGARH)", "", "AAACI9029G", "23AAACI9029G1ZR", "VENDOR", "DEVELOPER"],
+  [225, "V-0131", "V TRANS (INDIA) LTD", "", "", "", "VENDOR", ""],
+  [226, "V-0135", "V TRANS INDIA LTD", "", "", "", "VENDOR", ""],
+  [227, "V-0040", "VANISHA DESAI", "", "", "", "VENDOR", "DEVELOPER"],
+  [228, "V-0039", "VANISHA DESAI (BRD)", "", "", "", "VENDOR", ""],
+  [229, "V-0039", "VANISHA DESAI (DDR)", "", "", "", "VENDOR", ""],
+  [230, "V-0096", "VIJAYBHAI GAIKWAD", "", "", "", "VENDOR", "DEVELOPER"],
+  [231, "V-0106", "VIRAL INDUSTRIES", "", "", "24AERPP2729L1ZY", "VENDOR", "DEVELOPER"],
+  [232, "V-0179", "VRUND ENGITECH PRIVATE LIMITED", "", "AAKCV0100F", "24AAKCV0100F1ZY", "VENDOR", "ANIL PANDEY"],
+  [233, "V-0181", "ZENEX ANIMAL HEALTH INDIA PRIVATE LIMITED", "", "AAHCN4871E", "24AAHCN4871E1ZH", "VENDOR", "ANIL PANDEY"],
+  [234, "V-0109", "ZENPACK PREMIUM INDUSTRIES PRIVATE LIMITED", "", "AABCZ2009E", "24AABCZ2009E1ZT", "VENDOR", "DEVELOPER"],
+  [235, "V-0099", "", "", "", "", "AGENT", ""]
+];
+
+/* Dedupes by ATTrans SR NO. (unique per source row) so it's safe to run more
+   than once without piling up duplicates. */
+export function importLegacyVendors(db){
+  db.vendorDirectory = db.vendorDirectory || [];
+  const have = {};
+  db.vendorDirectory.forEach(v => { if (v.srNo != null) have[v.srNo] = true; });
+  let added = 0;
+  LEGACY_VENDORS.forEach(([srNo, vendorCode, name, contactNo, panCard, gst, type, createdBy]) => {
+    if (have[srNo]) return;
+    have[srNo] = true;
+    db.vendorDirectory.push({ id: uid('vd'), srNo, vendorCode, name, contactNo, panCard, gst, type, createdBy });
+    added++;
+  });
+  return added;
+}
+
+/* ---------- Bill / Invoice (Vendor Bill) — a NEW, independent module, separate
+   from LR / Consignment Notes (blankLR/computeLR/LR_CHG above are untouched).
+   Modeled on the ATTrans "Add New Bill" screen: a vendor bill that bundles one
+   or more of the company's own LRs (looked up read-only from db.lrs — a Bill
+   line never writes back to the LR record it was copied from) plus a fixed
+   LR Charges block, a free-form Payment Detail grid (additions/deductions),
+   and SGST/CGST/IGST computed on the gross. The vendor is picked from the
+   ATTrans-imported Vendor Directory (db.vendorDirectory, see importLegacyVendors
+   above) rather than db.vendors, since this Bill screen is itself a
+   reproduction of that same ATTrans "app.bgts.in" module the vendor register
+   came from.
+   ASSUMPTIONS (no reference data was given for these — flagged for review):
+     - BILL_PAYMENT_OPTIONS (the "SELECT AN OPTION" dropdown) and
+       BILL_BANK_OPTIONS are placeholder lists; edit them here once the
+       user confirms the real option sets.
+     - Calculation order: TOTAL AMOUNT (LR lines + LR Charges) -> + additions
+       - deductions = GROSS AMOUNT -> SGST/CGST/IGST % applied to GROSS AMOUNT
+       -> + Round Off = NET AMOUNT -> - Advance Receive = BALANCE AMOUNT. */
+export const BILL_CHG = [
+  ['hamali', 'HAMALI'], ['loading', 'LOADING'], ['unloading', 'UNLOADING'], ['rtoChallan', 'RTO CHALLAN'],
+  ['varai', 'VARAI'], ['lrCharges', 'LR CHARGES'], ['detention', 'DETENTION'], ['otherAdd', 'OTHER ADD'],
+  ['dockCharges', 'DOCK CHARGES'], ['extraDelivery', 'EXTRA DELIVERY']
+];
+export const BILL_PAYMENT_OPTIONS = ['TDS', 'ADVANCE ADJUSTMENT', 'COMMISSION', 'PENALTY / LATE DELIVERY', 'DAMAGE / SHORTAGE', 'INCENTIVE', 'OTHER'];
+export const BILL_BANK_OPTIONS = ['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Bank of Baroda', 'Kotak Mahindra Bank', 'IDFC FIRST Bank', 'Yes Bank', 'Other'];
+export const BILL_STATUS_OPTIONS = ['PENDING', 'RECEIVED', 'BILLED', 'PAID'];
+
+export function blankBillLine(){
+  return { id: uid('bl'), lrId: '', status: 'PENDING', lrNo: '', date: '', from: '', to: '', weight: '', pcs: '', rate: '', amount: '', otherCharges: '', remark: '' };
+}
+export function blankBill(){
+  const ch = {}; BILL_CHG.forEach(c => { ch[c[0]] = ''; });
+  return {
+    id: '', invoiceNo: '', vendorId: '', date: todayISO(), poNo: '', poDate: '',
+    lines: [blankBillLine()], charges: ch, additions: [], deductions: [],
+    sgstPct: '', cgstPct: '', igstPct: '', roundOff: '', advanceReceive: '',
+    bank: '', remark: '', subject: '', createdAt: ''
+  };
+}
+/* Copies an existing LR's descriptive fields into a bill-line shape — read-only
+   lookup, never mutates db.lrs. `amount` defaults to that LR's own billed gross
+   so the row starts pre-filled with what the LR already says it's worth; still
+   fully editable before the bill is saved. */
+export function billLineFromLR(lr){
+  const pcs = (lr.goods || []).reduce((sum, g) => sum + (Number(g.pcs) || 0), 0);
+  return {
+    lrId: lr.id, lrNo: lr.lrNo, date: lr.date, from: lr.fromPlace, to: lr.toPlace,
+    weight: lr.cWeight || lr.aWeight || '', pcs: pcs || '',
+    rate: (lr.charges && lr.charges.rate) || '', amount: lr.gross || ''
+  };
+}
+export function computeBill(bill){
+  const n = v => Number(v) || 0;
+  const lineTotal = (bill.lines || []).reduce((sum, l) => sum + n(l.amount) + n(l.otherCharges), 0);
+  const chargesTotal = BILL_CHG.reduce((sum, c) => sum + n(bill.charges && bill.charges[c[0]]), 0);
+  const totalAmount = lineTotal + chargesTotal;
+  const totalAddition = (bill.additions || []).reduce((sum, a) => sum + n(a.amount), 0);
+  const totalDeduction = (bill.deductions || []).reduce((sum, a) => sum + n(a.amount), 0);
+  const grossAmount = totalAmount + totalAddition - totalDeduction;
+  const sgstAmt = grossAmount * n(bill.sgstPct) / 100;
+  const cgstAmt = grossAmount * n(bill.cgstPct) / 100;
+  const igstAmt = grossAmount * n(bill.igstPct) / 100;
+  const netAmount = grossAmount + sgstAmt + cgstAmt + igstAmt + n(bill.roundOff);
+  const balanceAmount = netAmount - n(bill.advanceReceive);
+  return { lineTotal, chargesTotal, totalAmount, totalAddition, totalDeduction, grossAmount, sgstAmt, cgstAmt, igstAmt, netAmount, balanceAmount };
+}
+
 export function blankLR(){
   return {
     id: '', bookingId: '', lrType: 'ORIGINAL', truckNo: '', lrNo: '', date: todayISO(),
@@ -277,6 +618,8 @@ export function migrate(db){
   if (!db.lenders) db.lenders = [];
   if (!db.fixedExp) db.fixedExp = [];
   if (!db.auditLog) db.auditLog = [];
+  if (!db.vendorDirectory) db.vendorDirectory = [];
+  if (!db.bills) db.bills = [];
   db.clients.forEach(c => { if (c.creditLimit === undefined) c.creditLimit = 0; });
   ensureBillingBackup(db);
   if (!db.seq.lhc) db.seq.lhc = 1;

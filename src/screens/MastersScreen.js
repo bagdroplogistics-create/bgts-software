@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
-import { uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks } from '../logic';
+import { uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks, importLegacyVendors } from '../logic';
 
-const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['routes', 'Routes'], ['branches', 'Branches']];
-const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
+const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['vendorDirectory', 'Vendor Directory'], ['routes', 'Routes'], ['branches', 'Branches']];
+const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', vendorDirectory: '+ Add Vendor (Directory)', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
 
 export default function MastersScreen({ navigation, route }) {
   const { db, update } = useStore();
@@ -68,6 +68,15 @@ export default function MastersScreen({ navigation, route }) {
     { key: 'rcNo', label: 'RC No. on File', type: 'select', value: t ? (t.rcNo ? 'yes' : 'no') : 'no', options: [{ v: 'yes', l: 'Yes' }, { v: 'no', l: 'No' }] },
     { key: 'createdBy', label: 'Created By', value: t && t.createdBy }
   ];
+  const vendorDirFields = (v) => [
+    { key: 'vendorCode', label: 'Vendor Code', value: v && v.vendorCode, hint: 'e.g. V-0072' },
+    { key: 'name', label: 'Name', required: true, value: v && v.name },
+    { key: 'contactNo', label: 'Contact No.', value: v && v.contactNo },
+    { key: 'panCard', label: 'PAN Card', value: v && v.panCard },
+    { key: 'gst', label: 'GST', value: v && v.gst },
+    { key: 'type', label: 'Type', type: 'select', value: (v && v.type) || 'VENDOR', options: ['VENDOR', 'AGENT'].map(x => ({ v: x, l: x })) },
+    { key: 'createdBy', label: 'Created By', value: v && v.createdBy }
+  ];
   const routeFields = () => [
     { key: 'origin', label: 'Origin', required: true },
     { key: 'destination', label: 'Destination', required: true },
@@ -103,6 +112,14 @@ export default function MastersScreen({ navigation, route }) {
     });
     else if (tab === 'drivers') setForm({ title: 'Add Driver', fields: driverFields(null), onSubmit: v => update(d => d.drivers.push({ ...v, id: uid('d') })) });
     else if (tab === 'vendors') setForm({ title: 'Add Vendor', fields: vendorFields(null), onSubmit: v => update(d => d.vendors.push({ ...v, id: uid('ve') })) });
+    else if (tab === 'vendorDirectory') setForm({
+      title: 'Add Vendor (Directory)', fields: vendorDirFields(null),
+      onSubmit: v => update(d => {
+        d.vendorDirectory = d.vendorDirectory || [];
+        const maxSr = d.vendorDirectory.reduce((m, x) => Math.max(m, x.srNo || 0), 0);
+        d.vendorDirectory.push({ id: uid('vd'), srNo: maxSr + 1, vendorCode: v.vendorCode, name: v.name, contactNo: v.contactNo, panCard: v.panCard, gst: v.gst, type: v.type || 'VENDOR', createdBy: v.createdBy });
+      })
+    });
     else if (tab === 'branches') setForm({ title: 'Add Branch / Entity', fields: branchFields(null), onSubmit: v => update(d => d.branches.push({ ...v, id: uid('br'), name: String(v.name).toUpperCase() })) });
     else setForm({ title: 'Add Route', fields: routeFields(), onSubmit: v => update(d => d.routes.push({ ...v, id: uid('r') })) });
   };
@@ -131,8 +148,19 @@ export default function MastersScreen({ navigation, route }) {
     const added = importLegacyTrucks(d);
     setTimeout(() => alert('Truck list imported', added + ' truck(s) added' + (added < 121 ? ', ' + (121 - added) + ' already on file (skipped).' : '.')), 100);
   });
+  const doImportLegacyVendors = () => update(d => {
+    const added = importLegacyVendors(d);
+    setTimeout(() => alert('Vendor Directory imported', added + ' vendor(s) added' + (added < 235 ? ', ' + (235 - added) + ' already on file (skipped).' : '.')), 100);
+  });
   const editDriver = (dd) => setForm({ title: 'Edit Driver', fields: driverFields(dd), onSubmit: v => update(d => { const x = byId(d.drivers, dd.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendor = (vv) => setForm({ title: 'Edit Vendor', fields: vendorFields(vv), onSubmit: v => update(d => { const x = byId(d.vendors, vv.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
+  const editVendorDir = (vv) => setForm({
+    title: 'Edit ' + (vv.name || vv.vendorCode || 'Vendor'), fields: vendorDirFields(vv),
+    onSubmit: v => update(d => {
+      const x = byId(d.vendorDirectory, vv.id);
+      if (x) { x.vendorCode = v.vendorCode; x.name = v.name; x.contactNo = v.contactNo; x.panCard = v.panCard; x.gst = v.gst; x.type = v.type || 'VENDOR'; x.createdBy = v.createdBy; }
+    })
+  });
 
   /* Arriving from VehicleDetailScreen's "Edit Vehicle" button — jump straight
      into the edit form for that vehicle, then clear the param so navigating
@@ -167,6 +195,7 @@ export default function MastersScreen({ navigation, route }) {
         ))}
         <View style={{ flex: 1 }} />
         {tab === 'trucks' ? <Btn small tone="ghost" label="Import Legacy Truck List" onPress={doImportLegacyTrucks} /> : null}
+        {tab === 'vendorDirectory' ? <Btn small tone="ghost" label="Import ATTrans Vendor List" onPress={doImportLegacyVendors} /> : null}
         <Btn small label={ADD_LABEL[tab] || '+ Add'} tone="amber" onPress={add} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
@@ -281,6 +310,32 @@ export default function MastersScreen({ navigation, route }) {
                 city: v.city || '—',
                 rating: v.rating || '—',
                 actions: rowActions(() => editVendor(v), () => confirmDo('Delete vendor?', () => update(d => removeById(d.vendors, v.id))))
+              }))}
+            />
+          ))}
+          {tab === 'vendorDirectory' && (!(db.vendorDirectory || []).length ? <Empty text="No vendor directory entries yet. Add one, or use “Import ATTrans Vendor List” above." /> : (
+            <Table
+              cols={[
+                { key: 'srNo', label: 'Sr No', width: 60 },
+                { key: 'vendorCode', label: 'Vendor Code', width: 100 },
+                { key: 'name', label: 'Name', width: 170 },
+                { key: 'contactNo', label: 'Contact No', width: 110 },
+                { key: 'panCard', label: 'PAN Card', width: 110 },
+                { key: 'gst', label: 'GST', width: 150 },
+                { key: 'type', label: 'Type', width: 80 },
+                { key: 'createdBy', label: 'Created By', width: 110 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={[...db.vendorDirectory].sort((a, b) => (a.srNo || 0) - (b.srNo || 0)).map(v => ({
+                srNo: v.srNo != null ? v.srNo : '—',
+                vendorCode: v.vendorCode || '—',
+                name: <Text style={{ fontWeight: '700', color: C.navy }}>{v.name || '(blank in source)'}</Text>,
+                contactNo: v.contactNo || '—',
+                panCard: v.panCard || '—',
+                gst: v.gst || '—',
+                type: <Badge text={v.type || 'VENDOR'} tone={v.type === 'AGENT' ? 'purple' : 'navy'} />,
+                createdBy: v.createdBy || '—',
+                actions: rowActions(() => editVendorDir(v), () => confirmDo('Delete ' + (v.name || v.vendorCode || 'this entry') + '?', () => update(d => removeById(d.vendorDirectory, v.id))))
               }))}
             />
           ))}

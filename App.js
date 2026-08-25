@@ -13,6 +13,8 @@ import BookingsScreen from './src/screens/BookingsScreen';
 import LRScreen from './src/screens/LRScreen';
 import LRFormScreen from './src/screens/LRFormScreen';
 import LRImportScreen from './src/screens/LRImportScreen';
+import BillFormScreen from './src/screens/BillFormScreen';
+import BillListScreen from './src/screens/BillListScreen';
 import InquiriesScreen from './src/screens/InquiriesScreen';
 import BankingScreen from './src/screens/BankingScreen';
 import InvoiceImportScreen from './src/screens/InvoiceImportScreen';
@@ -58,6 +60,7 @@ const NAV_GROUPS = [
       ['Bookings', 'Bookings', '▣'],
       ['LR / Consignment Notes', 'LR', '▤'],
       ['POD Update', 'POD', '✓'],
+      ['Bill / Invoice', 'Bill', '▦'],
     ]
   },
   {
@@ -96,6 +99,8 @@ const TITLES = {
   Inquiries: 'Inquiries',
   LR: 'LR / Consignment Notes',
   POD: 'POD Update',
+  Bill: 'Bill / Invoice',
+  BillList: 'Bill Details',
   LHC: 'LHC / Truck Hire',
   Hired: 'Hired Vehicles',
   AccDash: 'Accounts Dashboard',
@@ -266,6 +271,8 @@ function WebShell({ navigationRef, routeName }) {
           <Stack.Screen name="LR" component={LRScreen} options={{ title: 'LR / Consignment Notes' }} />
           <Stack.Screen name="LRForm" component={LRFormScreen} options={{ title: 'Add / Edit LR' }} />
           <Stack.Screen name="LRImport" component={LRImportScreen} options={{ title: 'Import LRs (CSV / Excel)' }} />
+          <Stack.Screen name="Bill" component={BillFormScreen} options={{ title: 'Bill / Invoice' }} />
+          <Stack.Screen name="BillList" component={BillListScreen} options={{ title: 'Bill Details' }} />
           <Stack.Screen name="Inquiries" component={InquiriesScreen} />
           <Stack.Screen name="Banking" component={BankingScreen} options={{ title: 'Banking / Reconciliation' }} />
           <Stack.Screen name="InvoiceImport" component={InvoiceImportScreen} options={{ title: 'Import Invoices (CSV)' }} />
@@ -302,6 +309,8 @@ function MobileShell() {
       <Stack.Screen name="LR" component={LRScreen} options={{ title: 'LR / Consignment Notes' }} />
       <Stack.Screen name="LRForm" component={LRFormScreen} options={{ title: 'Add / Edit LR' }} />
       <Stack.Screen name="LRImport" component={LRImportScreen} options={{ title: 'Import LRs (CSV / Excel)' }} />
+      <Stack.Screen name="Bill" component={BillFormScreen} options={{ title: 'Bill / Invoice' }} />
+      <Stack.Screen name="BillList" component={BillListScreen} options={{ title: 'Bill Details' }} />
       <Stack.Screen name="Inquiries" component={InquiriesScreen} />
       <Stack.Screen name="Banking" component={BankingScreen} options={{ title: 'Banking / Reconciliation' }} />
       <Stack.Screen name="InvoiceImport" component={InvoiceImportScreen} options={{ title: 'Import Invoices (CSV)' }} />
