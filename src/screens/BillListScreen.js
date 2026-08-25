@@ -59,7 +59,7 @@ export default function BillListScreen({ navigation }) {
               <TextInput value={q} onChangeText={setQ} placeholder="Type to search…" placeholderTextColor={C.mut}
                 style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 7, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 9, fontSize: 13, color: C.txt }} />
             </View>
-            <Btn small tone="ghost" label="Reset" onPress={() => { setQ(''); setVendorId(''); }} />
+            <Btn small tone="ghost" label="Reset" onPress={() => { setQ(''); setVendorId(''); }} style={{ alignSelf: 'flex-end' }} />
           </View>
 
           {!list.length ? (

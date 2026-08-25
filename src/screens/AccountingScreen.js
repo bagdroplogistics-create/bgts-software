@@ -349,7 +349,7 @@ export default function AccountingScreen({ navigation }) {
             <TextInput value={invF.q} onChangeText={v => setIF('q', v)} placeholder="Type to search…" placeholderTextColor={C.mut}
               style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 7, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 9, fontSize: 13, color: C.txt }} />
           </FilterField>
-          <Btn small tone="ghost" label="Reset" onPress={resetInvFilter} />
+          <Btn small tone="ghost" label="Reset" onPress={resetInvFilter} style={{ alignSelf: 'flex-end' }} />
         </View>
         {!invList.length ? (
           <Empty text={totalInvCount ? 'No invoices match this search.' : 'No invoices raised yet.'} />

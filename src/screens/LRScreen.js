@@ -205,7 +205,7 @@ export default function LRScreen({ navigation }) {
               <TextInput value={flt.q} onChangeText={v => setF('q', v)} placeholder="Type to search…" placeholderTextColor={C.mut}
                 style={{ borderWidth: 1, borderColor: C.line2, borderRadius: 7, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 9, fontSize: 13, color: C.txt }} />
             </FilterField>
-            <Btn small tone="ghost" label="Reset" onPress={resetFilter} />
+            <Btn small tone="ghost" label="Reset" onPress={resetFilter} style={{ alignSelf: 'flex-end' }} />
           </View>
           {!list.length ? (
             <Empty text={totalLRCount ? 'No LRs match this search. Adjust the filters above, or click "+ ADD NEW LR".' : 'No LRs yet. Tap + ADD NEW LR.'} />
