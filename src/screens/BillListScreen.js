@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Btn, Empty, confirmDo, Table, PickerField } from '../ui';
-import { inr, fmtDate, byId, removeById, sum } from '../logic';
+import { C, S, Card, Btn, Empty, confirmDo, Table, PickerField, alert } from '../ui';
+import { inr, fmtDate, byId, removeById, sum, importLegacyBills, LEGACY_BILLS } from '../logic';
 
 /* "VIEW BILL DETAILS" register — the Bill module's own list/detail screen,
    reached from BillFormScreen's top-right button (and after SAVE & LIST).
@@ -27,6 +27,16 @@ export default function BillListScreen({ navigation }) {
 
   const del = (b) => confirmDo('Delete Bill ' + (b.invoiceNo || '') + '?', () => update(d => removeById(d.bills, b.id)));
 
+  const doImportLegacyBills = () => update(d => {
+    const { added, skippedNoVendor } = importLegacyBills(d);
+    setTimeout(() => {
+      let msg = added + ' bill(s) added';
+      msg += (added < LEGACY_BILLS.length - skippedNoVendor) ? ', ' + (LEGACY_BILLS.length - skippedNoVendor - added) + ' already on file (skipped).' : '.';
+      if (skippedNoVendor) msg += ' ' + skippedNoVendor + ' bill(s) skipped — their vendor isn’t in Vendor Directory yet. Import Masters → Vendor Directory first, then re-run this.';
+      alert('Billing Summary imported', msg);
+    }, 100);
+  });
+
   const vendorOptions = [{ v: '', l: 'All Vendors' }, ...(db.vendorDirectory || [])
     .slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
     .map(v => ({ v: v.id, l: v.name || '(blank name)' }))];
@@ -34,6 +44,7 @@ export default function BillListScreen({ navigation }) {
   return (
     <View style={S.screen}>
       <View style={{ padding: 14, paddingBottom: 6, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+        <Btn label="Import Billing Summary (148 bills)" tone="ghost" onPress={doImportLegacyBills} />
         <Btn label="+ ADD NEW BILL" tone="amber" onPress={() => navigation.navigate('Bill', {})} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
@@ -71,7 +82,7 @@ export default function BillListScreen({ navigation }) {
                 vendor: vendorNameOf(b.vendorId),
                 date: fmtDate(b.date),
                 poNo: b.poNo || '—',
-                gross: inr(b.grossAmount),
+                gross: inr(b.totalAmount),
                 net: <Text style={{ fontWeight: '800', color: C.navy }}>{inr(b.netAmount)}</Text>,
                 balance: <Text style={{ fontWeight: '700', color: Number(b.balanceAmount) > 0 ? C.red : C.green }}>{inr(b.balanceAmount)}</Text>,
                 actions: (

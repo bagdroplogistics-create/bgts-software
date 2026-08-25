@@ -262,7 +262,28 @@ export function importLegacyTrucks(db){
      - SR NO. 220 and 221 were each listed twice in a row in the source
        table (identical data both times); only included once each here.
      - Row 101 and row 135 (V-0065, "MR VIRENDRA MANDERA") are an exact
-       duplicate row in the source. */
+       duplicate row in the source.
+
+   Rows 236-283 (srNo) are a SECOND, separate batch appended later: the
+   Vendor* dropdown options from ATTrans's own "Add New Bill" form (a
+   `<select name="vendor_id">`, pasted by the user as HTML). That dropdown
+   is backed by a different ATTrans table (its own numeric vendor_id primary
+   key, e.g. option value="82") than the "View Vendor Details" register rows
+   1-235 above (which use V-XXXX style Vendor Codes) — so these are kept as
+   their own vendorCode scheme, "BV-<attrans vendor_id>" (BV = Bill Vendor),
+   rather than invented V-XXXX codes, and srNo here is just a continuing
+   sequence number for this array, not an ATTrans "SR NO." column (that
+   dropdown had no such column).
+   Flagged, not merged (same "flag rather than guess" rule as rows 1-235):
+   several of these names look like the same real people as existing rows
+   1-235 under a different branch suffix or ATTrans record — e.g. "MR
+   VIRENDRA MANDERA" (BV-82) vs. V-0065 "MR VIRENDRA MANDERA" above, and
+   "VANISHA DESAI (BRD)" (BV-50) vs. V-0039 "VANISHA DESAI (DDR)" above.
+   Left as separate rows rather than silently deduped/merged — worth a
+   manual look in Masters -> Vendor Directory. Also note "Mr. samir Vyas
+   ( BRD)" appears three times in ATTrans's own dropdown under different
+   casing (BV-7, BV-14, BV-16) — transcribed as three distinct rows since
+   that's what the source list shows, not a transcription artifact. */
 export const LEGACY_VENDORS = [
   [1, "V-0072", "", "", "", "", "AGENT", ""],
   [2, "V-0100", "MR. SAURABH BAFNA", "", "", "", "VENDOR", "DEVELOPER"],
@@ -498,7 +519,56 @@ export const LEGACY_VENDORS = [
   [232, "V-0179", "VRUND ENGITECH PRIVATE LIMITED", "", "AAKCV0100F", "24AAKCV0100F1ZY", "VENDOR", "ANIL PANDEY"],
   [233, "V-0181", "ZENEX ANIMAL HEALTH INDIA PRIVATE LIMITED", "", "AAHCN4871E", "24AAHCN4871E1ZH", "VENDOR", "ANIL PANDEY"],
   [234, "V-0109", "ZENPACK PREMIUM INDUSTRIES PRIVATE LIMITED", "", "AABCZ2009E", "24AABCZ2009E1ZT", "VENDOR", "DEVELOPER"],
-  [235, "V-0099", "", "", "", "", "AGENT", ""]
+  [235, "V-0099", "", "", "", "", "AGENT", ""],
+
+  [236, "BV-1", "GUJARAT ALKALIES & CHEMICALS LTD", "", "", "", "VENDOR", ""],
+  [237, "BV-2", "GUJARAT STATE ELECTRICITY CORP LTD WANAKBORI", "", "", "", "VENDOR", ""],
+  [238, "BV-4", "Deepak Shah ( BRD)", "", "", "", "VENDOR", ""],
+  [239, "BV-6", "NTPC", "", "", "", "VENDOR", ""],
+  [240, "BV-7", "Mr. samir Vyas ( BRD)", "", "", "", "VENDOR", ""],
+  [241, "BV-14", "Mr. SAMIR VYAS (BRD)", "", "", "", "VENDOR", ""],
+  [242, "BV-16", "MR SAMIR VYAS (BRD)", "", "", "", "VENDOR", ""],
+  [243, "BV-17", "MRS. KRISHNA  PATEL (AND)", "", "", "", "VENDOR", ""],
+  [244, "BV-20", "MR GAUTAM  AMIN (BRD)", "", "", "", "VENDOR", ""],
+  [245, "BV-21", "MRS. MAUSAM PATEL (BRD)", "", "", "", "VENDOR", ""],
+  [246, "BV-22", "MR. CHANDRAVADAN PATEL (BRD)", "", "", "", "VENDOR", ""],
+  [247, "BV-23", "MR. DHANANJAY JOSHI (BRD)", "", "", "", "VENDOR", ""],
+  [248, "BV-29", "SARDAR SAROVAR HOLIDAY RESORTS LLP", "", "", "", "VENDOR", ""],
+  [249, "BV-31", "MRS. ROSHANI VYAS (BRD)", "", "", "", "VENDOR", ""],
+  [250, "BV-33", "RAJKOT MUNICIPAL CORPORATION", "", "", "", "VENDOR", ""],
+  [251, "BV-36", "BHANU COSPACK PRIVATE LTD", "", "", "", "VENDOR", ""],
+  [252, "BV-39", "SARDAR PATEL EDUCATION TRUST", "", "", "", "VENDOR", ""],
+  [253, "BV-41", "MR. RISHABH JINGER (BRD)", "", "", "", "VENDOR", ""],
+  [254, "BV-43", "Mr Mounang Patel", "", "", "", "VENDOR", ""],
+  [255, "BV-50", "VANISHA DESAI (BRD)", "", "", "", "VENDOR", ""],
+  [256, "BV-55", "DENORA INDIA LTD", "", "", "", "VENDOR", ""],
+  [257, "BV-56", "GUJARAT ALKALIES & CHEMICALS LTD DAHEJ", "", "", "", "VENDOR", ""],
+  [258, "BV-60", "MR VASUDEV PATEL (BRD)", "", "", "", "VENDOR", ""],
+  [259, "BV-61", "MR ANMOL PATEL (BRD)", "", "", "", "VENDOR", ""],
+  [260, "BV-62", "SMITA KORADIYA", "", "", "", "VENDOR", ""],
+  [261, "BV-68", "MR NITYA PATEL (BRD)", "", "", "", "VENDOR", ""],
+  [262, "BV-72", "MR. CHIRAG PATEL", "", "", "", "VENDOR", ""],
+  [263, "BV-75", "MR. PARESH PARIKH (BRD)", "", "", "", "VENDOR", ""],
+  [264, "BV-76", "MRS. PRACHI SHAH (AHD)", "", "", "", "VENDOR", ""],
+  [265, "BV-82", "MR VIRENDRA MANDERA", "", "", "", "VENDOR", ""],
+  [266, "BV-84", "MR PRANAV PATEL BARODA", "", "", "", "VENDOR", ""],
+  [267, "BV-85", "Mr KUNAL SHAH ( BRD)", "", "", "", "VENDOR", ""],
+  [268, "BV-87", "CLARUS CORPORATION", "", "", "", "VENDOR", ""],
+  [269, "BV-91", "GUJARAT STATE ELECTRICITY CORP LTD BHAVNAGAR", "", "", "", "VENDOR", ""],
+  [270, "BV-97", "MR SURESH SHAH", "", "", "", "VENDOR", ""],
+  [271, "BV-98", "Mr. Nikunj Patel ( BRd)", "", "", "", "VENDOR", ""],
+  [272, "BV-100", "Mr Dilipbhai  Shah ( BRd)", "", "", "", "VENDOR", ""],
+  [273, "BV-104", "Mr. Aditya Shah", "", "", "", "VENDOR", ""],
+  [274, "BV-105", "Mr. Monish Jhaveri", "", "", "", "VENDOR", ""],
+  [275, "BV-108", "GUJARAT STATE ELECTRICITY CORPORATION LIMITED GANDHINAGAR", "", "", "", "VENDOR", ""],
+  [276, "BV-109", "Mr. Amish Bhavsar  (BRD)", "", "", "", "VENDOR", ""],
+  [277, "BV-111", "Mr. Vijaybhai Thakkar", "", "", "", "VENDOR", ""],
+  [278, "BV-119", "BLISS GVS PHARMA LIMITED", "", "", "", "VENDOR", ""],
+  [279, "BV-125", "MUSLIM BHAI (VADODARA)", "", "", "", "VENDOR", ""],
+  [280, "BV-126", "k m patel", "", "", "", "VENDOR", ""],
+  [281, "BV-135", "ARCELI LIFESCIENCE PRIVATE LIMITED", "", "", "", "VENDOR", ""],
+  [282, "BV-137", "ASKON HYGIENE PRODUCTS PRIVATE LIMITED", "", "", "", "VENDOR", ""],
+  [283, "BV-152", "MRS JHEEL", "", "", "", "VENDOR", ""]
 ];
 
 /* Dedupes by ATTrans SR NO. (unique per source row) so it's safe to run more
@@ -540,7 +610,7 @@ export const BILL_CHG = [
   ['varai', 'VARAI'], ['lrCharges', 'LR CHARGES'], ['detention', 'DETENTION'], ['otherAdd', 'OTHER ADD'],
   ['dockCharges', 'DOCK CHARGES'], ['extraDelivery', 'EXTRA DELIVERY']
 ];
-export const BILL_PAYMENT_OPTIONS = ['TDS', 'ADVANCE ADJUSTMENT', 'COMMISSION', 'PENALTY / LATE DELIVERY', 'DAMAGE / SHORTAGE', 'INCENTIVE', 'OTHER'];
+export const BILL_PAYMENT_OPTIONS = ['TDS', 'ADVANCE ADJUSTMENT', 'COMMISSION', 'PENALTY / LATE DELIVERY', 'DAMAGE / SHORTAGE', 'INCENTIVE', 'OTHER', 'GST / Other (from import)'];
 export const BILL_BANK_OPTIONS = ['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Bank of Baroda', 'Kotak Mahindra Bank', 'IDFC FIRST Bank', 'Yes Bank', 'Other'];
 export const BILL_STATUS_OPTIONS = ['PENDING', 'RECEIVED', 'BILLED', 'PAID'];
 
@@ -582,6 +652,228 @@ export function computeBill(bill){
   const netAmount = grossAmount + sgstAmt + cgstAmt + igstAmt + n(bill.roundOff);
   const balanceAmount = netAmount - n(bill.advanceReceive);
   return { lineTotal, chargesTotal, totalAmount, totalAddition, totalDeduction, grossAmount, sgstAmt, cgstAmt, igstAmt, netAmount, balanceAmount };
+}
+
+/* ---------- Legacy Bills — imported wholesale from ATTrans's "BILLING SUMMERY"
+   PDF export (period 01-04-2026 to 25-08-2026, 148 bills, uploaded 2026-08-25).
+   Row shape: [invoiceNo, date, vendorSrNo, gross, net] — invoiceNo is the
+   4-digit number from the source's "/BRD/00NN" bill code (the "/BRD/" part is
+   ATTrans's own branch-code prefix, not part of the Invoice No field itself —
+   matches the Bill Details register screenshot's INVOICE column, which shows
+   just "0148" etc). vendorSrNo is a Vendor Directory srNo (see LEGACY_VENDORS
+   above) — importLegacyBills() resolves it to that vendor's live `id` at
+   import time, so Vendor Directory must be imported first (Masters -> Vendor
+   Directory -> Import ATTrans Vendor List) or these rows have nowhere to
+   point and get skipped (surfaced back to the caller as skippedNoVendor).
+
+   IMPORTANT — what "gross" and "net" mean here, and why every imported bill
+   gets a "GST / Other (from import)" addition line:
+   The source PDF is a SUMMARY export — it gives only GROSS AMOUNT and NET
+   AMOUNT per bill, not the underlying LR lines / LR Charges / tax breakdown
+   that produced them. The gap between the two is NOT a clean, consistent
+   percentage (checked: most rows are exactly gross, or gross*1.18 — a normal
+   18% GST — but a distinct minority land on other ratios like 1.32, 1.52,
+   1.75, which aren't real GST slabs, so the gap is evidently a mix of tax AND
+   un-itemized LR charges for those bills). Rather than guess a tax rate that
+   would be wrong for those rows, each import: (1) creates ONE synthetic bill
+   line carrying the exact GROSS amount, clearly remarked as imported without
+   LR-level detail; (2) puts the entire gross-to-net gap into a single
+   Payment Detail addition labeled "GST / Other (from import)" — visible,
+   editable, and numerically exact, instead of a silently-assumed GST%.
+   This reproduces the source's own GROSS AMOUNT (-> Total Amount) and NET
+   AMOUNT (-> Net Amount) exactly, and stays exact if the bill is reopened
+   and re-saved without changes, since computeBill() derives both from data
+   actually stored on the record (not from a guessed rate). */
+export const LEGACY_BILLS = [
+  ["0001", "2026-04-01", 56, 114583.81, 135208.9],
+  ["0002", "2026-04-01", 52, 59239.22, 69902.28],
+  ["0003", "2026-04-03", 164, 44522.0, 44522.0],
+  ["0004", "2026-04-06", 164, 44522.0, 44522.0],
+  ["0005", "2026-04-09", 149, 18282.0, 21572.76],
+  ["0006", "2026-04-09", 164, 44522.0, 44522.0],
+  ["0007", "2026-04-10", 164, 44522.0, 44522.0],
+  ["0008", "2026-04-13", 233, 29635.0, 45058.3],
+  ["0009", "2026-04-13", 233, 29635.0, 45058.3],
+  ["0010", "2026-04-13", 233, 29635.0, 45058.3],
+  ["0011", "2026-04-13", 233, 29635.0, 45058.3],
+  ["0012", "2026-04-13", 233, 29635.0, 45058.3],
+  ["0013", "2026-04-14", 164, 44522.0, 44522.0],
+  ["0014", "2026-04-16", 164, 44522.0, 44522.0],
+  ["0015", "2026-04-20", 164, 44522.0, 44522.0],
+  ["0016", "2026-04-21", 164, 44522.0, 44522.0],
+  ["0017", "2026-04-22", 164, 44522.0, 44522.0],
+  ["0018", "2026-04-25", 164, 44522.0, 44522.0],
+  ["0019", "2026-04-25", 164, 44522.0, 44522.0],
+  ["0020", "2026-04-29", 164, 44522.0, 44522.0],
+  ["0021", "2026-05-01", 52, 20990.26, 24768.51],
+  ["0022", "2026-05-01", 164, 44522.0, 44522.0],
+  ["0023", "2026-05-01", 56, 114610.14, 135239.97],
+  ["0024", "2026-05-04", 164, 44522.0, 44522.0],
+  ["0025", "2026-05-08", 151, 58300.0, 68794.0],
+  ["0026", "2026-05-08", 164, 44522.0, 44522.0],
+  ["0027", "2026-05-08", 207, 37000.0, 43660.0],
+  ["0028", "2026-05-08", 207, 26000.0, 30680.0],
+  ["0029", "2026-05-08", 207, 150500.0, 183490.0],
+  ["0030", "2026-05-08", 207, 78200.0, 101716.0],
+  ["0031", "2026-05-08", 207, 1000.0, 1180.0],
+  ["0032", "2026-05-11", 53, 26434.5, 31192.71],
+  ["0033", "2026-05-12", 53, 26434.5, 31192.71],
+  ["0034", "2026-05-15", 52, 39741.57, 46895.05],
+  ["0035", "2026-05-15", 164, 44522.0, 44522.0],
+  ["0036", "2026-05-15", 164, 44522.0, 44522.0],
+  ["0037", "2026-05-16", 164, 44522.0, 44522.0],
+  ["0038", "2026-05-16", 164, 44522.0, 44522.0],
+  ["0039", "2026-05-19", 164, 44522.0, 44522.0],
+  ["0040", "2026-05-23", 164, 44522.0, 44522.0],
+  ["0041", "2026-05-24", 164, 44522.0, 44522.0],
+  ["0042", "2026-05-28", 164, 44522.0, 44522.0],
+  ["0043", "2026-05-29", 164, 44522.0, 44522.0],
+  ["0044", "2026-06-01", 53, 43998.8, 51918.58],
+  ["0045", "2026-06-01", 53, 43998.8, 51918.58],
+  ["0046", "2026-06-01", 164, 44522.0, 44522.0],
+  ["0047", "2026-06-01", 56, 114686.31, 135329.85],
+  ["0048", "2026-06-01", 52, 12687.45, 14971.19],
+  ["0049", "2026-06-01", 149, 25910.0, 30573.8],
+  ["0050", "2026-06-04", 233, 24635.0, 39158.3],
+  ["0051", "2026-06-04", 233, 24635.0, 39158.3],
+  ["0052", "2026-06-04", 233, 17285.0, 30249.3],
+  ["0053", "2026-06-04", 233, 24635.0, 39158.3],
+  ["0054", "2026-06-04", 233, 24635.0, 39158.3],
+  ["0055", "2026-06-04", 233, 17285.0, 30249.3],
+  ["0056", "2026-06-04", 164, 44522.0, 44522.0],
+  ["0057", "2026-06-04", 164, 44522.0, 44522.0],
+  ["0058", "2026-06-05", 164, 44522.0, 44522.0],
+  ["0059", "2026-06-05", 164, 44522.0, 44522.0],
+  ["0060", "2026-06-08", 164, 44522.0, 44522.0],
+  ["0061", "2026-06-09", 164, 44522.0, 44522.0],
+  ["0062", "2026-06-11", 164, 44522.0, 44522.0],
+  ["0063", "2026-06-16", 52, 22389.62, 26419.75],
+  ["0064", "2026-06-16", 164, 44522.0, 44522.0],
+  ["0065", "2026-06-17", 164, 44522.0, 44522.0],
+  ["0066", "2026-06-19", 164, 44522.0, 44522.0],
+  ["0067", "2026-06-21", 164, 44522.0, 44522.0],
+  ["0068", "2026-06-23", 164, 44522.0, 44522.0],
+  ["0069", "2026-06-24", 164, 44522.0, 44522.0],
+  ["0070", "2026-06-25", 233, 29635.0, 39158.3],
+  ["0071", "2026-06-25", 233, 29635.0, 39158.3],
+  ["0072", "2026-06-25", 233, 29635.0, 39158.3],
+  ["0073", "2026-06-25", 233, 29635.0, 39158.3],
+  ["0074", "2026-06-25", 233, 29635.0, 39158.3],
+  ["0075", "2026-06-25", 164, 44522.0, 44522.0],
+  ["0076", "2026-06-27", 164, 44522.0, 44522.0],
+  ["0077", "2026-06-30", 164, 44522.0, 44522.0],
+  ["0078", "2026-07-01", 164, 44522.0, 44522.0],
+  ["0079", "2026-07-01", 56, 120761.99, 142499.15],
+  ["0080", "2026-07-01", 52, 23882.27, 28181.08],
+  ["0081", "2026-07-03", 52, 50000.0, 59000.0],
+  ["0082", "2026-07-03", 164, 44522.0, 44522.0],
+  ["0083", "2026-07-05", 164, 44522.0, 44522.0],
+  ["0084", "2026-07-06", 164, 44522.0, 44522.0],
+  ["0085", "2026-07-08", 52, 50000.0, 59000.0],
+  ["0086", "2026-07-08", 164, 44522.0, 44522.0],
+  ["0087", "2026-07-10", 16, 11000.0, 12980.0],
+  ["0088", "2026-07-10", 32, 37700.0, 44486.0],
+  ["0089", "2026-07-10", 32, 37700.0, 44486.0],
+  ["0090", "2026-07-10", 53, 26434.5, 31192.71],
+  ["0091", "2026-07-10", 53, 26434.54, 31192.76],
+  ["0092", "2026-07-11", 32, 37700.0, 44486.0],
+  ["0093", "2026-07-13", 32, 37700.0, 44486.0],
+  ["0094", "2026-07-13", 164, 44522.0, 44522.0],
+  ["0095", "2026-07-13", 164, 44522.0, 44522.0],
+  ["0096", "2026-07-13", 164, 44522.0, 44522.0],
+  ["0097", "2026-07-14", 32, 37700.0, 44486.0],
+  ["0098", "2026-07-14", 32, 37700.0, 44486.0],
+  ["0099", "2026-07-16", 52, 30785.74, 36327.17],
+  ["0100", "2026-07-16", 32, 37700.0, 44486.0],
+  ["0101", "2026-07-17", 164, 44522.0, 44522.0],
+  ["0102", "2026-07-19", 164, 44522.0, 44522.0],
+  ["0103", "2026-07-19", 32, 37700.0, 44486.0],
+  ["0104", "2026-07-19", 149, 22500.0, 26550.0],
+  ["0105", "2026-07-20", 233, 34635.0, 47418.3],
+  ["0106", "2026-07-19", 233, 34635.0, 47418.3],
+  ["0107", "2026-07-21", 164, 44522.0, 44522.0],
+  ["0108", "2026-07-22", 32, 37700.0, 44486.0],
+  ["0109", "2026-07-23", 164, 44522.0, 44522.0],
+  ["0110", "2026-07-24", 32, 37700.0, 44486.0],
+  ["0111", "2026-07-27", 53, 43998.8, 51918.58],
+  ["0112", "2026-07-27", 53, 43998.8, 51918.58],
+  ["0113", "2026-07-27", 164, 44522.0, 44522.0],
+  ["0114", "2026-07-28", 32, 37700.0, 44486.0],
+  ["0115", "2026-07-28", 32, 26930.0, 31777.4],
+  ["0116", "2026-07-28", 164, 44522.0, 44522.0],
+  ["0117", "2026-07-29", 164, 44522.0, 44522.0],
+  ["0118", "2026-07-30", 32, 37700.0, 44486.0],
+  ["0119", "2026-08-01", 52, 50000.0, 59000.0],
+  ["0120", "2026-08-01", 164, 44522.0, 44522.0],
+  ["0121", "2026-08-01", 164, 44522.0, 44522.0],
+  ["0122", "2026-08-01", 52, 18004.98, 21245.88],
+  ["0123", "2026-08-01", 56, 118009.17, 139250.82],
+  ["0124", "2026-08-02", 32, 37700.0, 44486.0],
+  ["0125", "2026-08-03", 164, 44522.0, 44522.0],
+  ["0126", "2026-08-03", 164, 44522.0, 44522.0],
+  ["0127", "2026-08-04", 32, 37700.0, 44486.0],
+  ["0128", "2026-08-05", 164, 44522.0, 44522.0],
+  ["0129", "2026-08-06", 164, 44522.0, 44522.0],
+  ["0130", "2026-08-06", 32, 37700.0, 44486.0],
+  ["0131", "2026-08-09", 32, 37700.0, 44486.0],
+  ["0132", "2026-08-09", 164, 44522.0, 44522.0],
+  ["0133", "2026-08-09", 233, 34635.0, 47418.3],
+  ["0134", "2026-08-09", 233, 34635.0, 47418.3],
+  ["0135", "2026-08-09", 233, 34635.0, 47191.74],
+  ["0136", "2026-08-11", 32, 37700.0, 44486.0],
+  ["0137", "2026-08-11", 164, 44522.0, 44522.0],
+  ["0138", "2026-08-12", 164, 44522.0, 44522.0],
+  ["0139", "2026-08-13", 164, 44522.0, 44522.0],
+  ["0140", "2026-08-13", 32, 37700.0, 44486.0],
+  ["0141", "2026-08-15", 32, 37700.0, 44486.0],
+  ["0142", "2026-08-16", 164, 44522.0, 44522.0],
+  ["0143", "2026-08-16", 164, 44522.0, 44522.0],
+  ["0144", "2026-08-17", 32, 37700.0, 44486.0],
+  ["0145", "2026-08-17", 52, 12874.03, 15191.36],
+  ["0146", "2026-08-22", 164, 44522.0, 44522.0],
+  ["0147", "2026-08-22", 164, 44522.0, 44522.0],
+  ["0148", "2026-08-24", 164, 44522.0, 44522.0]
+];
+
+/* Dedupes by Invoice No (unique per source bill). Requires Vendor Directory to
+   already be imported — any row whose vendorSrNo isn't found there yet is
+   skipped and counted in skippedNoVendor rather than guessed at, so re-running
+   after importing Vendor Directory picks up exactly the rows that failed. */
+export function importLegacyBills(db){
+  db.bills = db.bills || [];
+  const have = {};
+  db.bills.forEach(b => { if (b.invoiceNo) have[b.invoiceNo] = true; });
+  const vendorBySr = {};
+  (db.vendorDirectory || []).forEach(v => { vendorBySr[v.srNo] = v; });
+  let added = 0, skippedNoVendor = 0;
+  LEGACY_BILLS.forEach(([invoiceNo, date, vendorSrNo, gross, net]) => {
+    if (have[invoiceNo]) return;
+    const vendor = vendorBySr[vendorSrNo];
+    if (!vendor) { skippedNoVendor++; return; }
+    have[invoiceNo] = true;
+    const gap = Math.round((net - gross) * 100) / 100;
+    const charges = {}; BILL_CHG.forEach(c => { charges[c[0]] = ''; });
+    const bill = {
+      id: uid('bill'), invoiceNo, vendorId: vendor.id, date, poNo: '', poDate: '',
+      lines: [{
+        id: uid('bl'), lrId: '', status: 'BILLED', lrNo: '', date, from: '', to: '', weight: '', pcs: '', rate: '',
+        amount: gross, otherCharges: '',
+        remark: 'Imported from Billing Summary PDF (01-04-2026 to 25-08-2026) — LR-level detail not itemized in source.'
+      }],
+      charges,
+      additions: gap > 0.005 ? [{ id: uid('bp'), type: 'GST / Other (from import)', amount: gap }] : [],
+      deductions: [],
+      sgstPct: '', cgstPct: '', igstPct: '', roundOff: '', advanceReceive: '',
+      bank: '', remark: '', subject: '', createdAt: new Date().toISOString()
+    };
+    const t = computeBill(bill);
+    bill.totalAmount = t.totalAmount; bill.totalAddition = t.totalAddition; bill.totalDeduction = t.totalDeduction;
+    bill.grossAmount = t.grossAmount; bill.sgstAmt = t.sgstAmt; bill.cgstAmt = t.cgstAmt; bill.igstAmt = t.igstAmt;
+    bill.netAmount = t.netAmount; bill.balanceAmount = t.balanceAmount;
+    db.bills.push(bill);
+    added++;
+  });
+  return { added, skippedNoVendor };
 }
 
 export function blankLR(){

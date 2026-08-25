@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
-import { uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks, importLegacyVendors } from '../logic';
+import { uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks, importLegacyVendors, LEGACY_VENDORS } from '../logic';
 
 const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['vendorDirectory', 'Vendor Directory'], ['routes', 'Routes'], ['branches', 'Branches']];
 const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', vendorDirectory: '+ Add Vendor (Directory)', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
@@ -150,7 +150,7 @@ export default function MastersScreen({ navigation, route }) {
   });
   const doImportLegacyVendors = () => update(d => {
     const added = importLegacyVendors(d);
-    setTimeout(() => alert('Vendor Directory imported', added + ' vendor(s) added' + (added < 235 ? ', ' + (235 - added) + ' already on file (skipped).' : '.')), 100);
+    setTimeout(() => alert('Vendor Directory imported', added + ' vendor(s) added' + (added < LEGACY_VENDORS.length ? ', ' + (LEGACY_VENDORS.length - added) + ' already on file (skipped).' : '.')), 100);
   });
   const editDriver = (dd) => setForm({ title: 'Edit Driver', fields: driverFields(dd), onSubmit: v => update(d => { const x = byId(d.drivers, dd.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendor = (vv) => setForm({ title: 'Edit Vendor', fields: vendorFields(vv), onSubmit: v => update(d => { const x = byId(d.vendors, vv.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
