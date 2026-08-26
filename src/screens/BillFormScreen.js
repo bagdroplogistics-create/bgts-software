@@ -137,7 +137,7 @@ function BillLineRow({ l, i, db, onChange, onRemove, canRemove }) {
       {col(95, <TextInput value={String(l.amount == null ? '' : l.amount)} onChangeText={t => set('amount')(t.replace(/[^0-9.]/g, ''))} keyboardType="numeric" placeholder="Amount" placeholderTextColor={C.line2} style={cell} />)}
       {col(110, <TextInput value={String(l.otherCharges == null ? '' : l.otherCharges)} onChangeText={t => set('otherCharges')(t.replace(/[^0-9.]/g, ''))} keyboardType="numeric" placeholder="Other Charges" placeholderTextColor={C.line2} style={cell} />)}
       {col(140, <TextInput value={l.remark} onChangeText={set('remark')} placeholder="Remark" placeholderTextColor={C.line2} style={cell} />)}
-      <View style={{ paddingTop: 4 }}>{canRemove ? <Btn small tone="red" label="✕" onPress={onRemove} /> : null}</View>
+      {col(40, <View style={{ paddingTop: 4 }}>{canRemove ? <Btn small tone="red" label="✕" onPress={onRemove} /> : null}</View>)}
     </View>
   );
 }
