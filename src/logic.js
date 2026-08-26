@@ -1319,8 +1319,13 @@ export function importLegacyBills(db){
      against ATTrans's actual LHC dropdown.
    - The screenshot's "Pay To" field's real option list also wasn't visible,
      so it's implemented as free text here rather than an invented dropdown.
-   - "IMAGE / Choose File" upload isn't implemented — this app has no file-
-     attachment infrastructure elsewhere; flagged, not built here. */
+   - "IMAGE / Choose File" is implemented (camera + gallery, same
+     expo-image-picker pattern PODScreen.js already uses elsewhere in this
+     app) — stored as a local URI string in imageUri. Same known limitation
+     as POD photos: on the web build this is a browser blob: URL that only
+     survives the current session (nothing is uploaded to durable storage;
+     there's no Supabase Storage bucket wired up anywhere in this app yet).
+     On native it's copied into permanent app storage, same as POD. */
 export const LHC_AGENTS = [
   'MITESHBHAI MUMBAI ',
   'Shree shyam travels',
@@ -1339,7 +1344,7 @@ export const LHC_AGENTS = [
   'pooja roadlines',
   'MR RAGHU BHARWAD'
 ];
-export const LHC_PAYMENT_OPTIONS = ['TDS', 'ADVANCE ADJUSTMENT', 'COMMISSION', 'PENALTY / LATE DELIVERY', 'DAMAGE / SHORTAGE', 'INCENTIVE', 'OTHER'];
+export const LHC_PAYMENT_OPTIONS = ['TDS', 'ADVANCE ADJUSTMENT', 'COMMISSION', 'PENALTY / LATE DELIVERY', 'DAMAGE / SHORTAGE', 'INCENTIVE', 'OTHER', 'BALANCE ADJUSTMENT (from import)'];
 
 export function blankLhcTripLine(){
   return { id: uid('ltl'), lrId: '', lrNo: '', date: '', content: '', pkgs: '', weight: '' };
@@ -1362,7 +1367,8 @@ export function blankLhcTrip(){
     ownerName: '', ownerAddress: '', ownerPan: '', ownerMobile: '',
     lorryHire: '', advance: '', additions: [], deductions: [], payTo: '',
     expenses: [],
-    createdAt: ''
+    imageUri: '',
+    createdBy: '', createdAt: ''
   };
 }
 export function blankLhcExpense(){ return { id: uid('lte'), account: '', amount: '' }; }
@@ -1374,6 +1380,118 @@ export function computeLhcTrip(trip){
   const netAmount = n(trip.lorryHire) + totalAddition - totalDeduction;
   const balanceAmount = netAmount - n(trip.advance);
   return { totalAddition, totalDeduction, totalExpense, netAmount, balanceAmount };
+}
+
+/* ---------- LHC historical register — ATTrans's own "VIEW LHC DETAILS"
+   list (32 rows, screenshots dated 2026-08-26), imported wholesale into the
+   new LHC module above.
+   Row shape: [lhcNo, date(ISO), truckNo, lrNo, fromPlace, toPlace,
+   lorryHire, advance, balance, payTo, createdBy] — this is exactly what the
+   register shows; no per-row Agent name, LR-level detail (content/pkgs/
+   weight), driver/owner/vehicle info, or addition/deduction breakdown is
+   available from this list view, so those are left blank on import, same
+   as the Billing Summary PDF import did for Bills.
+
+   FLAGGED, not silently fixed:
+   - The register's own BALANCE column frequently does NOT equal
+     Lorry Hire − Advance (e.g. SR 1/3/4: hire 20000, advance 12000, but
+     balance shown as 20000, not 8000; SR 14/15/19/32: balance shown as 0.00
+     even though hire − advance is positive; SR 21/22: balance shown well
+     above hire − advance). Rather than guess why (advance reversed, part-
+     settlement, manual override, data-entry error — no way to tell from a
+     list view), each row's addition/deduction is set to the exact single
+     value needed to reproduce ATTrans's own displayed balance via this
+     module's normal netAmount/balance formula, labeled
+     'BALANCE ADJUSTMENT (from import)' so it's visibly a reconciling entry,
+     not an invented real transaction. See importLegacyLhcTrips().
+   - SR 9 and SR 10 (BRD/02825, BRD/02824) share the same date (06-08-2026);
+     SR 13/14 share 30-07-2026; SR 20/21 share 15-10-2025 — kept as separate
+     rows, not merged; that's how the source register has them.
+   - TRUCK NO is transcribed verbatim including the source's own
+     inconsistent spacing/punctuation across otherwise-identical vehicles:
+     "GJ 06 AY 4675" (SR 14, 19) vs "GJ06AY4675" (SR 15); "GJ-06-BX-7185"
+     (SR 28); "GJ7YZ8661" (SR 32, missing the leading 0 that every other
+     "GJ07YZ8661" row has). SR 10 (BRD/02824) lists two truck numbers
+     separated by " | " in the source ("MH04CP1115 | GJ27TG1769") — kept as
+     one verbatim string, not split.
+   - The register's own LHC-number sequence isn't strictly chronological
+     across its two visible numbering batches ("BRD/028xx" vs "BRD/000xx") —
+     e.g. BRD/00016 (SR 17) is dated after BRD/00017 (SR 16). Transcribed as
+     shown, not reordered.
+   - PAYMENT column reads "AGENT" for all 32 rows — mapped to this module's
+     payTo field verbatim; the Agent dropdown field itself (a party name)
+     isn't populated since no per-row agent name is shown in this list. */
+export const LEGACY_LHC_TRIPS = [
+  ['BRD/02833', '2026-08-26', 'GJ07YZ8661', 'BRD/06824', 'BARODA', 'RAJKOT', 20000, 12000, 20000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02832', '2026-08-25', 'GJ07YZ8661', 'BRD/06823', 'GACL RANOLI', 'GACL COELHO PLANT', 1000, 0, 1000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02831', '2026-08-22', 'GJ06AT6590', 'BRD/06817', 'BARODA', 'RAJKOT', 20000, 12000, 20000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02830', '2026-08-20', 'GJ06AT6590', 'BRD/06809', 'BARODA', 'RAJKOT', 20000, 12000, 20000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02829', '2026-08-14', 'GJ06BT9525', 'BRD/06801', 'NANDESARI', 'ANKLESHWAR', 20000, 17000, 3000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02828', '2026-08-12', 'GJ06BT9525', 'BRD/06797', 'NANDESARI', 'ANKLESHWAR', 20000, 17000, 3000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02827', '2026-08-10', 'GJ06BT9525', 'BRD/06790', 'NANDESARI', 'ANKLESHWAR', 20000, 17000, 3000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02826', '2026-08-08', 'GJ06BT9525', 'BRD/06785', 'NANDESARI', 'ANKLESHWAR', 20000, 17000, 3000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02825', '2026-08-06', 'GJ06BT9525', 'BRD/06775', 'NANDESARI', 'ANKLESHWAR', 20000, 17000, 3000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02824', '2026-08-06', 'MH04CP1115 | GJ27TG1769', 'BRD/06776', 'CWC IMPEX JNPT', 'SURENDRANAGAR', 46000, 44000, 2000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02823', '2026-08-03', 'GJ06BT9525', 'BRD/06769', 'NANDESARI', 'ANKLESHWAR', 20000, 17000, 3000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02822', '2026-08-01', 'GJ06BT9525', 'BRD/06765', 'NANDESARI', 'ANKLESHWAR', 20000, 17000, 3000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02821', '2026-07-30', 'GJ06BT9525', 'BRD/06753', 'NANDESARI', 'ANKLESHWAR', 20000, 17000, 3000, 'AGENT', 'DEVELOPER'],
+  ['BRD/02820', '2026-07-30', 'GJ 06 AY 4675', 'BRD/06755', 'MAKARPURA', 'GACL RANOLI', 600, 0, 0, 'AGENT', 'DEVELOPER'],
+  ['BRD/02819', '2026-07-28', 'GJ06AY4675', 'BRD/06748', 'GACL RANOLI', 'MAKARPURA', 350, 0, 0, 'AGENT', 'DEVELOPER'],
+  ['BRD/00017', '2026-07-27', 'GJ06BT9525', 'BRD/06744', 'NANDESARI', 'ANKLESHWAR', 20000, 18000, 2000, 'AGENT', 'DEVELOPER'],
+  ['BRD/00016', '2026-07-29', 'GJ27TF9204', 'BRD/06750', 'GACL RANOLI', 'DENORA GOA', 40000, 38000, 2000, 'AGENT', 'DEVELOPER'],
+  ['BRD/00015', '2025-11-05', 'GJ01DV2129', 'BRD/06179', 'BEAWER', 'BAKROL', 16000, 13000, 3000, 'AGENT', 'DEVELOPER'],
+  ['BRD/00014', '2025-10-28', 'GJ 06 AY 4675', 'BRD/06166', 'GACL RANOLI', 'DAHEJ BHARUCH', 1700, 700, 0, 'AGENT', 'DEVELOPER'],
+  ['BRD/00013', '2025-10-15', 'GJ16AW-0776', 'BRD/06148', 'NANDESARI', 'GACL RANOLI', 5000, 5000, 0, 'AGENT', 'DEVELOPER'],
+  ['BRD/00012', '2025-10-15', 'GJ06AX8637', 'BRD/06147', 'RANOLI GIDC', 'GACL RANOLI', 900, 900, 900, 'AGENT', 'DEVELOPER'],
+  ['BRD/00011', '2025-10-09', 'GJ03AX9201', 'BRD/06135', 'DAHEJ', 'RAJPUR (CHATRAL)', 10500, 10000, 10500, 'AGENT', 'DEVELOPER'],
+  ['BRD/00010', '2025-08-06', 'GJ07YZ8661', 'BRD/06065', 'RAJKOT', 'BARODA', 18500, 0, 18500, 'AGENT', 'DEVELOPER'],
+  ['BRD/00009', '2025-07-29', 'GJ07YZ8661', 'BRD/06056', 'BARODA', 'RAJKOT', 18500, 0, 18500, 'AGENT', 'DEVELOPER'],
+  ['BRD/00008', '2025-07-23', 'GJ07YZ8661', 'BRD/06046', 'BARODA', 'RAJKOT', 18500, 0, 18500, 'AGENT', 'DEVELOPER'],
+  ['BRD/00007', '2025-07-18', 'GJ07YZ8661', 'BRD/06038', 'BARODA', 'RAJKOT', 18500, 0, 18500, 'AGENT', 'DEVELOPER'],
+  ['BRD/00006', '2025-07-14', 'GJ07YZ8661', 'BRD/06029', 'BARODA', 'RAJKOT', 18500, 0, 18500, 'AGENT', 'DEVELOPER'],
+  ['BRD/00005', '2025-07-07', 'GJ-06-BX-7185', 'BRD/06022', 'MANJUSAR BARODA', 'DAHEJ BHARUCH', 9000, 0, 9000, 'AGENT', 'DEVELOPER'],
+  ['BRD/00004', '2025-07-02', 'GJ07YZ8661', 'BRD/06014', 'BARODA', 'RAJKOT', 18500, 0, 18500, 'AGENT', 'DEVELOPER'],
+  ['BRD/00003', '2025-06-26', 'GJ07YZ8661', 'BRD/06008', 'BARODA', 'RAJKOT', 18500, 0, 18500, 'AGENT', 'DEVELOPER'],
+  ['BRD/00002', '2025-06-23', 'GJ07YZ8661', 'BRD/06004', 'BARODA', 'RAJKOT', 18500, 0, 18500, 'AGENT', 'DEVELOPER'],
+  ['BRD/00001', '2025-06-19', 'GJ7YZ8661', 'BRD/05996', 'BARODA', 'RAJKOT', 18500, 0, 0, 'AGENT', 'DEVELOPER']
+];
+
+/* Dedupes by LHC No — safe to re-run. Reconciles Lorry Hire/Advance against
+   the source's own Balance via a single labeled addition or deduction line
+   (see the doc comment above LEGACY_LHC_TRIPS) so this module's normal
+   computeLhcTrip() reproduces ATTrans's displayed balance exactly. */
+export function importLegacyLhcTrips(db){
+  db.lhcTrips = db.lhcTrips || [];
+  const have = {};
+  db.lhcTrips.forEach(t => { if (t.lhcNo) have[t.lhcNo] = true; });
+  let added = 0;
+  LEGACY_LHC_TRIPS.forEach(([lhcNo, date, truckNo, lrNo, fromPlace, toPlace, lorryHire, advance, balance, payTo, createdBy]) => {
+    if (have[lhcNo]) return;
+    have[lhcNo] = true;
+    const expected = Math.round((lorryHire - advance) * 100) / 100;
+    const gap = Math.round((balance - expected) * 100) / 100;
+    const additions = [], deductions = [];
+    if (gap > 0.005) additions.push({ id: uid('lp'), type: 'BALANCE ADJUSTMENT (from import)', amount: gap });
+    else if (gap < -0.005) deductions.push({ id: uid('lp'), type: 'BALANCE ADJUSTMENT (from import)', amount: -gap });
+    const trip = {
+      id: uid('lht'), lhcNo, date, truckNo, fromPlace, toPlace,
+      lines: [{ id: uid('ltl'), lrId: '', lrNo, date: '', content: '', pkgs: '', weight: '' }],
+      agent: '', lorryType: '', chasisNo: '', engineNo: '', permitNo: '', insuranceCo: '', branch: '', policyNo: '',
+      permitFrom: '', permitUpto: '', insuranceUpto: '',
+      driverName: '', driverAddress: '', driverLicNo: '', driverLicDate: '', driverIssuedFrom: '', driverMobile: '',
+      ownerName: '', ownerAddress: '', ownerPan: '', ownerMobile: '',
+      lorryHire, advance, additions, deductions, payTo,
+      expenses: [],
+      imageUri: '',
+      createdBy, createdAt: new Date().toISOString()
+    };
+    const t = computeLhcTrip(trip);
+    trip.totalAddition = t.totalAddition; trip.totalDeduction = t.totalDeduction; trip.totalExpense = t.totalExpense;
+    trip.netAmount = t.netAmount; trip.balanceAmount = t.balanceAmount;
+    db.lhcTrips.push(trip);
+    added++;
+  });
+  return added;
 }
 
 export function blankLR(){

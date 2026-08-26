@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal, Image, Platform } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
 import { C, S, Card, Btn, DatePicker, PickerField, alert } from '../ui';
 import {
@@ -210,6 +212,32 @@ export default function LHCTripFormScreen({ navigation, route }) {
   const pkgsTotal = (f.lines || []).reduce((s2, l) => s2 + (Number(l.pkgs) || 0), 0);
   const weightTotal = (f.lines || []).reduce((s2, l) => s2 + (Number(l.weight) || 0), 0);
 
+  /* Same expo-image-picker pattern PODScreen.js already uses for POD photos
+     — camera or gallery, cross-platform. On web the picker's own blob: URI
+     is kept as-is (only survives the current browser session — this app
+     has no Supabase Storage bucket wired up, same known limitation as POD
+     photos); on native it's copied into permanent app storage. */
+  const pickImage = async (fromCamera) => {
+    try {
+      let res;
+      if (fromCamera) {
+        if (Platform.OS !== 'web') {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) { alert('Camera permission needed', 'Allow camera access to photograph the LHC document.'); return; }
+        }
+        res = await ImagePicker.launchCameraAsync({ quality: 0.5, allowsEditing: false });
+      } else {
+        res = await ImagePicker.launchImageLibraryAsync({ quality: 0.5, mediaTypes: ImagePicker.MediaTypeOptions.Images });
+      }
+      if (res.canceled || !res.assets || !res.assets.length) return;
+      const asset = res.assets[0];
+      const dest = Platform.OS === 'web' ? asset.uri : FileSystem.documentDirectory + 'lhc_' + (f.id || uid('lht')) + '.jpg';
+      if (Platform.OS !== 'web') await FileSystem.copyAsync({ from: asset.uri, to: dest });
+      setF(p => ({ ...p, imageUri: dest }));
+    } catch (e) { alert('Error', String(e.message || e)); }
+  };
+  const removeImage = () => setF(p => ({ ...p, imageUri: '' }));
+
   const save = () => {
     const req = [[f.lhcNo, 'LHC No'], [f.date, 'Date']];
     for (const [v, l] of req) { if (!String(v || '').trim()) { alert('Missing field', l + ' is required.'); return; } }
@@ -290,7 +318,18 @@ export default function LHCTripFormScreen({ navigation, route }) {
           <Fld l="Policy No" v={f.policyNo} set={t => setF(p => ({ ...p, policyNo: t }))} />
           <Fld l="Insurance Up To" v={f.insuranceUpto} set={t => setF(p => ({ ...p, insuranceUpto: t }))} date />
         </Grid>
-        <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 2 }}>Image upload isn't implemented in this build (this app has no file-attachment infrastructure elsewhere yet) — flagged, not built here.</Text>
+        <View style={{ marginTop: 10 }}>
+          <Text style={{ fontSize: 10, fontWeight: '800', color: C.mut, textTransform: 'uppercase', marginBottom: 6 }}>Image</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {f.imageUri ? (
+              <Image source={{ uri: f.imageUri }} style={{ width: 64, height: 64, borderRadius: 8, borderWidth: 1, borderColor: C.line2 }} />
+            ) : null}
+            {Platform.OS !== 'web' ? <Btn small tone="ghost" label="📷 Take Photo" onPress={() => pickImage(true)} /> : null}
+            <Btn small tone="ghost" label={f.imageUri ? 'Choose File' : 'Choose File'} onPress={() => pickImage(false)} />
+            {f.imageUri ? <Btn small tone="red" label="Remove" onPress={removeImage} /> : <Text style={{ fontSize: 11.5, color: C.mut }}>No file chosen</Text>}
+          </View>
+          <Text style={{ fontSize: 10.5, color: C.mut, marginTop: 6 }}>Stored on this device only — on the web build this file isn't uploaded anywhere durable and won't survive closing the browser tab (this app has no cloud file storage wired up yet).</Text>
+        </View>
       </Card>
 
       <Card title="Driver Information">

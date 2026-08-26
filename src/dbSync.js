@@ -507,7 +507,7 @@ const LHC_TRIP_DEF = { table: 'lhc_trips', fields: [
   ['ownerName','owner_name','s'],['ownerAddress','owner_address','s'],['ownerPan','owner_pan','s'],['ownerMobile','owner_mobile','s'],
   ['lorryHire','lorry_hire','nr'],['advance','advance','nr'],['payTo','pay_to','s'],
   ['totalAddition','total_addition','nr'],['totalDeduction','total_deduction','nr'],['totalExpense','total_expense','nr'],
-  ['netAmount','net_amount','nr'],['balanceAmount','balance_amount','nr']
+  ['netAmount','net_amount','nr'],['balanceAmount','balance_amount','nr'],['createdBy','created_by','s'],['imageUri','image_uri','s']
 ] };
 
 async function syncLhcTrips(prevArr, nextArr) {

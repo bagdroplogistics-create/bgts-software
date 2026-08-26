@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput } from 'react-native';
+import { View, Text, ScrollView, TextInput, Image } from 'react-native';
 import { useStore } from '../store';
-import { C, S, Card, Btn, Empty, confirmDo, Table, PickerField } from '../ui';
-import { inr, fmtDate, removeById, sum, LHC_AGENTS } from '../logic';
+import { C, S, Card, Btn, Empty, confirmDo, Table, PickerField, alert } from '../ui';
+import { inr, fmtDate, removeById, sum, LHC_AGENTS, importLegacyLhcTrips, LEGACY_LHC_TRIPS } from '../logic';
 
 /* "VIEW LHC DETAILS" register — the new LHC module's own list screen,
    reached from LHCTripFormScreen's top-right button (and after SAVE &
@@ -26,11 +26,17 @@ export default function LHCTripListScreen({ navigation }) {
 
   const del = (t) => confirmDo('Delete LHC ' + (t.lhcNo || '') + '?', () => update(d => removeById(d.lhcTrips, t.id)));
 
+  const doImportLegacyLhcTrips = () => update(d => {
+    const added = importLegacyLhcTrips(d);
+    setTimeout(() => alert('LHC register imported', added + ' LHC(s) added' + (added < LEGACY_LHC_TRIPS.length ? ', ' + (LEGACY_LHC_TRIPS.length - added) + ' already on file (skipped).' : '.')), 100);
+  });
+
   const agentOptions = [{ v: '', l: 'All Agents' }, ...LHC_AGENTS.map(a => ({ v: a, l: a.trim() || '(blank)' }))];
 
   return (
     <View style={S.screen}>
       <View style={{ padding: 14, paddingBottom: 6, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+        <Btn label="Import ATTrans LHC Register (32)" tone="ghost" onPress={doImportLegacyLhcTrips} />
         <Btn label="+ ADD NEW LHC" tone="amber" onPress={() => navigation.navigate('LHCTrip', {})} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
@@ -57,22 +63,32 @@ export default function LHCTripListScreen({ navigation }) {
                 { key: 'lhcNo', label: 'LHC No', width: 100 },
                 { key: 'date', label: 'Date', width: 90 },
                 { key: 'truck', label: 'Truck / Route', width: 180 },
-                { key: 'agent', label: 'Agent', width: 150 },
+                { key: 'lrNo', label: 'LR No', width: 110 },
+                { key: 'agent', label: 'Agent', width: 130 },
                 { key: 'lorryHire', label: 'Lorry Hire', width: 100 },
                 { key: 'advance', label: 'Advance', width: 100 },
                 { key: 'net', label: 'Net Amount', width: 100 },
                 { key: 'balance', label: 'Balance', width: 100 },
+                { key: 'payTo', label: 'Payment', width: 90 },
+                { key: 'createdBy', label: 'Created By', width: 100 },
+                { key: 'image', label: 'Image', width: 60 },
                 { key: 'actions', label: '', width: 150 }
               ]}
               rows={list.map(t => ({
                 lhcNo: <Text style={{ fontWeight: '700', color: C.navy }}>{t.lhcNo}</Text>,
                 date: fmtDate(t.date),
                 truck: (t.truckNo || '—') + '\n' + (t.fromPlace || '') + ' → ' + (t.toPlace || ''),
+                lrNo: (t.lines || []).map(l => l.lrNo).filter(Boolean).join(', ') || '—',
                 agent: (t.agent || '—').trim() || '—',
                 lorryHire: inr(t.lorryHire),
                 advance: inr(t.advance),
                 net: <Text style={{ fontWeight: '800', color: C.navy }}>{inr(t.netAmount)}</Text>,
                 balance: <Text style={{ fontWeight: '700', color: Number(t.balanceAmount) > 0 ? C.red : C.green }}>{inr(t.balanceAmount)}</Text>,
+                payTo: t.payTo || '—',
+                createdBy: t.createdBy || '—',
+                image: t.imageUri
+                  ? <Image source={{ uri: t.imageUri }} style={{ width: 32, height: 32, borderRadius: 5, borderWidth: 1, borderColor: C.line2 }} />
+                  : '—',
                 actions: (
                   <View style={S.wrapRow}>
                     <Btn small tone="ghost" label="Edit" onPress={() => navigation.navigate('LHCTrip', { lhcTripId: t.id })} />
