@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
-import { uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks, importLegacyVendors, LEGACY_VENDORS } from '../logic';
+import {
+  uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks, importLegacyVendors, LEGACY_VENDORS,
+  importLegacyTaxMaster, LEGACY_TAX_MASTER, TAX_MODULES
+} from '../logic';
 
-const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['vendorDirectory', 'Vendor Directory'], ['routes', 'Routes'], ['branches', 'Branches']];
-const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', vendorDirectory: '+ Add Vendor (Directory)', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
+const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['vendorDirectory', 'Vendor Directory'], ['taxMaster', 'Tax Master'], ['routes', 'Routes'], ['branches', 'Branches']];
+const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', vendorDirectory: '+ Add Vendor (Directory)', taxMaster: '+ Add Tax', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
 
 export default function MastersScreen({ navigation, route }) {
   const { db, update } = useStore();
@@ -77,6 +80,13 @@ export default function MastersScreen({ navigation, route }) {
     { key: 'type', label: 'Type', type: 'select', value: (v && v.type) || 'VENDOR', options: ['VENDOR', 'AGENT'].map(x => ({ v: x, l: x })) },
     { key: 'createdBy', label: 'Created By', value: v && v.createdBy }
   ];
+  const taxFields = (t) => [
+    { key: 'sign', label: 'Sign', type: 'select', required: true, value: (t && t.sign) || '+', options: [{ v: '+', l: '+ (Add)' }, { v: '-', l: '− (Less)' }] },
+    { key: 'description', label: 'Description', required: true, value: t && t.description },
+    { key: 'accountGroup', label: 'Account', required: true, value: t && t.accountGroup, hint: 'Ledger account this charge posts to' },
+    { key: 'modules', label: 'Module', type: 'checkboxes', full: true, value: t && t.modules, options: TAX_MODULES.map(m => ({ v: m, l: m })) },
+    { key: 'createdBy', label: 'Created By', value: t && t.createdBy }
+  ];
   const routeFields = () => [
     { key: 'origin', label: 'Origin', required: true },
     { key: 'destination', label: 'Destination', required: true },
@@ -120,6 +130,14 @@ export default function MastersScreen({ navigation, route }) {
         d.vendorDirectory.push({ id: uid('vd'), srNo: maxSr + 1, vendorCode: v.vendorCode, name: v.name, contactNo: v.contactNo, panCard: v.panCard, gst: v.gst, type: v.type || 'VENDOR', createdBy: v.createdBy });
       })
     });
+    else if (tab === 'taxMaster') setForm({
+      title: 'Add Tax', fields: taxFields(null),
+      onSubmit: v => update(d => {
+        d.taxMaster = d.taxMaster || [];
+        const maxSr = d.taxMaster.reduce((m, x) => Math.max(m, x.srNo || 0), 0);
+        d.taxMaster.push({ id: uid('tx'), srNo: maxSr + 1, sign: v.sign || '+', description: v.description, accountGroup: v.accountGroup, modules: v.modules || '', createdBy: v.createdBy });
+      })
+    });
     else if (tab === 'branches') setForm({ title: 'Add Branch / Entity', fields: branchFields(null), onSubmit: v => update(d => d.branches.push({ ...v, id: uid('br'), name: String(v.name).toUpperCase() })) });
     else setForm({ title: 'Add Route', fields: routeFields(), onSubmit: v => update(d => d.routes.push({ ...v, id: uid('r') })) });
   };
@@ -152,6 +170,10 @@ export default function MastersScreen({ navigation, route }) {
     const added = importLegacyVendors(d);
     setTimeout(() => alert('Vendor Directory imported', added + ' vendor(s) added' + (added < LEGACY_VENDORS.length ? ', ' + (LEGACY_VENDORS.length - added) + ' already on file (skipped).' : '.')), 100);
   });
+  const doImportLegacyTaxMaster = () => update(d => {
+    const added = importLegacyTaxMaster(d);
+    setTimeout(() => alert('Tax Master imported', added + ' entr' + (added === 1 ? 'y' : 'ies') + ' added' + (added < LEGACY_TAX_MASTER.length ? ', ' + (LEGACY_TAX_MASTER.length - added) + ' already on file (skipped).' : '.')), 100);
+  });
   const editDriver = (dd) => setForm({ title: 'Edit Driver', fields: driverFields(dd), onSubmit: v => update(d => { const x = byId(d.drivers, dd.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendor = (vv) => setForm({ title: 'Edit Vendor', fields: vendorFields(vv), onSubmit: v => update(d => { const x = byId(d.vendors, vv.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendorDir = (vv) => setForm({
@@ -159,6 +181,13 @@ export default function MastersScreen({ navigation, route }) {
     onSubmit: v => update(d => {
       const x = byId(d.vendorDirectory, vv.id);
       if (x) { x.vendorCode = v.vendorCode; x.name = v.name; x.contactNo = v.contactNo; x.panCard = v.panCard; x.gst = v.gst; x.type = v.type || 'VENDOR'; x.createdBy = v.createdBy; }
+    })
+  });
+  const editTax = (t) => setForm({
+    title: 'Edit ' + t.description, fields: taxFields(t),
+    onSubmit: v => update(d => {
+      const x = byId(d.taxMaster, t.id);
+      if (x) { x.sign = v.sign || '+'; x.description = v.description; x.accountGroup = v.accountGroup; x.modules = v.modules || ''; x.createdBy = v.createdBy; }
     })
   });
 
@@ -196,6 +225,7 @@ export default function MastersScreen({ navigation, route }) {
         <View style={{ flex: 1 }} />
         {tab === 'trucks' ? <Btn small tone="ghost" label="Import Legacy Truck List" onPress={doImportLegacyTrucks} /> : null}
         {tab === 'vendorDirectory' ? <Btn small tone="ghost" label="Import ATTrans Vendor List" onPress={doImportLegacyVendors} /> : null}
+        {tab === 'taxMaster' ? <Btn small tone="ghost" label="Import ATTrans Tax Master" onPress={doImportLegacyTaxMaster} /> : null}
         <Btn small label={ADD_LABEL[tab] || '+ Add'} tone="amber" onPress={add} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
@@ -336,6 +366,28 @@ export default function MastersScreen({ navigation, route }) {
                 type: <Badge text={v.type || 'VENDOR'} tone={v.type === 'AGENT' ? 'purple' : 'navy'} />,
                 createdBy: v.createdBy || '—',
                 actions: rowActions(() => editVendorDir(v), () => confirmDo('Delete ' + (v.name || v.vendorCode || 'this entry') + '?', () => update(d => removeById(d.vendorDirectory, v.id))))
+              }))}
+            />
+          ))}
+          {tab === 'taxMaster' && (!(db.taxMaster || []).length ? <Empty text="No tax master entries yet. Add one, or use “Import ATTrans Tax Master” above." /> : (
+            <Table
+              cols={[
+                { key: 'srNo', label: 'Sr No', width: 60 },
+                { key: 'sign', label: 'Sign', width: 60 },
+                { key: 'description', label: 'Description', width: 150 },
+                { key: 'accountGroup', label: 'Account', width: 160 },
+                { key: 'modules', label: 'Module', width: 260 },
+                { key: 'createdBy', label: 'Created By', width: 110 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={[...db.taxMaster].sort((a, b) => (a.srNo || 0) - (b.srNo || 0)).map(t => ({
+                srNo: t.srNo != null ? t.srNo : '—',
+                sign: <Badge text={t.sign === '-' ? '−' : '+'} tone={t.sign === '-' ? 'red' : 'green'} />,
+                description: <Text style={{ fontWeight: '700', color: C.navy }}>{t.description}</Text>,
+                accountGroup: t.accountGroup || '—',
+                modules: t.modules || '—',
+                createdBy: t.createdBy || '—',
+                actions: rowActions(() => editTax(t), () => confirmDo('Delete ' + (t.description || 'this entry') + '?', () => update(d => removeById(d.taxMaster, t.id))))
               }))}
             />
           ))}

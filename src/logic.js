@@ -166,7 +166,7 @@ export function blankDB(){
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
     lrs: [], lhcs: [], advances: [], acctExp: [], inquiries: [], bankTxns: [], billingBackup: [], truckMaster: [],
-    lenders: [], fixedExp: [], auditLog: [], vendorDirectory: [], bills: []
+    lenders: [], fixedExp: [], auditLog: [], vendorDirectory: [], bills: [], taxMaster: []
   };
 }
 
@@ -238,6 +238,60 @@ export function importLegacyTrucks(db){
     if (have[key]) return;
     have[key] = true;
     db.truckMaster.push({ id: uid('tm'), code, truckNo, ownerName: '', contactNo: '', panCard: false, rcNo: false, createdBy: '' });
+    added++;
+  });
+  return added;
+}
+
+/* ---------- Tax Master — ATTrans's "VIEW TAX DETAILS" register (15 rows,
+   screenshots dated 2026-08-26), imported wholesale as its own standalone
+   master, independent of BILL_CHG/BILL_PAYMENT_OPTIONS above. This register
+   is evidently the authoritative source those two static lists were drawn
+   from: rows 1-8 are exactly the original 8 LR Charges, rows 9-10 are the
+   2 new ones (Dock Charges, Extra Delivery), and rows 11-15 are deduction-side
+   entries (T P Mamul, Balance, Cash, TDS, Other Less) matching the shape of
+   a Payment Detail "deduction" row. Kept standalone for now, matching the
+   scope of what was asked (Masters tab + Add form) — BILL_CHG/
+   BILL_PAYMENT_OPTIONS are NOT wired to read from this yet; that would be a
+   reasonable follow-up if wanted, not assumed here.
+   Row shape: [srNo, sign, description, accountGroup, modules, createdBy] —
+   sign is '+' (adds to the bill) or '-' (deducts), modules is a comma-joined
+   list from the fixed TAX_MODULES set (mirrors ATTrans's own comma-joined
+   MODULE column and its Add New Tax form's checkbox set exactly).
+   Transcribed verbatim, including the source's own spelling — "GANERAL
+   SALES"/"GANERAL PURCHASE" and "HAMALI CHAGES"/"BALANCE CHAGES" are typos
+   in ATTrans itself, not transcription errors here. */
+export const TAX_MODULES = ['LR', 'LHC', 'BILL', 'MR', 'CONTRACT', 'BALANCE ADVICE', 'CONTRACT LHC', 'GANERAL SALES', 'GANERAL PURCHASE'];
+const ALL_TAX_MODULES = TAX_MODULES.join(',');
+
+export const LEGACY_TAX_MASTER = [
+  [1, '+', 'HAMALI', 'HAMALI CHAGES', ALL_TAX_MODULES, ''],
+  [2, '+', 'LOADING', 'LOADING CHARGES', ALL_TAX_MODULES, ''],
+  [3, '+', 'UNLOADING', 'UNLOADING CHARGES', ALL_TAX_MODULES, ''],
+  [4, '+', 'RTO CHALLAN', 'RTO CHALLAN CHARGES', ALL_TAX_MODULES, ''],
+  [5, '+', 'VARAI', 'VARAI CHARGES', ALL_TAX_MODULES, ''],
+  [6, '+', 'L R CHARGES', 'L R CHARGES', ALL_TAX_MODULES, ''],
+  [7, '+', 'DETENTION', 'DETENTION CHARGES', ALL_TAX_MODULES, ''],
+  [8, '+', 'OTHER ADD', 'OTHER ADD', ALL_TAX_MODULES, ''],
+  [9, '+', 'DOCK CHARGES', 'DOCK CHARGES', 'BILL', 'DEVELOPER'],
+  [10, '+', 'EXTRA DELIVERY', 'EXTRA DELIVERY', ALL_TAX_MODULES, 'DEVELOPER'],
+  [11, '-', 'T P MAMUL', 'T P MAMUL', ALL_TAX_MODULES, ''],
+  [12, '-', 'BALANCE', 'BALANCE CHAGES', ALL_TAX_MODULES, ''],
+  [13, '-', 'CASH', 'DRIVER CASH', ALL_TAX_MODULES, ''],
+  [14, '-', 'TDS', 'TDS PAYABLE', ALL_TAX_MODULES, ''],
+  [15, '-', 'OTHER LESS', 'OTHER LESS', ALL_TAX_MODULES, '']
+];
+
+/* Dedupes by ATTrans SR NO. — safe to re-run. */
+export function importLegacyTaxMaster(db){
+  db.taxMaster = db.taxMaster || [];
+  const have = {};
+  db.taxMaster.forEach(t => { if (t.srNo != null) have[t.srNo] = true; });
+  let added = 0;
+  LEGACY_TAX_MASTER.forEach(([srNo, sign, description, accountGroup, modules, createdBy]) => {
+    if (have[srNo]) return;
+    have[srNo] = true;
+    db.taxMaster.push({ id: uid('tx'), srNo, sign, description, accountGroup, modules, createdBy });
     added++;
   });
   return added;
@@ -912,6 +966,7 @@ export function migrate(db){
   if (!db.auditLog) db.auditLog = [];
   if (!db.vendorDirectory) db.vendorDirectory = [];
   if (!db.bills) db.bills = [];
+  if (!db.taxMaster) db.taxMaster = [];
   db.clients.forEach(c => { if (c.creditLimit === undefined) c.creditLimit = 0; });
   ensureBillingBackup(db);
   if (!db.seq.lhc) db.seq.lhc = 1;

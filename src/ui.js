@@ -446,7 +446,9 @@ export function DatePicker({ value, onChange, placeholder }) {
 }
 
 /* ---------- generic modal form ----------
-   form = { title, fields:[{key,label,type:'text'|'number'|'date'|'select'|'multiline',options:[{v,l}],required,hint,value}], onSubmit(values) }
+   form = { title, fields:[{key,label,type:'text'|'number'|'date'|'select'|'multiline'|'checkboxes',options:[{v,l}],required,hint,value}], onSubmit(values) }
+   'checkboxes' stores its value as a comma-joined string of selected option v's (e.g. "LR,BILL") — same
+   convention TAX_MODULES/Tax Master uses, so it round-trips straight to/from a plain text DB column.
 */
 /* Matches the HTML's #modalwrap/#modal: centered card, max-width 640, radius 12,
    padding 22/24, h3 title with amber underline, .frm 2-col field grid (collapsing to
@@ -522,6 +524,26 @@ export function ModalForm({ form, onClose }) {
                           <Text style={{ color: C.mut, marginLeft: 6, fontSize: 11 }}>▾</Text>
                         </TouchableOpacity>
                       )
+                    ) : f.type === 'checkboxes' ? (
+                      <View style={[S.wrapRow, { borderWidth: 1, borderColor: C.line2, borderRadius: 7, padding: 6, backgroundColor: '#fff' }]}>
+                        {(f.options || []).map(o => {
+                          const cur = String(vals[f.key] || '').split(',').filter(Boolean);
+                          const on = cur.indexOf(String(o.v)) >= 0;
+                          return (
+                            <TouchableOpacity key={String(o.v)} onPress={() => {
+                              const next = on ? cur.filter(x => x !== String(o.v)) : [...cur, String(o.v)];
+                              set(f.key, next.join(','));
+                            }} style={{
+                              flexDirection: 'row', alignItems: 'center', gap: 5,
+                              backgroundColor: on ? C.navy2 : '#fff', borderWidth: 1, borderColor: on ? C.navy2 : C.line2,
+                              borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 4
+                            }}>
+                              <Text style={{ fontSize: 11, color: on ? '#fff' : C.mut }}>{on ? '☑' : '☐'}</Text>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: on ? '#fff' : C.txt }}>{o.l}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
                     ) : f.type === 'date' ? (
                       <DatePicker value={vals[f.key]} onChange={v => set(f.key, v)} />
                     ) : (
