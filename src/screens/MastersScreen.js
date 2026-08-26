@@ -4,11 +4,12 @@ import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
 import {
   uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks, importLegacyVendors, LEGACY_VENDORS,
-  importLegacyTaxMaster, LEGACY_TAX_MASTER, TAX_MODULES, importLegacyAccountGroups, LEGACY_ACCOUNT_GROUPS
+  importLegacyTaxMaster, LEGACY_TAX_MASTER, TAX_MODULES, importLegacyAccountGroups, LEGACY_ACCOUNT_GROUPS,
+  importLegacyAccounts, LEGACY_ACCOUNTS
 } from '../logic';
 
-const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['vendorDirectory', 'Vendor Directory'], ['taxMaster', 'Tax Master'], ['accountGroups', 'Account Group'], ['routes', 'Routes'], ['branches', 'Branches']];
-const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', vendorDirectory: '+ Add Vendor (Directory)', taxMaster: '+ Add Tax', accountGroups: '+ Add Account Group', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
+const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['vendorDirectory', 'Vendor Directory'], ['taxMaster', 'Tax Master'], ['accountGroups', 'Account Group'], ['accounts', 'Account'], ['routes', 'Routes'], ['branches', 'Branches']];
+const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', vendorDirectory: '+ Add Vendor (Directory)', taxMaster: '+ Add Tax', accountGroups: '+ Add Account Group', accounts: '+ Add Account', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
 
 export default function MastersScreen({ navigation, route }) {
   const { db, update } = useStore();
@@ -98,6 +99,14 @@ export default function MastersScreen({ navigation, route }) {
     { key: 'status', label: 'Status', type: 'select', required: true, value: (g && g.status) || 'ACTIVE', options: [{ v: 'ACTIVE', l: 'ACTIVE' }, { v: 'IN-ACTIVE', l: 'IN-ACTIVE' }] },
     { key: 'createdBy', label: 'Created By', value: g && g.createdBy }
   ];
+  const accountFields = (a) => [
+    { key: 'code', label: 'Code', required: true, value: a && a.code, hint: 'e.g. ACT-0270' },
+    { key: 'description', label: 'Description', required: true, value: a && a.description },
+    { key: 'group', label: 'Group', required: true, value: a && a.group, hint: 'e.g. ASSETS, BANK, CASH, EXPENSES, INCOME, LIABILITIES, SUNDRY DEBTORS, SUNDRY CREDITORS' },
+    { key: 'openingDr', label: 'Opening (Dr.)', type: 'number', value: a && a.openingDr != null ? String(a.openingDr) : '0' },
+    { key: 'openingCr', label: 'Opening (Cr.)', type: 'number', value: a && a.openingCr != null ? String(a.openingCr) : '0' },
+    { key: 'createdBy', label: 'Created By', value: a && a.createdBy }
+  ];
   const routeFields = () => [
     { key: 'origin', label: 'Origin', required: true },
     { key: 'destination', label: 'Destination', required: true },
@@ -157,6 +166,17 @@ export default function MastersScreen({ navigation, route }) {
         d.accountGroups.push({ id: uid('ag'), srNo: maxSr + 1, name: String(v.name || '').toUpperCase(), parentId: v.parentId || '', status: v.status || 'ACTIVE', createdBy: v.createdBy });
       })
     });
+    else if (tab === 'accounts') setForm({
+      title: 'Add New Account', fields: accountFields(null),
+      onSubmit: v => update(d => {
+        d.accounts = d.accounts || [];
+        const maxSr = d.accounts.reduce((m, x) => Math.max(m, x.srNo || 0), 0);
+        d.accounts.push({
+          id: uid('acc'), srNo: maxSr + 1, code: v.code, description: v.description, group: String(v.group || '').toUpperCase(),
+          openingDr: Number(v.openingDr) || 0, openingCr: Number(v.openingCr) || 0, createdBy: v.createdBy
+        });
+      })
+    });
     else if (tab === 'branches') setForm({ title: 'Add Branch / Entity', fields: branchFields(null), onSubmit: v => update(d => d.branches.push({ ...v, id: uid('br'), name: String(v.name).toUpperCase() })) });
     else setForm({ title: 'Add Route', fields: routeFields(), onSubmit: v => update(d => d.routes.push({ ...v, id: uid('r') })) });
   };
@@ -197,6 +217,10 @@ export default function MastersScreen({ navigation, route }) {
     const added = importLegacyAccountGroups(d);
     setTimeout(() => alert('Account Groups imported', added + ' group(s) added' + (added < LEGACY_ACCOUNT_GROUPS.length ? ', ' + (LEGACY_ACCOUNT_GROUPS.length - added) + ' already on file (skipped).' : '.')), 100);
   });
+  const doImportLegacyAccounts = () => update(d => {
+    const added = importLegacyAccounts(d);
+    setTimeout(() => alert('Accounts imported', added + ' account(s) added' + (added < LEGACY_ACCOUNTS.length ? ', ' + (LEGACY_ACCOUNTS.length - added) + ' already on file (skipped).' : '.')), 100);
+  });
   const editDriver = (dd) => setForm({ title: 'Edit Driver', fields: driverFields(dd), onSubmit: v => update(d => { const x = byId(d.drivers, dd.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendor = (vv) => setForm({ title: 'Edit Vendor', fields: vendorFields(vv), onSubmit: v => update(d => { const x = byId(d.vendors, vv.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendorDir = (vv) => setForm({
@@ -218,6 +242,16 @@ export default function MastersScreen({ navigation, route }) {
     onSubmit: v => update(d => {
       const x = byId(d.accountGroups, g.id);
       if (x) { x.name = String(v.name || '').toUpperCase(); x.parentId = v.parentId || ''; x.status = v.status || 'ACTIVE'; x.createdBy = v.createdBy; }
+    })
+  });
+  const editAccount = (a) => setForm({
+    title: 'Edit ' + (a.description || a.code), fields: accountFields(a),
+    onSubmit: v => update(d => {
+      const x = byId(d.accounts, a.id);
+      if (x) {
+        x.code = v.code; x.description = v.description; x.group = String(v.group || '').toUpperCase();
+        x.openingDr = Number(v.openingDr) || 0; x.openingCr = Number(v.openingCr) || 0; x.createdBy = v.createdBy;
+      }
     })
   });
 
@@ -257,6 +291,7 @@ export default function MastersScreen({ navigation, route }) {
         {tab === 'vendorDirectory' ? <Btn small tone="ghost" label="Import ATTrans Vendor List" onPress={doImportLegacyVendors} /> : null}
         {tab === 'taxMaster' ? <Btn small tone="ghost" label="Import ATTrans Tax Master" onPress={doImportLegacyTaxMaster} /> : null}
         {tab === 'accountGroups' ? <Btn small tone="ghost" label="Import ATTrans Account Groups" onPress={doImportLegacyAccountGroups} /> : null}
+        {tab === 'accounts' ? <Btn small tone="ghost" label="Import ATTrans Accounts (266)" onPress={doImportLegacyAccounts} /> : null}
         <Btn small label={ADD_LABEL[tab] || '+ Add'} tone="amber" onPress={add} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
@@ -439,6 +474,30 @@ export default function MastersScreen({ navigation, route }) {
                 status: <Badge text={g.status === 'IN-ACTIVE' ? 'IN-ACTIVE' : 'ACTIVE'} tone={g.status === 'IN-ACTIVE' ? 'red' : 'green'} />,
                 createdBy: g.createdBy || '—',
                 actions: rowActions(() => editAccountGroup(g), () => confirmDo('Delete ' + (g.name || 'this entry') + '?', () => update(d => removeById(d.accountGroups, g.id))))
+              }))}
+            />
+          ))}
+          {tab === 'accounts' && (!(db.accounts || []).length ? <Empty text="No accounts yet. Add one, or use “Import ATTrans Accounts (266)” above." /> : (
+            <Table
+              cols={[
+                { key: 'srNo', label: 'Sr No', width: 60 },
+                { key: 'code', label: 'Code', width: 90 },
+                { key: 'description', label: 'Description', width: 260 },
+                { key: 'group', label: 'Group', width: 130 },
+                { key: 'openingDr', label: 'Opening (Dr.)', width: 100 },
+                { key: 'openingCr', label: 'Opening (Cr.)', width: 100 },
+                { key: 'createdBy', label: 'Created By', width: 110 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={[...db.accounts].sort((a, b) => (a.srNo || 0) - (b.srNo || 0)).map(a => ({
+                srNo: a.srNo != null ? a.srNo : '—',
+                code: <Text style={{ fontWeight: '700', color: C.navy }}>{a.code}</Text>,
+                description: a.description || '—',
+                group: <Badge text={a.group || '—'} tone="navy" />,
+                openingDr: (Number(a.openingDr) || 0).toFixed(2),
+                openingCr: (Number(a.openingCr) || 0).toFixed(2),
+                createdBy: a.createdBy || '—',
+                actions: rowActions(() => editAccount(a), () => confirmDo('Delete ' + (a.description || a.code || 'this entry') + '?', () => update(d => removeById(d.accounts, a.id))))
               }))}
             />
           ))}
