@@ -166,7 +166,7 @@ export function blankDB(){
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
     lrs: [], lhcs: [], advances: [], acctExp: [], inquiries: [], bankTxns: [], billingBackup: [], truckMaster: [],
-    lenders: [], fixedExp: [], auditLog: [], vendorDirectory: [], bills: [], taxMaster: [], accountGroups: [], accounts: []
+    lenders: [], fixedExp: [], auditLog: [], vendorDirectory: [], bills: [], taxMaster: [], accountGroups: [], accounts: [], lhcTrips: []
   };
 }
 
@@ -1292,6 +1292,90 @@ export function importLegacyBills(db){
   return { added, skippedNoVendor };
 }
 
+/* ---------- LHC (Lorry Hire Contract) trip — a NEW, independent module
+   mirroring ATTrans's own "ADD NEW LHC" form (screenshot dated 2026-08-26),
+   added as its own tab positioned right after LR / Consignment Notes.
+
+   This does NOT touch the existing db.lhcs / LHCScreen.js — an older,
+   simpler LHC form (vendorId + lorryHire/advance/tdsPct/payments) that isn't
+   even wired into the sidebar nav currently. Rather than reshape that
+   existing array/table to fit this much richer screenshot (header + LR
+   table + vehicle/insurance/permit fields + Driver/Owner Info + Payment
+   Detail + Expense grid) and risk breaking whatever depends on its current
+   shape, this is kept as its own db.lhcTrips array with its own Supabase
+   tables (lhc_trips / lhc_trip_lines / lhc_trip_payments / lhc_trip_expenses),
+   same "new tab, new module" pattern used for the Bill tab.
+
+   Row/field notes, flagged rather than guessed:
+   - AGENT options below are transcribed verbatim from ATTrans's own
+     <select name="agent"> dump, including its own duplicates/whitespace
+     quirks ("Railway  Booking" with a double space AND a separate
+     "Railway Booking" with a single space; "MITESHBHAI MUMBAI" has a
+     trailing space in the source). Not merged or cleaned up.
+   - LHC_PAYMENT_OPTIONS (the "---SELECT---" dropdown in the Payment Detail
+     rows) — ATTrans's real option list wasn't visible in the screenshot
+     (only the closed placeholder). Reused Bill's Payment Detail category
+     list as a reasonable placeholder; flagged as an assumption to verify
+     against ATTrans's actual LHC dropdown.
+   - The screenshot's "Pay To" field's real option list also wasn't visible,
+     so it's implemented as free text here rather than an invented dropdown.
+   - "IMAGE / Choose File" upload isn't implemented — this app has no file-
+     attachment infrastructure elsewhere; flagged, not built here. */
+export const LHC_AGENTS = [
+  'MITESHBHAI MUMBAI ',
+  'Shree shyam travels',
+  'Railway  Booking',
+  'Railway Booking',
+  'jayesh bharwad',
+  'MITESHBHAI',
+  'SHIVAM CARGO',
+  'jayhind roadways (dahej)',
+  'MANOJ PATNI',
+  'JIYA KAUNDAL',
+  'Mr. Mohan baria',
+  'JAGAT PANWAR',
+  'akshar roadlines',
+  'usman bhai',
+  'pooja roadlines',
+  'MR RAGHU BHARWAD'
+];
+export const LHC_PAYMENT_OPTIONS = ['TDS', 'ADVANCE ADJUSTMENT', 'COMMISSION', 'PENALTY / LATE DELIVERY', 'DAMAGE / SHORTAGE', 'INCENTIVE', 'OTHER'];
+
+export function blankLhcTripLine(){
+  return { id: uid('ltl'), lrId: '', lrNo: '', date: '', content: '', pkgs: '', weight: '' };
+}
+export function lhcTripLineFromLR(lr){
+  const pcs = (lr.goods || []).reduce((sum, g) => sum + (Number(g.pcs) || 0), 0);
+  return {
+    lrId: lr.id, lrNo: lr.lrNo, date: lr.date,
+    content: (lr.goods || []).map(g => g.desc).filter(Boolean).join(', '),
+    pkgs: pcs || '', weight: lr.cWeight || lr.aWeight || ''
+  };
+}
+export function blankLhcTrip(){
+  return {
+    id: '', lhcNo: '', date: todayISO(), truckNo: '', fromPlace: '', toPlace: '',
+    lines: [blankLhcTripLine()],
+    agent: '', lorryType: '', chasisNo: '', engineNo: '', permitNo: '', insuranceCo: '', branch: '', policyNo: '',
+    permitFrom: '', permitUpto: '', insuranceUpto: '',
+    driverName: '', driverAddress: '', driverLicNo: '', driverLicDate: '', driverIssuedFrom: '', driverMobile: '',
+    ownerName: '', ownerAddress: '', ownerPan: '', ownerMobile: '',
+    lorryHire: '', advance: '', additions: [], deductions: [], payTo: '',
+    expenses: [],
+    createdAt: ''
+  };
+}
+export function blankLhcExpense(){ return { id: uid('lte'), account: '', amount: '' }; }
+export function computeLhcTrip(trip){
+  const n = v => Number(v) || 0;
+  const totalAddition = (trip.additions || []).reduce((sum, a) => sum + n(a.amount), 0);
+  const totalDeduction = (trip.deductions || []).reduce((sum, a) => sum + n(a.amount), 0);
+  const totalExpense = (trip.expenses || []).reduce((sum, e) => sum + n(e.amount), 0);
+  const netAmount = n(trip.lorryHire) + totalAddition - totalDeduction;
+  const balanceAmount = netAmount - n(trip.advance);
+  return { totalAddition, totalDeduction, totalExpense, netAmount, balanceAmount };
+}
+
 export function blankLR(){
   return {
     id: '', bookingId: '', lrType: 'ORIGINAL', truckNo: '', lrNo: '', date: todayISO(),
@@ -1331,6 +1415,7 @@ export function migrate(db){
   if (!db.taxMaster) db.taxMaster = [];
   if (!db.accountGroups) db.accountGroups = [];
   if (!db.accounts) db.accounts = [];
+  if (!db.lhcTrips) db.lhcTrips = [];
   db.clients.forEach(c => { if (c.creditLimit === undefined) c.creditLimit = 0; });
   ensureBillingBackup(db);
   if (!db.seq.lhc) db.seq.lhc = 1;

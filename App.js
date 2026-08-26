@@ -15,6 +15,8 @@ import LRFormScreen from './src/screens/LRFormScreen';
 import LRImportScreen from './src/screens/LRImportScreen';
 import BillFormScreen from './src/screens/BillFormScreen';
 import BillListScreen from './src/screens/BillListScreen';
+import LHCTripFormScreen from './src/screens/LHCTripFormScreen';
+import LHCTripListScreen from './src/screens/LHCTripListScreen';
 import InquiriesScreen from './src/screens/InquiriesScreen';
 import BankingScreen from './src/screens/BankingScreen';
 import InvoiceImportScreen from './src/screens/InvoiceImportScreen';
@@ -59,6 +61,7 @@ const NAV_GROUPS = [
       ['Inquiries', 'Inquiries', '✆'],
       ['Bookings', 'Bookings', '▣'],
       ['LR / Consignment Notes', 'LR', '▤'],
+      ['LHC / Lorry Hire', 'LHCTrip', '🚚'],
       ['POD Update', 'POD', '✓'],
       ['Bill / Invoice', 'Bill', '▦'],
     ]
@@ -102,6 +105,8 @@ const TITLES = {
   Bill: 'Bill / Invoice',
   BillList: 'Bill Details',
   LHC: 'LHC / Truck Hire',
+  LHCTrip: 'LHC / Lorry Hire',
+  LHCTripList: 'LHC Details',
   Hired: 'Hired Vehicles',
   AccDash: 'Accounts Dashboard',
   Banking: 'Banking / Reconciliation',
@@ -273,6 +278,8 @@ function WebShell({ navigationRef, routeName }) {
           <Stack.Screen name="LRImport" component={LRImportScreen} options={{ title: 'Import LRs (CSV / Excel)' }} />
           <Stack.Screen name="Bill" component={BillFormScreen} options={{ title: 'Bill / Invoice' }} />
           <Stack.Screen name="BillList" component={BillListScreen} options={{ title: 'Bill Details' }} />
+          <Stack.Screen name="LHCTrip" component={LHCTripFormScreen} options={{ title: 'LHC / Lorry Hire' }} />
+          <Stack.Screen name="LHCTripList" component={LHCTripListScreen} options={{ title: 'LHC Details' }} />
           <Stack.Screen name="Inquiries" component={InquiriesScreen} />
           <Stack.Screen name="Banking" component={BankingScreen} options={{ title: 'Banking / Reconciliation' }} />
           <Stack.Screen name="InvoiceImport" component={InvoiceImportScreen} options={{ title: 'Import Invoices (CSV)' }} />
@@ -311,6 +318,8 @@ function MobileShell() {
       <Stack.Screen name="LRImport" component={LRImportScreen} options={{ title: 'Import LRs (CSV / Excel)' }} />
       <Stack.Screen name="Bill" component={BillFormScreen} options={{ title: 'Bill / Invoice' }} />
       <Stack.Screen name="BillList" component={BillListScreen} options={{ title: 'Bill Details' }} />
+      <Stack.Screen name="LHCTrip" component={LHCTripFormScreen} options={{ title: 'LHC / Lorry Hire' }} />
+      <Stack.Screen name="LHCTripList" component={LHCTripListScreen} options={{ title: 'LHC Details' }} />
       <Stack.Screen name="Inquiries" component={InquiriesScreen} />
       <Stack.Screen name="Banking" component={BankingScreen} options={{ title: 'Banking / Reconciliation' }} />
       <Stack.Screen name="InvoiceImport" component={InvoiceImportScreen} options={{ title: 'Import Invoices (CSV)' }} />

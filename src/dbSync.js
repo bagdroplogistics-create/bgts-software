@@ -489,6 +489,80 @@ async function pullBills() {
 }
 
 /* ============================================================
+   lhc_trips (NEW LHC / Lorry Hire Contract module — separate from the
+   older, unlinked lhcs table) — flat fields on lhc_trips, plus:
+     lhc_trip_lines      (lines[], replace-all, sort_order preserves order)
+     lhc_trip_payments   (additions[]/deductions[] sharing one table via `kind`)
+     lhc_trip_expenses   (expenses[], replace-all)
+   lhc_trip_lines.lr_id is a nullable read-only reference into lrs, mirroring
+   bill_lines.lr_id — never written back to the LR.
+   ============================================================ */
+const LHC_TRIP_DEF = { table: 'lhc_trips', fields: [
+  ['lhcNo','lhc_no','s'],['date','date','s'],['truckNo','truck_no','s'],['fromPlace','from_place','s'],['toPlace','to_place','s'],
+  ['agent','agent','s'],['lorryType','lorry_type','s'],['chasisNo','chasis_no','s'],['engineNo','engine_no','s'],
+  ['permitNo','permit_no','s'],['insuranceCo','insurance_co','s'],['branch','branch','s'],['policyNo','policy_no','s'],
+  ['permitFrom','permit_from','d'],['permitUpto','permit_upto','d'],['insuranceUpto','insurance_upto','d'],
+  ['driverName','driver_name','s'],['driverAddress','driver_address','s'],['driverLicNo','driver_lic_no','s'],
+  ['driverLicDate','driver_lic_date','d'],['driverIssuedFrom','driver_issued_from','s'],['driverMobile','driver_mobile','s'],
+  ['ownerName','owner_name','s'],['ownerAddress','owner_address','s'],['ownerPan','owner_pan','s'],['ownerMobile','owner_mobile','s'],
+  ['lorryHire','lorry_hire','nr'],['advance','advance','nr'],['payTo','pay_to','s'],
+  ['totalAddition','total_addition','nr'],['totalDeduction','total_deduction','nr'],['totalExpense','total_expense','nr'],
+  ['netAmount','net_amount','nr'],['balanceAmount','balance_amount','nr']
+] };
+
+async function syncLhcTrips(prevArr, nextArr) {
+  const { changed, deletedIds } = diffById(prevArr, nextArr);
+  for (const t of changed) {
+    await upsert('lhc_trips', [toRow(t, LHC_TRIP_DEF)]);
+
+    await replaceChildren('lhc_trip_lines', 'lhc_trip_id', t.id, (t.lines || []).map((l, i) => ({
+      lhc_trip_id: t.id, sort_order: i, lr_id: fk(l.lrId), lr_no: s(l.lrNo), date: dateOpt(l.date),
+      content: s(l.content), pkgs: numOpt(l.pkgs), weight: numOpt(l.weight)
+    })));
+
+    const payRows = [
+      ...(t.additions || []).map((a, i) => ({ lhc_trip_id: t.id, kind: 'addition', sort_order: i, type: s(a.type), amount: numReq(a.amount) })),
+      ...(t.deductions || []).map((a, i) => ({ lhc_trip_id: t.id, kind: 'deduction', sort_order: i, type: s(a.type), amount: numReq(a.amount) }))
+    ];
+    await replaceChildren('lhc_trip_payments', 'lhc_trip_id', t.id, payRows);
+
+    await replaceChildren('lhc_trip_expenses', 'lhc_trip_id', t.id, (t.expenses || []).map((e, i) => ({
+      lhc_trip_id: t.id, sort_order: i, account: s(e.account), amount: numReq(e.amount)
+    })));
+  }
+  if (deletedIds.length) await del('lhc_trips', deletedIds); // children cascade-delete
+}
+async function pullLhcTrips() {
+  const [rows, lines, payments, expenses] = await Promise.all([
+    fetchAll('lhc_trips'), fetchAll('lhc_trip_lines'), fetchAll('lhc_trip_payments'), fetchAll('lhc_trip_expenses')
+  ]);
+  const linesByTrip = byKey(lines, 'lhc_trip_id');
+  const payByTrip = byKey(payments, 'lhc_trip_id');
+  const expByTrip = byKey(expenses, 'lhc_trip_id');
+
+  return rows.map(r => {
+    const rec = fromRow(r, LHC_TRIP_DEF);
+
+    rec.lines = (linesByTrip[r.id] || []).slice().sort((a, b2) => a.sort_order - b2.sort_order).map(l => ({
+      id: l.id, lrId: l.lr_id || '', lrNo: l.lr_no || '', date: l.date || '', content: l.content || '',
+      pkgs: l.pkgs == null ? '' : String(l.pkgs), weight: l.weight == null ? '' : String(l.weight)
+    }));
+
+    const pays = payByTrip[r.id] || [];
+    rec.additions = pays.filter(p => p.kind === 'addition').sort((a, b2) => a.sort_order - b2.sort_order)
+      .map(p => ({ id: p.id, type: p.type || '', amount: p.amount == null ? '' : String(p.amount) }));
+    rec.deductions = pays.filter(p => p.kind === 'deduction').sort((a, b2) => a.sort_order - b2.sort_order)
+      .map(p => ({ id: p.id, type: p.type || '', amount: p.amount == null ? '' : String(p.amount) }));
+
+    rec.expenses = (expByTrip[r.id] || []).slice().sort((a, b2) => a.sort_order - b2.sort_order).map(e => ({
+      id: e.id, account: e.account || '', amount: e.amount == null ? '' : String(e.amount)
+    }));
+
+    return rec;
+  });
+}
+
+/* ============================================================
    billing backup — one-time seed only, app never mutates it after
    ensureBillingBackup() runs once in logic.js's migrate().
    ============================================================ */
@@ -563,18 +637,18 @@ export async function pullDb() {
   const [
     seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups, accounts
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups, accounts, lhcTrips
   ] = await Promise.all([
     pullSeq(), pullFlat(FLAT.clients), pullFlat(FLAT.vehicles), pullFlat(FLAT.drivers), pullFlat(FLAT.vendors),
     pullFlat(FLAT.routes), pullFlat(FLAT.branches), pullContracts(), pullFlat(FLAT.bookings), pullFlat(FLAT.expenses),
     pullFlat(FLAT.renewals), pullInvoices(), pullFlat(FLAT.payments), pullLRs(), pullLHCs(), pullFlat(FLAT.advances),
     pullFlat(FLAT.acctExp), pullFlat(FLAT.inquiries), pullFlat(FLAT.bankTxns), pullBillingBackup(), pullFlat(FLAT.truckMaster),
-    pullFlat(FLAT.lenders), pullFlat(FLAT.fixedExp), pullFlat(FLAT.auditLog), pullFlat(FLAT.vendorDirectory), pullBills(), pullFlat(FLAT.taxMaster), pullFlat(FLAT.accountGroups), pullFlat(FLAT.accounts)
+    pullFlat(FLAT.lenders), pullFlat(FLAT.fixedExp), pullFlat(FLAT.auditLog), pullFlat(FLAT.vendorDirectory), pullBills(), pullFlat(FLAT.taxMaster), pullFlat(FLAT.accountGroups), pullFlat(FLAT.accounts), pullLhcTrips()
   ]);
   return {
     company, seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups, accounts, regSeeded: true, pdfRecon: '2026-08-07'
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups, accounts, lhcTrips, regSeeded: true, pdfRecon: '2026-08-07'
   };
 }
 
@@ -612,6 +686,7 @@ export async function seedIfEmpty(db) {
   await syncFlat('taxMaster', FLAT.taxMaster, [], db.taxMaster);
   await syncFlat('accountGroups', FLAT.accountGroups, [], db.accountGroups);
   await syncFlat('accounts', FLAT.accounts, [], db.accounts);
+  await syncLhcTrips([], db.lhcTrips); // after lrs (lhc_trip_lines.lr_id fk)
   await seedBillingBackupIfEmpty(db.billingBackup);
 }
 
@@ -655,5 +730,6 @@ export async function pushDb(prevDb, nextDb) {
   await syncFlat('taxMaster', FLAT.taxMaster, prevDb.taxMaster, nextDb.taxMaster);
   await syncFlat('accountGroups', FLAT.accountGroups, prevDb.accountGroups, nextDb.accountGroups);
   await syncFlat('accounts', FLAT.accounts, prevDb.accounts, nextDb.accounts);
+  await syncLhcTrips(prevDb.lhcTrips, nextDb.lhcTrips);
   // billingBackup is intentionally not synced here — see seedBillingBackupIfEmpty.
 }
