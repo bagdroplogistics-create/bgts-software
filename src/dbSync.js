@@ -146,6 +146,9 @@ const FLAT = {
   taxMaster: { table: 'tax_master', fields: [
     ['srNo','sr_no','nr'],['sign','sign','s'],['description','description','s'],['accountGroup','account_group','s'],
     ['modules','modules','s'],['createdBy','created_by','s']
+  ] },
+  accountGroups: { table: 'account_groups', fields: [
+    ['srNo','sr_no','nr'],['name','name','s'],['parentId','parent_id','fk'],['status','status','s'],['createdBy','created_by','s']
   ] }
 };
 
@@ -556,18 +559,18 @@ export async function pullDb() {
   const [
     seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups
   ] = await Promise.all([
     pullSeq(), pullFlat(FLAT.clients), pullFlat(FLAT.vehicles), pullFlat(FLAT.drivers), pullFlat(FLAT.vendors),
     pullFlat(FLAT.routes), pullFlat(FLAT.branches), pullContracts(), pullFlat(FLAT.bookings), pullFlat(FLAT.expenses),
     pullFlat(FLAT.renewals), pullInvoices(), pullFlat(FLAT.payments), pullLRs(), pullLHCs(), pullFlat(FLAT.advances),
     pullFlat(FLAT.acctExp), pullFlat(FLAT.inquiries), pullFlat(FLAT.bankTxns), pullBillingBackup(), pullFlat(FLAT.truckMaster),
-    pullFlat(FLAT.lenders), pullFlat(FLAT.fixedExp), pullFlat(FLAT.auditLog), pullFlat(FLAT.vendorDirectory), pullBills(), pullFlat(FLAT.taxMaster)
+    pullFlat(FLAT.lenders), pullFlat(FLAT.fixedExp), pullFlat(FLAT.auditLog), pullFlat(FLAT.vendorDirectory), pullBills(), pullFlat(FLAT.taxMaster), pullFlat(FLAT.accountGroups)
   ]);
   return {
     company, seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, regSeeded: true, pdfRecon: '2026-08-07'
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups, regSeeded: true, pdfRecon: '2026-08-07'
   };
 }
 
@@ -603,6 +606,7 @@ export async function seedIfEmpty(db) {
   await syncFlat('vendorDirectory', FLAT.vendorDirectory, [], db.vendorDirectory);
   await syncBills([], db.bills); // after lrs (bill_lines.lr_id fk) and vendorDirectory (bills.vendor_id fk)
   await syncFlat('taxMaster', FLAT.taxMaster, [], db.taxMaster);
+  await syncFlat('accountGroups', FLAT.accountGroups, [], db.accountGroups);
   await seedBillingBackupIfEmpty(db.billingBackup);
 }
 
@@ -644,5 +648,6 @@ export async function pushDb(prevDb, nextDb) {
   await syncFlat('vendorDirectory', FLAT.vendorDirectory, prevDb.vendorDirectory, nextDb.vendorDirectory);
   await syncBills(prevDb.bills, nextDb.bills);
   await syncFlat('taxMaster', FLAT.taxMaster, prevDb.taxMaster, nextDb.taxMaster);
+  await syncFlat('accountGroups', FLAT.accountGroups, prevDb.accountGroups, nextDb.accountGroups);
   // billingBackup is intentionally not synced here — see seedBillingBackupIfEmpty.
 }

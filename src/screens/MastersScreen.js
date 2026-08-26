@@ -4,11 +4,11 @@ import { useStore } from '../store';
 import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert } from '../ui';
 import {
   uid, fmtDate, daysTo, driverName, byId, removeById, importLegacyTrucks, importLegacyVendors, LEGACY_VENDORS,
-  importLegacyTaxMaster, LEGACY_TAX_MASTER, TAX_MODULES
+  importLegacyTaxMaster, LEGACY_TAX_MASTER, TAX_MODULES, importLegacyAccountGroups, LEGACY_ACCOUNT_GROUPS
 } from '../logic';
 
-const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['vendorDirectory', 'Vendor Directory'], ['taxMaster', 'Tax Master'], ['routes', 'Routes'], ['branches', 'Branches']];
-const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', vendorDirectory: '+ Add Vendor (Directory)', taxMaster: '+ Add Tax', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
+const TABS = [['clients', 'Clients'], ['vehicles', 'Vehicles'], ['trucks', 'Trucks'], ['drivers', 'Drivers'], ['vendors', 'Vendors'], ['vendorDirectory', 'Vendor Directory'], ['taxMaster', 'Tax Master'], ['accountGroups', 'Account Group'], ['routes', 'Routes'], ['branches', 'Branches']];
+const ADD_LABEL = { clients: '+ Add Client', vehicles: '+ Add Vehicle', trucks: '+ Add Truck', drivers: '+ Add Driver', vendors: '+ Add Vendor', vendorDirectory: '+ Add Vendor (Directory)', taxMaster: '+ Add Tax', accountGroups: '+ Add Account Group', routes: '+ Add Route', branches: '+ Add Branch / Entity' };
 
 export default function MastersScreen({ navigation, route }) {
   const { db, update } = useStore();
@@ -87,6 +87,17 @@ export default function MastersScreen({ navigation, route }) {
     { key: 'modules', label: 'Module', type: 'checkboxes', full: true, value: t && t.modules, options: TAX_MODULES.map(m => ({ v: m, l: m })) },
     { key: 'createdBy', label: 'Created By', value: t && t.createdBy }
   ];
+  const accountGroupFields = (g) => [
+    { key: 'name', label: 'Name', required: true, value: g && g.name, hint: 'e.g. ASSETS, BANK, CASH, EXPENSES, INCOME, LIABILITIES' },
+    {
+      key: 'parentId', label: 'Parent', value: g && g.parentId, type: 'select',
+      options: [{ v: '', l: '— none (top level) —' }].concat(
+        (db.accountGroups || []).filter(x => !g || x.id !== g.id).map(x => ({ v: x.id, l: x.name }))
+      )
+    },
+    { key: 'status', label: 'Status', type: 'select', required: true, value: (g && g.status) || 'ACTIVE', options: [{ v: 'ACTIVE', l: 'ACTIVE' }, { v: 'IN-ACTIVE', l: 'IN-ACTIVE' }] },
+    { key: 'createdBy', label: 'Created By', value: g && g.createdBy }
+  ];
   const routeFields = () => [
     { key: 'origin', label: 'Origin', required: true },
     { key: 'destination', label: 'Destination', required: true },
@@ -138,6 +149,14 @@ export default function MastersScreen({ navigation, route }) {
         d.taxMaster.push({ id: uid('tx'), srNo: maxSr + 1, sign: v.sign || '+', description: v.description, accountGroup: v.accountGroup, modules: v.modules || '', createdBy: v.createdBy });
       })
     });
+    else if (tab === 'accountGroups') setForm({
+      title: 'Add New Account Group Details', fields: accountGroupFields(null),
+      onSubmit: v => update(d => {
+        d.accountGroups = d.accountGroups || [];
+        const maxSr = d.accountGroups.reduce((m, x) => Math.max(m, x.srNo || 0), 0);
+        d.accountGroups.push({ id: uid('ag'), srNo: maxSr + 1, name: String(v.name || '').toUpperCase(), parentId: v.parentId || '', status: v.status || 'ACTIVE', createdBy: v.createdBy });
+      })
+    });
     else if (tab === 'branches') setForm({ title: 'Add Branch / Entity', fields: branchFields(null), onSubmit: v => update(d => d.branches.push({ ...v, id: uid('br'), name: String(v.name).toUpperCase() })) });
     else setForm({ title: 'Add Route', fields: routeFields(), onSubmit: v => update(d => d.routes.push({ ...v, id: uid('r') })) });
   };
@@ -174,6 +193,10 @@ export default function MastersScreen({ navigation, route }) {
     const added = importLegacyTaxMaster(d);
     setTimeout(() => alert('Tax Master imported', added + ' entr' + (added === 1 ? 'y' : 'ies') + ' added' + (added < LEGACY_TAX_MASTER.length ? ', ' + (LEGACY_TAX_MASTER.length - added) + ' already on file (skipped).' : '.')), 100);
   });
+  const doImportLegacyAccountGroups = () => update(d => {
+    const added = importLegacyAccountGroups(d);
+    setTimeout(() => alert('Account Groups imported', added + ' group(s) added' + (added < LEGACY_ACCOUNT_GROUPS.length ? ', ' + (LEGACY_ACCOUNT_GROUPS.length - added) + ' already on file (skipped).' : '.')), 100);
+  });
   const editDriver = (dd) => setForm({ title: 'Edit Driver', fields: driverFields(dd), onSubmit: v => update(d => { const x = byId(d.drivers, dd.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendor = (vv) => setForm({ title: 'Edit Vendor', fields: vendorFields(vv), onSubmit: v => update(d => { const x = byId(d.vendors, vv.id); if (x) Object.keys(v).forEach(k => { x[k] = v[k]; }); }) });
   const editVendorDir = (vv) => setForm({
@@ -188,6 +211,13 @@ export default function MastersScreen({ navigation, route }) {
     onSubmit: v => update(d => {
       const x = byId(d.taxMaster, t.id);
       if (x) { x.sign = v.sign || '+'; x.description = v.description; x.accountGroup = v.accountGroup; x.modules = v.modules || ''; x.createdBy = v.createdBy; }
+    })
+  });
+  const editAccountGroup = (g) => setForm({
+    title: 'Edit ' + g.name, fields: accountGroupFields(g),
+    onSubmit: v => update(d => {
+      const x = byId(d.accountGroups, g.id);
+      if (x) { x.name = String(v.name || '').toUpperCase(); x.parentId = v.parentId || ''; x.status = v.status || 'ACTIVE'; x.createdBy = v.createdBy; }
     })
   });
 
@@ -226,6 +256,7 @@ export default function MastersScreen({ navigation, route }) {
         {tab === 'trucks' ? <Btn small tone="ghost" label="Import Legacy Truck List" onPress={doImportLegacyTrucks} /> : null}
         {tab === 'vendorDirectory' ? <Btn small tone="ghost" label="Import ATTrans Vendor List" onPress={doImportLegacyVendors} /> : null}
         {tab === 'taxMaster' ? <Btn small tone="ghost" label="Import ATTrans Tax Master" onPress={doImportLegacyTaxMaster} /> : null}
+        {tab === 'accountGroups' ? <Btn small tone="ghost" label="Import ATTrans Account Groups" onPress={doImportLegacyAccountGroups} /> : null}
         <Btn small label={ADD_LABEL[tab] || '+ Add'} tone="amber" onPress={add} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 14, paddingTop: 6, paddingBottom: 60 }}>
@@ -388,6 +419,26 @@ export default function MastersScreen({ navigation, route }) {
                 modules: t.modules || '—',
                 createdBy: t.createdBy || '—',
                 actions: rowActions(() => editTax(t), () => confirmDo('Delete ' + (t.description || 'this entry') + '?', () => update(d => removeById(d.taxMaster, t.id))))
+              }))}
+            />
+          ))}
+          {tab === 'accountGroups' && (!(db.accountGroups || []).length ? <Empty text="No account groups yet. Add one, or use “Import ATTrans Account Groups” above." /> : (
+            <Table
+              cols={[
+                { key: 'srNo', label: 'Sr No', width: 60 },
+                { key: 'name', label: 'Name', width: 200 },
+                { key: 'parent', label: 'Parent', width: 160 },
+                { key: 'status', label: 'Status', width: 100 },
+                { key: 'createdBy', label: 'Created By', width: 110 },
+                { key: 'actions', label: '', width: 150 }
+              ]}
+              rows={[...db.accountGroups].sort((a, b) => (a.srNo || 0) - (b.srNo || 0)).map(g => ({
+                srNo: g.srNo != null ? g.srNo : '—',
+                name: <Text style={{ fontWeight: '700', color: C.navy }}>{g.name}</Text>,
+                parent: (byId(db.accountGroups, g.parentId) || {}).name || '—',
+                status: <Badge text={g.status === 'IN-ACTIVE' ? 'IN-ACTIVE' : 'ACTIVE'} tone={g.status === 'IN-ACTIVE' ? 'red' : 'green'} />,
+                createdBy: g.createdBy || '—',
+                actions: rowActions(() => editAccountGroup(g), () => confirmDo('Delete ' + (g.name || 'this entry') + '?', () => update(d => removeById(d.accountGroups, g.id))))
               }))}
             />
           ))}

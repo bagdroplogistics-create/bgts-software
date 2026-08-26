@@ -166,7 +166,7 @@ export function blankDB(){
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
     lrs: [], lhcs: [], advances: [], acctExp: [], inquiries: [], bankTxns: [], billingBackup: [], truckMaster: [],
-    lenders: [], fixedExp: [], auditLog: [], vendorDirectory: [], bills: [], taxMaster: []
+    lenders: [], fixedExp: [], auditLog: [], vendorDirectory: [], bills: [], taxMaster: [], accountGroups: []
   };
 }
 
@@ -294,6 +294,48 @@ export function importLegacyTaxMaster(db){
     db.taxMaster.push({ id: uid('tx'), srNo, sign, description, accountGroup, modules, createdBy });
     added++;
   });
+  return added;
+}
+
+/* ---------- Account Group — ATTrans's "VIEW ACCOUNT GROUP DETAILS" register
+   (6 rows, screenshots dated 2026-08-26), imported as its own standalone
+   chart-of-accounts master. Distinct from Tax Master's free-text "Account"
+   field above (that field was left as-is, unlinked, per the original scope —
+   see the note on LEGACY_TAX_MASTER); this is the real hierarchical group
+   list ATTrans's own "PARENT" dropdown draws from.
+   Row shape: [srNo, name, parentSrNo, status, createdBy] — parentSrNo is
+   null for a top-level group, else another row's srNo. Resolved to a live
+   parentId (not a hardcoded uid) at import time, same pattern as
+   importLegacyBills resolving vendor srNo -> live vendor id. */
+export const LEGACY_ACCOUNT_GROUPS = [
+  [1, 'ASSETS', null, 'ACTIVE', ''],
+  [2, 'BANK', null, 'ACTIVE', ''],
+  [3, 'CASH', null, 'ACTIVE', ''],
+  [4, 'EXPENSES', null, 'ACTIVE', ''],
+  [5, 'INCOME', null, 'ACTIVE', ''],
+  [6, 'LIABILITIES', null, 'ACTIVE', '']
+];
+
+/* Dedupes by ATTrans SR NO. — safe to re-run. Two-pass so a later row's
+   PARENT (given as another row's srNo) resolves to the real live id of an
+   already-imported group, even across separate import runs. */
+export function importLegacyAccountGroups(db){
+  db.accountGroups = db.accountGroups || [];
+  const have = {};
+  const bySr = {};
+  db.accountGroups.forEach(g => { if (g.srNo != null) { have[g.srNo] = true; bySr[g.srNo] = g; } });
+  let added = 0;
+  const pending = [];
+  LEGACY_ACCOUNT_GROUPS.forEach(([srNo, name, parentSrNo, status, createdBy]) => {
+    if (have[srNo]) return;
+    have[srNo] = true;
+    const g = { id: uid('ag'), srNo, name, parentId: '', status: status || 'ACTIVE', createdBy: createdBy || '' };
+    db.accountGroups.push(g);
+    bySr[srNo] = g;
+    pending.push([g, parentSrNo]);
+    added++;
+  });
+  pending.forEach(([g, parentSrNo]) => { if (parentSrNo != null && bySr[parentSrNo]) g.parentId = bySr[parentSrNo].id; });
   return added;
 }
 
@@ -967,6 +1009,7 @@ export function migrate(db){
   if (!db.vendorDirectory) db.vendorDirectory = [];
   if (!db.bills) db.bills = [];
   if (!db.taxMaster) db.taxMaster = [];
+  if (!db.accountGroups) db.accountGroups = [];
   db.clients.forEach(c => { if (c.creditLimit === undefined) c.creditLimit = 0; });
   ensureBillingBackup(db);
   if (!db.seq.lhc) db.seq.lhc = 1;
