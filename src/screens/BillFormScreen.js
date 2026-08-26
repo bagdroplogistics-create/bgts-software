@@ -116,11 +116,15 @@ function LrNoField({ value, db, onChangeText, onPick }) {
    button. Rendered inside a horizontal ScrollView so all 12 columns stay
    readable at their own width instead of being squeezed. */
 function BillLineRow({ l, i, db, onChange, onRemove, canRemove }) {
-  const cell = { borderWidth: 1, borderColor: C.line2, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 7, fontSize: 12, color: C.txt, backgroundColor: '#fff' };
+  const cell = { borderWidth: 1, borderColor: C.line2, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 7, fontSize: 12, color: C.txt, backgroundColor: '#fff', width: '100%' };
   const set = (k) => (t) => onChange(i, k, t);
-  const col = (w, child) => <View style={{ width: w, marginRight: 6 }}>{child}</View>;
+  /* Pure-CSS flex fill (same technique as ui.js's Table): each column grows
+     proportionally to its base width so the row stretches to fill the full
+     card width on wide screens, instead of sitting cramped at its intrinsic
+     pixel width with empty space to the right. */
+  const col = (w, child) => <View style={{ flexGrow: w, flexShrink: 0, flexBasis: 0, minWidth: w, marginRight: 6 }}>{child}</View>;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: C.line }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: C.line, width: '100%' }}>
       {col(26, <Text style={{ fontSize: 12, color: C.mut, textAlign: 'center', paddingTop: 8 }}>{i + 1}</Text>)}
       {col(112, <PickerField value={l.status} onChange={set('status')} placeholder="Status" options={BILL_STATUS_OPTIONS.map(x => ({ v: x, l: x }))} />)}
       {col(140, <LrNoField value={l.lrNo} db={db} onChangeText={set('lrNo')} onPick={(lr) => onChange(i, '__lr', lr)} />)}
@@ -232,12 +236,12 @@ export default function BillFormScreen({ navigation, route }) {
       </Card>
 
       <Card title="LR / Consignment Details">
-        <ScrollView horizontal showsHorizontalScrollIndicator style={{ width: '100%' }}>
-          <View>
-            <View style={{ flexDirection: 'row', backgroundColor: C.navy, borderRadius: 6, paddingVertical: 6, marginBottom: 4 }}>
-              {['#', 'Status', 'LR No', 'Date', 'From', 'To', 'Weight', 'Pcs', 'Rate', 'Amount', 'Other Chg', 'Remark', ''].map((h, idx) => (
-                <Text key={idx} style={{
-                  width: [26, 112, 140, 120, 120, 120, 85, 65, 85, 95, 110, 140, 40][idx], marginRight: 6,
+        <ScrollView horizontal showsHorizontalScrollIndicator style={{ width: '100%' }} contentContainerStyle={{ width: '100%', minWidth: '100%' }}>
+          <View style={{ width: '100%' }}>
+            <View style={{ flexDirection: 'row', backgroundColor: C.navy, borderRadius: 6, paddingVertical: 6, marginBottom: 4, width: '100%' }}>
+              {[['#', 26], ['Status', 112], ['LR No', 140], ['Date', 120], ['From', 120], ['To', 120], ['Weight', 85], ['Pcs', 65], ['Rate', 85], ['Amount', 95], ['Other Chg', 110], ['Remark', 140], ['', 40]].map(([h, w], idx) => (
+                <Text key={idx} numberOfLines={1} style={{
+                  flexGrow: w, flexShrink: 0, flexBasis: 0, minWidth: w, marginRight: 6,
                   color: '#fff', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', paddingHorizontal: 6
                 }}>{h}</Text>
               ))}
