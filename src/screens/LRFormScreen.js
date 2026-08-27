@@ -450,6 +450,7 @@ export default function LRFormScreen({ navigation, route }) {
           <Fld l="To Be Billed At" v={f.billedAt} set={set('billedAt')} />
         </Grid>
         <Chips l="LR Mode" v={f.lrMode} set={set('lrMode')} opts={['Door Delivery', 'Godown Delivery', 'Direct Delivery']} />
+        <Chips l="Transport Mode" v={f.transportMode} set={set('transportMode')} opts={['ROAD', 'RAIL', 'AIR', 'SEA']} />
         <Fld l="Delivery Address" v={f.deliveryAddress} set={set('deliveryAddress')} multi />
         <Grid min={220} max={2}>
           <Chips l="Billing Party" v={f.billingParty} set={set('billingParty')} opts={['Consignor', 'Consignee', 'Third Party']} />

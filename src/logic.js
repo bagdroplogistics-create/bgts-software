@@ -1,6 +1,7 @@
 /* BGTS-OS core business logic v2 — pure JS, no React Native imports.
    Shared data model with the web build (v1.2) + v2 additions: full LR entity,
    LHC (truck hire) with TDS 194C, driver advances, accounting expense heads. */
+import qrcode from 'qrcode-generator';
 
 export function pad(n){ return (n < 10 ? '0' : '') + n; }
 export function todayISO(){ const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
@@ -47,7 +48,12 @@ export function csvString(rows){
 /* ---------- v2 constants ---------- */
 export const EXP_HEADS = ['Fuel Expense', 'Toll & FASTag', 'Driver Salaries & Bhatta', 'Vehicle Repairs & Maintenance', 'Tyres & Spares', 'Vehicle Insurance & Permits', 'Loading & Unloading Charges', 'Hired Vehicle / Subcontractor', 'Warehouse Rent', 'Office & Admin', 'Telephone & Internet', 'Bank Fees and Charges', 'E-Way Bill / Compliance', 'Other Expenses'];
 export const PAY_THROUGH = ['Bank — Current A/c', 'Petty Cash', 'UPI', 'Credit (payable)'];
-export const LR_CHG = [['rateCh', 'RATE CHARGE'], ['freight', 'FREIGHT'], ['surcharge', 'SURCHARGE'], ['localCartage', 'LOCAL CARTAGE'], ['lastMile', 'LAST MILE FRT'], ['fov', 'FOV'], ['loading', 'LOADING'], ['unloading', 'UNLOADING'], ['handling', 'HANDLING'], ['gc', 'GC CHARGE'], ['other', 'OTHER'], ['ewayCh', 'E-WAY CHARGE'], ['aoc', 'AOC']];
+/* Labels kept Title Case (not ALL CAPS) — the on-screen form always displays
+   them uppercase anyway via Fld's own textTransform:'uppercase' CSS, so this
+   only affects the printed LR (lrHtml()), where these exact labels ("Freight",
+   "Local Cartage", "Loading CHG", etc.) are what the reference printed LR
+   format uses, and the charges ledger there is not auto-uppercased. */
+export const LR_CHG = [['rateCh', 'Rate Charge'], ['freight', 'Freight'], ['surcharge', 'Surcharge'], ['localCartage', 'Local Cartage'], ['lastMile', 'Last Mile Frt'], ['fov', 'FOV'], ['loading', 'Loading CHG'], ['unloading', 'Unloading CHG'], ['handling', 'Handling CHG'], ['gc', 'GC Charge'], ['other', 'Other Charge'], ['ewayCh', 'Eway Bill CHG'], ['aoc', 'AOC']];
 export const PKG_TYPES = ['', 'BOX', 'BAG', 'BUNDLE', 'DRUM', 'ROLL', 'PALLET', 'LOOSE', 'CASE', 'OTHER'];
 export const TRIP_EXP_CATS = ['Fuel', 'Toll/FASTag', 'Driver Salary/Bhatta', 'Loading/Unloading', 'Maintenance', 'Tyres', 'Other'];
 
@@ -161,7 +167,7 @@ export function lhcStatus(l){
 /* ---------- database ---------- */
 export function blankDB(){
   return {
-    company: { name: 'Baroda Goods Transport Service Pvt. Ltd.', addr: 'Vadodara, Gujarat, India', gstin: '', panNo: '', phone: '', email: '', lrPrefix: 'BRD/' },
+    company: { name: 'Baroda Goods Transport Service Pvt. Ltd.', addr: 'Vadodara, Gujarat, India', gstin: '', panNo: '', phone: '', email: '', website: '', lrPrefix: 'BRD/' },
     seq: { lr: 1, inv: 1, bk: 1, lhc: 1 },
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
@@ -1623,7 +1629,7 @@ export function blankLR(){
     consignee: { name: '', city: '', contact: '', pan: '', gst: '' },
     billingTo: { name: '', city: '', contact: '', pan: '', gst: '' },
     agent: '', billedAt: '', goods: [], aWeight: '', cWeight: '',
-    expenses: [], remark: '', employee: '', driverNo: '', preparedBy: '',
+    expenses: [], remark: '', employee: '', driverNo: '', preparedBy: '', transportMode: 'ROAD',
     charges: { abovePct: '', aboveCh: '', belowPct: '', belowCh: '', rate: '', rateCh: '', freight: '', surcharge: '', localCartage: '', lastMile: '', fov: '', loading: '', unloading: '', handling: '', gc: '', other: '', ewayCh: '', aoc: '' },
     igstPct: '', cgstPct: '', sgstPct: '',
     subTotal: 0, igstAmt: 0, cgstAmt: 0, sgstAmt: 0, gross: 0, pod: false,
@@ -1654,7 +1660,9 @@ export function migrate(db){
   if (!db.lhcTrips) db.lhcTrips = [];
   if (!db.lhcPayments) db.lhcPayments = [];
   if (db.company && db.company.panNo === undefined) db.company.panNo = '';
+  if (db.company && db.company.website === undefined) db.company.website = '';
   (db.branches || []).forEach(b => { if (b.panNo === undefined) b.panNo = ''; });
+  (db.lrs || []).forEach(l => { if (l.transportMode === undefined) l.transportMode = 'ROAD'; });
   db.clients.forEach(c => { if (c.creditLimit === undefined) c.creditLimit = 0; });
   ensureBillingBackup(db);
   if (!db.seq.lhc) db.seq.lhc = 1;
@@ -1970,7 +1978,7 @@ const IMP_ALIASES = {
   igst:'igstPct', igstpct:'igstPct', cgst:'cgstPct', cgstpct:'cgstPct', sgst:'sgstPct', sgstpct:'sgstPct',
   hirevendor:'hireVendor', vendor:'hireVendor', hireamount:'hireAmount', lorryhire:'hireAmount', hireadvance:'hireAdvance', advance:'hireAdvance',
   agent:'agent', tobilledat:'billedAt', billedat:'billedAt', remark:'remark', remarks:'remark',
-  employee:'employee', driverno:'driverNo', truckdriverno:'driverNo', preparedby:'preparedBy', privatemark:'privateMark',
+  employee:'employee', driverno:'driverNo', truckdriverno:'driverNo', preparedby:'preparedBy', mode:'transportMode', transportmode:'transportMode', privatemark:'privateMark',
   packing:'packing', methodofpacking:'packing', lorrytype:'lorryType', pod:'pod'
 };
 const p2 = n => { n = String(n); return n.length < 2 ? '0' + n : n; };
@@ -2051,7 +2059,7 @@ export function buildLRImportPlan(db, aoa){
       agent: o.agent || '', billedAt: o.billedAt || '',
       goods: o.cargo ? [{ desc: o.cargo, pkgType: o.pkgType || '', pcs: o.pkgs || '', aw: o.aw || '', cw: o.cw || o.aw || '', l: '', w: '', h: '' }] : [],
       aWeight: o.aw || '', cWeight: o.cw || o.aw || '',
-      remark: o.remark || '', employee: o.employee || '', driverNo: o.driverNo || '', preparedBy: o.preparedBy || '',
+      remark: o.remark || '', employee: o.employee || '', driverNo: o.driverNo || '', preparedBy: o.preparedBy || '', transportMode: o.transportMode || 'ROAD',
       charges, igstPct: impNum(o.igstPct), cgstPct: impNum(o.cgstPct), sgstPct: impNum(o.sgstPct),
       subTotal: t.subTotal, igstAmt: t.igstAmt, cgstAmt: t.cgstAmt, sgstAmt: t.sgstAmt, gross: t.gross,
       pod: /^(y|1|t)/i.test(o.pod || ''), ownership,
@@ -2513,6 +2521,32 @@ function bgtsLogoImg(logoUri, height){
   if (!logoUri) return '<div style="color:#fff;font-weight:800;font-size:' + Math.round(height * 0.4) + 'px;letter-spacing:.5px">BGTS-OS</div>';
   return '<img src="' + logoUri + '" alt="BGTS" style="height:' + height + 'px;width:auto;display:block" />';
 }
+/* Inline SVG QR code, built with the qrcode-generator library (pure JS, no
+   network/image request needed — the whole thing is just <rect> tags, so it
+   prints identically on native (expo-print) and web with zero extra assets).
+   text: the string to encode (kept short — LR No + company name); size: px.
+   Falls back to a blank bordered box if the text is empty or encoding fails
+   (e.g. text too long for the smallest QR version), never throws. */
+function qrSvg(text, size){
+  size = size || 84;
+  if (!text) return '<div style="width:' + size + 'px;height:' + size + 'px;border:1px dashed #a1a1aa"></div>';
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(String(text));
+    qr.make();
+    const n = qr.getModuleCount();
+    const cell = size / n;
+    let rects = '';
+    for (let r = 0; r < n; r++){
+      for (let c = 0; c < n; c++){
+        if (qr.isDark(r, c)) rects += '<rect x="' + (c * cell).toFixed(2) + '" y="' + (r * cell).toFixed(2) + '" width="' + cell.toFixed(2) + '" height="' + cell.toFixed(2) + '"/>';
+      }
+    }
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" xmlns="http://www.w3.org/2000/svg" style="background:#fff;fill:#111">' + rects + '</svg>';
+  } catch (e) {
+    return '<div style="width:' + size + 'px;height:' + size + 'px;border:1px dashed #a1a1aa"></div>';
+  }
+}
 /* Shared page chrome (branded header + base table/print styles) so every printable
    document — LR, receipt, and any future one — looks like one consistent, professional
    document family instead of each screen inventing its own look. */
@@ -2525,9 +2559,14 @@ function printDocStyle(){
     + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:11.5px;color:#111;margin:16px;background:#ececed}'
     + '.doc{border:2px solid #2b2b2f;border-radius:10px;overflow:hidden;max-width:800px;margin:0 auto;background:#fff}'
     + '.r{text-align:right}.muted{color:#71717a;font-style:italic}'
-    + '.head{background:#2b2b2f;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:3px solid #f6d048}'
-    + '.head .brand{display:flex;gap:12px;align-items:center}'
-    + '.head h1{margin:0;font-size:18px;letter-spacing:.2px}.head p{margin:3px 0 0;font-size:9.5px;color:#d4d4d8}'
+    + '.head{background:#2b2b2f;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;border-top:3px solid #f6d048}'
+    + '.head .brand{display:flex;gap:20px;align-items:center;flex:1.4;min-width:200px}'
+    + '.head h1{margin:0;font-size:16px;letter-spacing:.2px}.head p{margin:3px 0 0;font-size:9px;color:#d4d4d8}'
+    + '.headCol{flex:1;min-width:130px;font-size:10px;line-height:1.5}'
+    + '.headCol.mid{border-left:1px solid rgba(255,255,255,.25);border-right:1px solid rgba(255,255,255,.25);padding:0 14px}'
+    + '.headCol.right{flex:0 0 auto;text-align:center}'
+    + '.tag{margin:0 0 4px;font-size:8.5px;letter-spacing:.5px;text-transform:uppercase;color:#f6d048;font-weight:800}'
+    + '.headCol b.big{color:#f6d048;font-size:14px}'
     + '.num{text-align:right;font-size:11px;line-height:1.5;white-space:nowrap}.num b{color:#f6d048;font-size:15px}'
     + 'table{width:100%;border-collapse:collapse}'
     + 'td,th{border:1px solid #d4d4d8;padding:6px 8px;font-size:10.8px;text-align:left;vertical-align:top}'
@@ -2536,6 +2575,9 @@ function printDocStyle(){
     + '.totalsTbl td{border-color:#a1a1aa}'
     + '.grossRow td{background:#fbe9de;font-size:13px}'
     + '.terms{font-size:8.5px;color:#555;padding:9px 12px;border-top:1px solid #a1a1aa;background:#f7f7f7}'
+    + '.pageFooter{font-size:8.5px;color:#a1a1aa;font-style:italic;text-align:center;padding:6px 0}'
+    + '.sealBox{width:70px;height:70px;border:1px dashed #a1a1aa;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:7.5px;color:#a1a1aa;margin:6px auto 0;padding:4px}'
+    + '.sectionNote{font-size:8.5px;color:#71717a;padding:4px 8px}'
     + '@media print{ body{background:#fff;margin:0} .doc{border-radius:0;max-width:none} }';
 }
 
@@ -2550,7 +2592,7 @@ export function receiptHtml(db, p, logoUri){
   const co = { name: br.entityName || db.company.name, addr: br.addr || db.company.addr, gstin: br.gstin || db.company.gstin };
   const bal = inv.id ? invOutstanding(db, inv) : 0;
   return '<html><head><meta charset="utf-8"><title>Receipt ' + esc(p.mrNo || '') + '</title><style>' + printDocStyle() + '</style></head><body><div class="doc">'
-    + '<div class="head"><div class="brand">' + bgtsLogoImg(logoUri, 40) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + '</p><p>MONEY RECEIPT</p></div></div>'
+    + '<div class="head"><div class="brand">' + bgtsLogoImg(logoUri, 52) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + '</p><p>MONEY RECEIPT</p></div></div>'
     + '<div class="num">Receipt No.<br><b>' + esc(p.mrNo || 'MR') + '</b><br>Date: ' + fmtDate(p.date) + '</div></div>'
     + '<table><tr><th style="width:35%">Received with thanks from</th><td><b>' + esc(clientName(db, inv.clientId)) + '</b></td></tr>'
     + '<tr><th>The sum of</th><td><b>' + inr(p.amount) + '</b><br><span style="font-size:10px;color:#555">Rupees ' + esc(numWordsIN(p.amount)) + ' Only</span></td></tr>'
@@ -2564,55 +2606,134 @@ export function receiptHtml(db, p, logoUri){
 /* ---------- LR document HTML (full v2 format, for PDF sharing) ---------- */
 /* logoUri: optional data: URI from src/logoAsset.js's getLogoDataUri() — see
    the same note on receiptHtml() above. */
+/* Field/label parity note: this mirrors, field-for-field and label-for-label,
+   the reference printed LR format (white "GC NO." style consignment note),
+   restyled in BGTS-OS's own dark-navy/yellow brand rather than the
+   reference's plain black-and-white grid — same content, new look. A few
+   labels (e.g. "Billed To (Service Reciever)") keep the reference's exact
+   wording, typo included, since matching the label text exactly was the
+   point. Fields this app already tracked that AREN'T in the reference
+   (Booking/To Branch, Lorry Type, Employee, Truck Driver No, Inv./E-Way
+   sub-dates, Packing, Agent, To Be Billed At) are kept as an additional
+   "extra details" block near the bottom rather than dropped, so nothing
+   already useful is lost. Two flagged simplifications: (1) Consignor/
+   Consignee/Billed To only carry name/city/phone/GSTIN/PAN today — the
+   reference's full multi-line street address isn't a field this app's
+   party forms collect yet; (2) "GC No." reuses this app's own LR numbering
+   (Company Settings → LR Number Prefix), not the reference sample's literal
+   numbering scheme, since changing the live numbering convention wasn't
+   asked for. */
 export function lrHtml(db, l, logoUri){
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const br = byId(db.branches || [], l.branchId) || {};
-  const co = { name: br.entityName || db.company.name, addr: br.addr || db.company.addr, gstin: br.gstin || db.company.gstin, panNo: br.panNo || db.company.panNo, phone: br.phone || db.company.phone };
+  const co = {
+    name: br.entityName || db.company.name, addr: br.addr || db.company.addr, gstin: br.gstin || db.company.gstin,
+    panNo: br.panNo || db.company.panNo, phone: br.phone || db.company.phone,
+    email: db.company.email, website: db.company.website
+  };
   const party = p => {
     p = p || {};
     let s = '<b>' + esc(p.name || '—') + '</b>';
     if (p.city) s += '<br>' + esc(p.city);
     if (p.contact) s += '<br>Ph: ' + esc(p.contact);
-    if (p.gst) s += '<br>GST: ' + esc(p.gst);
-    if (p.pan) s += '<br>PAN: ' + esc(p.pan);
+    if (p.gst) s += '<br>GSTIN : ' + esc(p.gst);
+    if (p.pan) s += '<br>PAN : ' + esc(p.pan);
     return s;
   };
   const dims = g => (g.l || g.w || g.h) ? esc((g.l || '—') + ' × ' + (g.w || '—') + ' × ' + (g.h || '—')) : '—';
-  let goodsRows = '';
-  (l.goods || []).forEach((g, i) => {
-    goodsRows += '<tr><td>' + (i + 1) + '</td><td>' + esc(g.desc) + '</td><td>' + esc(g.pkgType || '—') + '</td><td class="r">' + esc(g.pcs || '—') + '</td><td class="r">' + esc(g.aw || '—') + '</td><td class="r">' + esc(g.cw || '—') + '</td><td class="r">' + dims(g) + '</td></tr>';
+  let goodsRows = '', pkgsTotal = 0;
+  (l.goods || []).forEach(g => {
+    pkgsTotal += Number(g.pcs) || 0;
+    const content = esc(g.desc || '—') + (g.pkgType && g.pkgType !== 'OTHER' ? ' <span class="muted">(' + esc(g.pkgType) + ')</span>' : '');
+    goodsRows += '<tr><td class="r">' + esc(g.pcs || '—') + '</td><td>' + content + '</td><td class="r">' + esc(g.aw || '—') + '</td><td class="r">' + esc(g.cw || '—') + '</td><td class="r">' + dims(g) + '</td></tr>';
   });
-  if (!goodsRows) goodsRows = '<tr><td colspan="7" class="muted">No goods rows recorded.</td></tr>';
-  let chg = ''; const ch = l.charges || {};
+  if (!goodsRows) goodsRows = '<tr><td colspan="5" class="muted">No goods rows recorded.</td></tr>';
+  const ch = l.charges || {};
+  /* Every fixed charge category always prints (even at 0.00) to match the
+     reference's fixed ledger layout, instead of only showing nonzero lines.
+     Above%/Below%/Rate are this app's own extras (not in the reference), so
+     those stay conditional — only shown when actually used on this LR. */
+  let chg = '';
   if (Number(ch.aboveCh)) chg += '<tr><td>Above ' + esc(ch.abovePct || '') + '%</td><td class="r">' + inr(ch.aboveCh) + '</td></tr>';
   if (Number(ch.belowCh)) chg += '<tr><td>Below ' + esc(ch.belowPct || '') + '%</td><td class="r">' + inr(ch.belowCh) + '</td></tr>';
-  LR_CHG.forEach(c => { if (Number(ch[c[0]])) chg += '<tr><td>' + c[1] + '</td><td class="r">' + inr(ch[c[0]]) + '</td></tr>'; });
-  if (!chg) chg = '<tr><td class="muted">No charge lines entered.</td><td class="r">—</td></tr>';
+  if (Number(ch.rateCh)) chg += '<tr><td>Rate Charge</td><td class="r">' + inr(ch.rateCh) + '</td></tr>';
+  LR_CHG.filter(c => c[0] !== 'rateCh').forEach(c => { chg += '<tr><td>' + c[1] + '</td><td class="r">' + inr(ch[c[0]] || 0) + '</td></tr>'; });
+  const qr = qrSvg(l.lrNo + ' | ' + co.name + (co.website ? ' | ' + co.website : ''), 56);
+
   return '<html><head><meta charset="utf-8"><title>LR ' + esc(l.lrNo) + '</title><style>' + printDocStyle()
     + '</style></head><body><div class="doc">'
-    + '<div class="head"><div class="brand">' + bgtsLogoImg(logoUri, 40) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + (co.panNo ? ' · PAN: ' + esc(co.panNo) : '') + (co.phone ? ' · Ph: ' + esc(co.phone) : '') + '</p>'
-    + '<p>CONSIGNMENT NOTE / LORRY RECEIPT — AT OWNER\'S RISK' + (l.lrType === 'DUMMY' ? ' — <b>DUMMY</b>' : '') + '</p></div></div>'
-    + '<div class="num">LR No.<br><b>' + esc(l.lrNo) + '</b><br>Date: ' + fmtDate(l.date) + '<br>' + esc(l.lrType) + '</div></div>'
-    + '<table><tr><th>Truck No</th><th>From</th><th>To</th><th>Booking Branch</th><th>To Branch</th><th>Lorry Type</th></tr>'
-    + '<tr><td><b>' + esc(l.truckNo) + '</b></td><td>' + esc(l.fromPlace) + '</td><td>' + esc(l.toPlace) + '</td><td>' + esc(l.bookingBranch || '—') + (br.addr ? '<br><span class="muted">' + esc(br.addr) + '</span>' : '') + '</td><td>' + esc(l.toBranch || '—') + '</td><td>' + esc(l.lorryType || '—') + '</td></tr></table>'
-    + '<table><tr><th style="width:33%">Consignor</th><th style="width:33%">Consignee</th><th>Billing To</th></tr>'
-    + '<tr><td>' + party(l.consignor) + '</td><td>' + party(l.consignee) + '</td><td>' + ((l.billingTo && l.billingTo.name) ? party(l.billingTo) : esc(l.billingParty || '—')) + '</td></tr></table>'
-    + '<table><tr><th>Invoice No</th><th>Inv. Amt</th><th>Inv. Date</th><th>E-Way No</th><th>E-Way Date</th><th>E-Way Expiry</th><th>P.O. Date</th></tr>'
-    + '<tr><td>' + esc(l.invoiceNo || '—') + '</td><td>' + (l.invAmount ? inr(l.invAmount) : '—') + '</td><td>' + fmtDate(l.invoiceDate) + '</td><td>' + esc(l.ewayBillNo || '—') + '</td><td>' + fmtDate(l.ewayBillDate) + '</td><td>' + fmtDate(l.ewayExDate) + '</td><td>' + fmtDate(l.poDate) + '</td></tr></table>'
-    + '<table><tr><th>#</th><th>Description</th><th>Pkgs Type</th><th>Pcs</th><th>Actual Wt</th><th>Charged Wt</th><th>L × W × H</th></tr>' + goodsRows
-    + '<tr><td colspan="4" class="r"><b>TOTAL</b></td><td class="r"><b>' + esc(l.aWeight || '—') + '</b></td><td class="r"><b>' + esc(l.cWeight || '—') + '</b></td><td></td></tr></table>'
-    + '<table><tr><th>Packing</th><th>Private Mark</th><th>LR Mode</th><th>GST Paid By</th><th>GST Slab</th><th>Insurance</th><th>Payment</th><th>Agent</th></tr>'
-    + '<tr><td>' + esc(l.packing || '—') + '</td><td>' + esc(l.privateMark || '—') + '</td><td>' + esc(l.lrMode || '—') + '</td><td>' + esc(l.gstPaidBy || '—') + '</td><td>' + esc(l.gstSlab || '—') + '</td><td>' + esc(l.insurance || '—') + '</td><td><b>' + esc(l.payTerms || '—') + '</b></td><td>' + esc(l.agent || '—') + '</td></tr></table>'
-    + (l.deliveryAddress ? '<table><tr><th>Delivery Address</th></tr><tr><td>' + esc(l.deliveryAddress) + '</td></tr></table>' : '')
-    + '<table class="totalsTbl"><tr><th colspan="2">Freight & Charges</th></tr>' + chg
-    + '<tr><td class="r"><b>SUB TOTAL</b></td><td class="r"><b>' + inr(l.subTotal) + '</b></td></tr>'
-    + (Number(l.igstAmt) ? '<tr><td class="r">IGST ' + l.igstPct + '%</td><td class="r">' + inr(l.igstAmt) + '</td></tr>' : '')
-    + (Number(l.cgstAmt) ? '<tr><td class="r">CGST ' + l.cgstPct + '%</td><td class="r">' + inr(l.cgstAmt) + '</td></tr>' : '')
-    + (Number(l.sgstAmt) ? '<tr><td class="r">SGST ' + l.sgstPct + '%</td><td class="r">' + inr(l.sgstAmt) + '</td></tr>' : '')
-    + '<tr class="grossRow"><td class="r"><b>GROSS AMOUNT</b></td><td class="r"><b>' + inr(l.gross) + '</b></td></tr></table>'
-    + (l.remark ? '<table><tr><th>Remarks</th></tr><tr><td>' + esc(l.remark) + '</td></tr></table>' : '')
-    + '<table><tr><th>Employee</th><th>Truck Driver No</th><th>Prepared By</th><th style="width:24%">Receiver Signature &amp; Stamp (POD)</th><th style="width:20%">For, ' + esc(co.name) + '</th></tr>'
-    + '<tr><td>' + esc(l.employee || '—') + '</td><td>' + esc(l.driverNo || '—') + '</td><td>' + esc(l.preparedBy || '—') + '</td><td class="sig"></td><td class="sig" style="text-align:center;vertical-align:bottom"><span class="muted" style="font-size:8.5px">Authorised Signatory</span></td></tr></table>'
+
+    /* ---- header: Head Office details / GC No. + Booking Office / At
+       Owner's Risk + QR — three columns, same info as the reference's top
+       band, restyled dark-navy + yellow instead of plain white. ---- */
+    + '<div class="head">'
+      + '<div class="brand">' + bgtsLogoImg(logoUri, 58) + '<div><h1>' + esc(co.name) + '</h1>'
+        + '<p>Head Office: ' + esc(db.company.addr) + '</p>'
+        + '<p>' + (co.phone ? 'Tele: ' + esc(co.phone) : '') + '</p>'
+        + '<p>' + (co.email ? 'Email: ' + esc(co.email) : '') + (co.website ? (co.email ? ' · ' : '') + 'Web: ' + esc(co.website) : '') + '</p>'
+      + '</div></div>'
+      + '<div class="headCol mid">'
+        + '<p class="tag">Consignment' + (l.lrType === 'DUMMY' ? ' — DUMMY' : '') + '</p>'
+        + '<p>GC No.<br><b class="big">' + esc(l.lrNo) + '</b></p>'
+        + '<p>Booking Office :<br>' + esc(l.bookingBranch || co.name) + (br.addr ? '<br>' + esc(br.addr) : '') + '<br>Mob: ' + esc(br.phone || co.phone || 'NA') + '</p>'
+      + '</div>'
+      + '<div class="headCol right">'
+        + '<p class="tag">At Owner\'s Risk</p>'
+        + qr
+      + '</div>'
+    + '</div>'
+
+    /* ---- PAN No / GSTIN / GC Date / Vehicle No / From / To ---- */
+    + '<table><tr><th>PAN No</th><th>GSTIN</th><th>GC Date</th><th>Vehicle No.</th><th>From</th><th>To</th></tr>'
+    + '<tr><td>' + esc(co.panNo || '—') + '</td><td>' + esc(co.gstin || '—') + '</td><td>' + fmtDate(l.date) + '</td><td><b>' + esc(l.truckNo) + '</b></td><td>' + esc(l.fromPlace) + '</td><td>' + esc(l.toPlace) + '</td></tr></table>'
+
+    /* ---- Consignors / Consignees ---- */
+    + '<table><tr><th style="width:50%">Consignors Name &amp; Address</th><th>Consignees Name &amp; Address</th></tr>'
+    + '<tr><td>' + party(l.consignor) + '</td><td>' + party(l.consignee) + '</td></tr></table>'
+
+    /* ---- Billed To / Delivery Address ---- */
+    + '<table><tr><th style="width:50%">Billed To (Service Reciever)</th><th>Delivery Address</th></tr>'
+    + '<tr><td>' + ((l.billingTo && l.billingTo.name) ? party(l.billingTo) : esc(l.billingParty || '—')) + '</td><td>' + (l.deliveryAddress ? esc(l.deliveryAddress) : '—') + '</td></tr></table>'
+
+    /* ---- Invoice No. / Value / E-way Bill No. / Mode / AOC ---- */
+    + '<table><tr><th>Invoice No.</th><th>Value</th><th>E-way Bill No.</th><th>Mode</th><th>AOC</th></tr>'
+    + '<tr><td>' + esc(l.invoiceNo || '—') + '</td><td>' + (l.invAmount ? inr(l.invAmount) : '—') + '</td><td>' + esc(l.ewayBillNo || '—') + '</td><td>' + esc(l.transportMode || 'ROAD') + '</td><td>' + (Number(ch.aoc) ? inr(ch.aoc) : '—') + '</td></tr></table>'
+
+    /* ---- Goods: Pkgs / Content / A Weight / C Weight / Size ---- */
+    + '<table><tr><th>Pkgs</th><th>Content</th><th>A Weight</th><th>C Weight</th><th>Size (L × W × H)</th></tr>' + goodsRows
+    + '<tr><td class="r"><b>' + pkgsTotal + '</b></td><td></td><td class="r"><b>' + (Number(l.aWeight) || 0).toFixed(2) + '</b></td><td class="r"><b>' + (Number(l.cWeight) || 0).toFixed(2) + '</b></td><td></td></tr></table>'
+    + '<table><tr><th>Private Mark</th></tr><tr><td>' + esc(l.privateMark || '—') + '</td></tr></table>'
+
+    /* ---- Freight & Charges — every category always shown, matching the
+       reference's fixed ledger rather than hiding zero lines ---- */
+    + '<table class="totalsTbl"><tr><th colspan="2">Freight &amp; Charges</th></tr>' + chg
+    + '<tr><td class="r"><b>Sub Total</b></td><td class="r"><b>' + inr(l.subTotal) + '</b></td></tr>'
+    + '<tr><td class="r">IGST' + (l.igstPct ? ' ' + l.igstPct + '%' : '') + '</td><td class="r">' + inr(l.igstAmt) + '</td></tr>'
+    + '<tr><td class="r">CGST' + (l.cgstPct ? ' ' + l.cgstPct + '%' : '') + '</td><td class="r">' + inr(l.cgstAmt) + '</td></tr>'
+    + '<tr><td class="r">SGST' + (l.sgstPct ? ' ' + l.sgstPct + '%' : '') + '</td><td class="r">' + inr(l.sgstAmt) + '</td></tr>'
+    + '<tr class="grossRow"><td class="r"><b>Total Amount</b></td><td class="r"><b>' + inr(l.gross) + '</b></td></tr></table>'
+
+    /* ---- For, Company (blank seal placeholder — a real stamp/signature is
+       applied by hand after printing, not fabricated here) + Prepared By ---- */
+    + '<table><tr><th style="width:60%">For, ' + esc(co.name) + '</th><th>Prepared By</th></tr>'
+    + '<tr><td style="text-align:center"><div class="sealBox">Company<br>Seal</div></td><td>' + esc(l.preparedBy || '—') + '</td></tr></table>'
+
+    /* ---- Insurance / GST Payable By / Payment Terms ---- */
+    + '<table><tr><th>Insurance</th><th>GST Payable By</th><th>Payment Terms</th></tr>'
+    + '<tr><td>' + esc(l.insurance || '—') + '</td><td>' + esc(l.gstPaidBy || '—') + '<br><span class="muted">GST Slabs : ' + esc(l.gstSlab || '—') + '</span></td><td><b>' + esc(l.payTerms || '—') + '</b></td></tr></table>'
+
+    /* ---- Delivery At / Remarks ---- */
+    + '<table><tr><th style="width:50%">Delivery At</th><th>Remarks</th></tr>'
+    + '<tr><td>' + esc(l.lrMode || '—') + '</td><td>' + (l.remark ? esc(l.remark) : '—') + '</td></tr></table>'
+
+    /* ---- extra details this app already tracked, kept beyond the
+       reference format rather than dropped ---- */
+    + '<table><tr><th>Invoice Date</th><th>E-Way Date</th><th>E-Way Expiry</th><th>P.O. Date</th><th>Packing</th><th>Agent</th><th>To Be Billed At</th></tr>'
+    + '<tr><td>' + fmtDate(l.invoiceDate) + '</td><td>' + fmtDate(l.ewayBillDate) + '</td><td>' + fmtDate(l.ewayExDate) + '</td><td>' + fmtDate(l.poDate) + '</td><td>' + esc(l.packing || '—') + '</td><td>' + esc(l.agent || '—') + '</td><td>' + esc(l.billedAt || '—') + '</td></tr></table>'
+    + '<table><tr><th>Employee</th><th>Truck Driver No</th><th>Booking Branch</th><th>To Branch</th><th>Lorry Type</th><th style="width:22%">Receiver Signature &amp; Stamp (POD)</th></tr>'
+    + '<tr><td>' + esc(l.employee || '—') + '</td><td>' + esc(l.driverNo || '—') + '</td><td>' + esc(l.bookingBranch || '—') + '</td><td>' + esc(l.toBranch || '—') + '</td><td>' + esc(l.lorryType || '—') + '</td><td class="sig"></td></tr></table>'
+
     + '<div class="terms">Goods are transported at owner\'s risk. Delivery subject to terms &amp; conditions of carriage of ' + esc(co.name) + '. Consignment must be insured by the consignor. Subject to Vadodara jurisdiction. System-generated from BGTS-OS.</div>'
+    + '<div class="pageFooter">PAGE 1 OF 1</div>'
     + '</div></body></html>';
 }
