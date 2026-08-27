@@ -74,7 +74,16 @@ export function lrTripExpTotal(l){ return sum(l.tripExpenses || [], t => t.amoun
 export function branchName(db, id){ const b = byId(db.branches || [], id); return b ? b.name : '—'; }
 export function ensureBranches(db){
   if (!db.branches || !db.branches.length){
-    db.branches = [{ id: 'br_main', name: 'VADODARA', entityName: db.company.name, gstin: db.company.gstin || '', panNo: db.company.panNo || '', addr: db.company.addr || '', lrPrefix: db.company.lrPrefix || '', phone: db.company.phone || '' }];
+    /* Booking Office address is its own value (0, Near Natraj Cinema,
+       Pratapgunj Naka, Vadodara, Gujarat, 390002 per the old reference LR) —
+       deliberately NOT inherited from db.company.addr (Head Office), since
+       the reference prints two different addresses for these two fields.
+       Same caveat as blankDB(): only seeds a brand-new/empty database;
+       an existing branch keeps whatever address is saved in Masters. */
+    /* phone deliberately left blank (not inherited from db.company.phone) so
+       the printed Booking Office shows "Mob: NA", matching the reference —
+       the Booking Office genuinely has no mobile number of its own there. */
+    db.branches = [{ id: 'br_main', name: 'VADODARA', entityName: db.company.name, gstin: db.company.gstin || '', panNo: db.company.panNo || '', addr: '0, Near Natraj Cinema, Pratapgunj Naka, Vadodara, Gujarat, 390002', lrPrefix: db.company.lrPrefix || '', phone: '' }];
   }
   const main = db.branches[0];
   const byNm = nm => {
@@ -167,7 +176,13 @@ export function lhcStatus(l){
 /* ---------- database ---------- */
 export function blankDB(){
   return {
-    company: { name: 'Baroda Goods Transport Service Pvt. Ltd.', addr: 'Vadodara, Gujarat, India', gstin: '', panNo: '', phone: '', email: '', website: '', lrPrefix: 'BRD/' },
+    /* Head Office address matches the old reference LR exactly (Near Central
+       St Depot, Station Road, Pratapgunj Naka, Baroda - 390002). This is
+       only the seed value for a brand-new/empty database — an already-
+       running install keeps whatever is saved in Settings, so existing
+       users still need to update Company Address there for this to appear
+       on their prints. */
+    company: { name: 'Baroda Goods Transport Service Pvt. Ltd.', addr: 'Near Central St Depot, Station Road, Pratapgunj Naka, Baroda - 390002', gstin: '', panNo: '', phone: '0265-2787129', email: 'info@bgts.in', website: 'www.bgts.in', lrPrefix: 'BRD/' },
     seq: { lr: 1, inv: 1, bk: 1, lhc: 1 },
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
@@ -2806,7 +2821,12 @@ function lrDocBody(db, l, logoUri, copyLabel){
       + '<div class="headCol mid">'
         + '<p class="tag">Consignment' + (l.lrType === 'DUMMY' ? ' — DUMMY' : '') + '</p>'
         + '<p>GC No.<br><b class="big">' + esc(l.lrNo) + '</b></p>'
-        + '<p>Booking Office :<br>' + esc(l.bookingBranch || co.name) + (br.addr ? '<br>' + esc(br.addr) : '') + '<br>Mob: ' + esc(br.phone || co.phone || 'NA') + '</p>'
+        /* Booking Office's Mob is its own branch-level number (or NA if
+           unset) — deliberately not falling back to Head Office's Tele,
+           since the reference LR prints these as two independent numbers
+           (Booking Office genuinely shows "Mob: NA" even though Head
+           Office has a working Tele/Mob of its own). */
+        + '<p>Booking Office :<br>' + esc(l.bookingBranch || co.name) + (br.addr ? '<br>' + esc(br.addr) : '') + '<br>Mob: ' + esc(br.phone || 'NA') + '</p>'
       + '</div>'
       + '<div class="headCol right">'
         + '<p class="tag">At Owner\'s Risk</p>'
