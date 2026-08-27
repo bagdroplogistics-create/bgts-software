@@ -1639,6 +1639,110 @@ export function blankLR(){
   };
 }
 
+/* ---------- LR register — ATTrans's own "LR / Consignment Notes" list view
+   (42 rows across 3 screenshots dated 2026-08-28) — a standalone import into
+   this app's OWN db.lrs, same standalone-master pattern as the LHC/Bill/Tax
+   Master imports above.
+
+   This register is a summary LIST view, not the detailed "ADD NEW LR" form,
+   so it only gives: LR No, Date, Truck No, From, To, Consignor, Consignee, an
+   Agent column (blank for all rows except one), and a single lump-sum Amount
+   — no goods/package description, no GST breakdown, no consignor/consignee
+   address/GSTIN. Rather than invent any of that, each imported LR is built
+   with: goods left empty (flagged, not fabricated), GST% left at 0, and the
+   Amount posted as the sole "Freight" charge line — since computeLR() with
+   0% GST makes gross === subTotal === that Freight line exactly, this
+   reproduces the register's Amount column exactly with NO reconciliation
+   fudge-factor needed (unlike the Bill/LHC imports, where the source total
+   didn't cleanly decompose and a labeled adjustment line was needed).
+
+   FLAGGED, not silently fixed:
+   - LR No BRD/06802 is missing from the sequence (jumps 06803 -> 06801) —
+     a genuine gap in ATTrans's own numbering, not a transcription error.
+   - SR 6 (BRD/06823) and SR 14 (BRD/06815) were shown highlighted (pink) in
+     the source register — some status/flag ATTrans itself was tracking that
+     isn't decodable from a list screenshot alone. Imported like any other
+     row; not marked cancelled/duplicate without evidence of what the color
+     actually meant.
+   - Both "Created By" columns in the source show "DEVELOPER" for every row
+     (evident placeholder/test authorship data, same as prior imports) — this
+     app's LR record has no createdBy field at all, so it isn't carried in.
+   - Every row is assigned to this app's main branch (db.branches[0]) and
+     lrType 'ORIGINAL' with blankLR()'s other defaults (GST Exempt (RCM),
+     Door Delivery, etc.) since the register doesn't expose those per row.
+   Row shape: [srNo, lrNo, date(ISO), truckNo, fromPlace, toPlace,
+   consignorName, consigneeName, agent, amount]. */
+export const LEGACY_LRS = [
+  [1, 'BRD/06828', '2026-08-28', '', 'NTPC JHANOR', 'GACL RANOLI', 'NTPC', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 0],
+  [2, 'BRD/06827', '2026-08-27', '', 'GACL RANOLI', 'NTPC JHANOR', 'GUJARAT ALKALIES & CHEMICALS LTD', 'NTPC', '', 0],
+  [3, 'BRD/06826', '2026-08-26', 'GJ06BY1577', 'DASHRATH', 'GACL RANOLI', 'ASSOCIATED ROAD CARRIERS LIMITED', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 1541.15],
+  [4, 'BRD/06825', '2026-08-27', 'GJ07YZ8661', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 0],
+  [5, 'BRD/06824', '2026-08-26', 'GJ07YZ8661', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 0],
+  [6, 'BRD/06823', '2026-08-25', 'GJ07YZ8661', 'GACL RANOLI', 'GACL COELHO PLANT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 3302.47],
+  [7, 'BRD/06822', '2026-08-26', 'GJ 34 T 2262', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 0],
+  [8, 'BRD/06821', '2026-08-25', 'GJ 34 T 2262', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 0],
+  [9, 'BRD/06820', '2026-08-24', 'GJ 34 T 2262', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 22261.00],
+  [10, 'BRD/06819', '2026-08-23', 'GJ 34 T 2262', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 22261.00],
+  [11, 'BRD/06818', '2026-08-23', 'GJ06AT6590', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 22261.00],
+  [12, 'BRD/06817', '2026-08-22', 'GJ06AT6590', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 22261.00],
+  [13, 'BRD/06816', '2026-08-22', 'GJ 34 T 2262', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 22261.00],
+  [14, 'BRD/06815', '2026-08-21', 'GJ 34 T 2262', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 22261.00],
+  [15, 'BRD/06814', '2026-08-20', 'GJ06BY1577', 'MAKARPURA', 'GACL RANOLI', 'VRUND ENGITECH PRIVATE LIMITED', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 2421.81],
+  [16, 'BRD/06813', '2026-08-19', 'GJ06BY1577', 'GACL RANOLI', 'RANOLI', 'GUJARAT ALKALIES & CHEMICALS LTD', 'M/S CONTINENTAL VALVES LIMITED C/O ACPL TRANSPORT', '', 1541.15],
+  [17, 'BRD/06812', '2026-08-19', 'GJ06BY1577', 'DASHRATH', 'GACL RANOLI', 'LALJI MULJI TRANSPORT CO', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 1541.15],
+  [18, 'BRD/06811', '2026-08-19', 'GJ06BY1577', 'DASHRATH', 'GACL RANOLI', 'SURAT AHMEDABAD TRANSPORT PVT LTD', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 1541.15],
+  [19, 'BRD/06810', '2026-08-21', 'GJ06AT6590', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 22261.00],
+  [20, 'BRD/06809', '2026-08-20', 'GJ06AT6590', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 22261.00],
+  [21, 'BRD/06808', '2026-08-17', 'GJ 34 T 2262', 'GACL COELHO PLANT', 'GACL RANOLI', 'GUJARAT ALKALIES & CHEMICALS LTD', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 3302.47],
+  [22, 'BRD/06807', '2026-08-19', 'GJ 34 T 2262', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 22261.00],
+  [23, 'BRD/06806', '2026-08-18', 'GJ 34 T 2262', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 22261.00],
+  [24, 'BRD/06805', '2026-08-17', 'GJ 06 AY 4675', 'NANDESARI', 'GACL RANOLI', 'SHREE RAM RUBTECH PVT LTD', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 1541.15],
+  [25, 'BRD/06804', '2026-08-17', 'GJ06BT9525', 'NANDESARI', 'ANKLESHWAR', 'DEEPAK NITRITE LIMITED', 'AMAL LIMITED', '', 12708.60],
+  [26, 'BRD/06803', '2026-08-15', 'GJ06BT9525', 'ANKLESHWAR', 'NANDESARI', 'AMAL LIMITED', 'DEEPAK NITRITE LIMITED', '', 31777.40],
+  [27, 'BRD/06801', '2026-08-14', 'GJ06BT9525', 'NANDESARI', 'ANKLESHWAR', 'DEEPAK NITRITE LIMITED', 'AMAL LIMITED', '', 10770.00],
+  [28, 'BRD/06800', '2026-08-16', 'GJ19X6890', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 22261.00],
+  [29, 'BRD/06799', '2026-08-15', 'GJ19X6890', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 22261.00],
+  [30, 'BRD/06798', '2026-08-13', 'GJ06BT9525', 'ANKLESHWAR', 'NANDESARI', 'AMAL LIMITED', 'DEEPAK NITRITE LIMITED', '', 31777.40],
+  [31, 'BRD/06797', '2026-08-12', 'GJ06BT9525', 'NANDESARI', 'ANKLESHWAR', 'DEEPAK NITRITE LIMITED', 'AMAL LIMITED', '', 12708.60],
+  [32, 'BRD/06796', '2026-08-13', '', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 22261.00],
+  [33, 'BRD/06795', '2026-08-12', '', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 22261.00],
+  [34, 'BRD/06794', '2026-08-13', '', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 22261.00],
+  [35, 'BRD/06793', '2026-08-12', '', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 22261.00],
+  [36, 'BRD/06792', '2026-08-11', 'GJ06BY1577', 'MAKARPURA', 'GACL RANOLI', 'SHIV INDUSTRIES', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 1981.48],
+  [37, 'BRD/06791', '2026-08-11', 'GJ06BT9525', 'ANKLESHWAR', 'NANDESARI', 'AMAL LIMITED', 'DEEPAK NITRITE LIMITED', '', 31777.40],
+  [38, 'BRD/06790', '2026-08-10', 'GJ06BT9525', 'NANDESARI', 'ANKLESHWAR', 'DEEPAK NITRITE LIMITED', 'AMAL LIMITED', '', 12708.60],
+  [39, 'BRD/06789', '2026-08-12', 'GJ 34 T 2262', 'RAJKOT', 'BARODA', 'RAJKOT MUNICIPAL CORPORATION', 'GUJARAT ALKALIES & CHEMICALS LTD', '', 22261.00],
+  [40, 'BRD/06788', '2026-08-11', 'GJ 34 T 2262', 'BARODA', 'RAJKOT', 'GUJARAT ALKALIES & CHEMICALS LTD', 'RAJKOT MUNICIPAL CORPORATION', '', 22261.00],
+  [41, 'BRD/06787', '2026-08-10', 'GJ06BY1577', 'GACL RANOLI', 'AHMEDABAD', 'GUJARAT ALKALIES & CHEMICALS LTD', 'AIR POWER SERVICES', '', 3302.47],
+  [42, 'BRD/06786', '2026-08-09', 'GJ06BT9525', 'ANKLESHWAR', 'NANDESARI', 'AMAL LIMITED', 'DEEPAK NITRITE LIMITED', 'USMAN BHAI', 31777.40]
+];
+
+export function importLegacyLRs(db){
+  db.lrs = db.lrs || [];
+  ensureBranches(db);
+  const have = {};
+  db.lrs.forEach(l => { if (l.lrNo) have[l.lrNo] = true; });
+  const mainBranch = db.branches[0] || {};
+  let added = 0;
+  LEGACY_LRS.forEach(([srNo, lrNo, date, truckNo, fromPlace, toPlace, consignorName, consigneeName, agent, amount]) => {
+    if (have[lrNo]) return;
+    have[lrNo] = true;
+    const lr = blankLR();
+    lr.id = uid('lr');
+    lr.lrNo = lrNo; lr.date = date; lr.truckNo = truckNo; lr.fromPlace = fromPlace; lr.toPlace = toPlace;
+    lr.branchId = mainBranch.id || ''; lr.bookingBranch = mainBranch.name || lr.bookingBranch;
+    lr.consignor = { name: consignorName, city: '', contact: '', pan: '', gst: '' };
+    lr.consignee = { name: consigneeName, city: '', contact: '', pan: '', gst: '' };
+    lr.agent = agent || '';
+    lr.charges.freight = String(amount);
+    const t = computeLR(lr.charges, lr.igstPct, lr.cgstPct, lr.sgstPct);
+    lr.subTotal = t.subTotal; lr.igstAmt = t.igstAmt; lr.cgstAmt = t.cgstAmt; lr.sgstAmt = t.sgstAmt; lr.gross = t.gross;
+    db.lrs.push(lr);
+    added++;
+  });
+  return added;
+}
+
 /* migrate: ensure v2 keys and convert booking-embedded LRs into LR records */
 export function migrate(db){
   if (!db.lrs) db.lrs = [];

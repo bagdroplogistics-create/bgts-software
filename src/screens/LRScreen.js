@@ -6,7 +6,8 @@ import { downloadFile, printHtml } from '../fileIO';
 import { getLogoDataUri } from '../logoAsset';
 import {
   uid, inr, fmtDate, todayISO, byId, removeById, lrHtml, vendorName, csvString,
-  lrHireBalance, lrTripExpTotal, truckToVehicleId, TRIP_EXP_CATS, sum
+  lrHireBalance, lrTripExpTotal, truckToVehicleId, TRIP_EXP_CATS, sum,
+  importLegacyLRs, LEGACY_LRS
 } from '../logic';
 
 /* ---------- LR Register filter bar (from bgts-os-app_8.html's lrFilterBar/lrMatches) ---------- */
@@ -56,6 +57,11 @@ export default function LRScreen({ navigation }) {
     return String(b.id).localeCompare(String(a.id));
   });
   const listGross = sum(list, l => l.gross);
+
+  const doImportLegacyLRs = () => update(d => {
+    const added = importLegacyLRs(d);
+    setTimeout(() => alert('LR register imported', added + ' LR(s) added' + (added < LEGACY_LRS.length ? ', ' + (LEGACY_LRS.length - added) + ' already on file (skipped).' : '.')), 100);
+  });
 
   const exportCsv = async () => {
     try {
@@ -177,6 +183,7 @@ export default function LRScreen({ navigation }) {
   return (
     <View style={S.screen}>
       <View style={{ padding: 14, paddingBottom: 6, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+        <Btn label="Import ATTrans LR Register (42)" tone="ghost" onPress={doImportLegacyLRs} />
         <Btn label="Export CSV" tone="ghost" onPress={exportCsv} />
         <Btn label="⬆ Import CSV / Excel" onPress={() => navigation.navigate('LRImport')} />
         <Btn label="+ ADD NEW LR" tone="amber" onPress={() => navigation.navigate('LRForm', {})} />
