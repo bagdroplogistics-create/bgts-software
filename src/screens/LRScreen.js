@@ -5,10 +5,15 @@ import { C, S, Card, Badge, Btn, Empty, ModalForm, confirmDo, Table, alert, Pick
 import { downloadFile, printHtml } from '../fileIO';
 import { getLogoDataUri } from '../logoAsset';
 import {
-  uid, inr, fmtDate, todayISO, byId, removeById, lrHtml, vendorName, csvString,
+  uid, inr, fmtDate, todayISO, byId, removeById, lrMultiCopyHtml, vendorName, csvString,
   lrHireBalance, lrTripExpTotal, truckToVehicleId, TRIP_EXP_CATS, sum,
   importLegacyLRs, LEGACY_LRS
 } from '../logic';
+
+/* Print-copy picker options — mirrors the reference app's own "VIEW LR
+   DETAILS" print popup (5 checkboxes + PRINT button) exactly, label for
+   label. */
+const LR_COPY_LABELS = ['CONSIGNOR COPY', 'CONSIGNEE COPY', 'DRIVER COPY', 'OFFICE COPY', 'DUPLICATE COPY'];
 
 /* ---------- LR Register filter bar (from bgts-os-app_8.html's lrFilterBar/lrMatches) ---------- */
 function FilterField({ label, grow, children }) {
@@ -71,13 +76,32 @@ export default function LRScreen({ navigation }) {
     } catch (e) { alert('Error', String(e.message || e)); }
   };
 
-  const sharePdf = async (l) => {
-    try {
-      const logoUri = await getLogoDataUri();
-      await printHtml(lrHtml(db, l, logoUri), l.lrNo);
-    } catch (e) {
-      alert('PDF error', String(e.message || e));
-    }
+  /* Print icon -> copy-selection popup (Consignor/Consignee/Driver/Office/
+     Duplicate Copy + PRINT), same flow as the reference app's own print
+     icon. Reuses the existing generic ModalForm's "checkboxes" field type
+     rather than a bespoke modal. Defaults to Consignor Copy pre-checked;
+     "required" on the field means the built-in ModalForm validation blocks
+     submit (and keeps the modal open) until at least one box is ticked. */
+  const printLR = (l) => {
+    setForm({
+      title: 'Print LR ' + l.lrNo + ' — Select Copies',
+      submitLabel: 'PRINT',
+      fields: [
+        {
+          key: 'copies', label: 'Copies to Print', type: 'checkboxes', required: true, full: true,
+          value: 'CONSIGNOR COPY', options: LR_COPY_LABELS.map(x => ({ v: x, l: x }))
+        }
+      ],
+      onSubmit: async (v) => {
+        const labels = String(v.copies || '').split(',').filter(Boolean);
+        try {
+          const logoUri = await getLogoDataUri();
+          await printHtml(lrMultiCopyHtml(db, l, logoUri, labels), l.lrNo);
+        } catch (e) {
+          alert('PDF error', String(e.message || e));
+        }
+      }
+    });
   };
 
   const markPOD = (l) => update(d => {
@@ -171,7 +195,7 @@ export default function LRScreen({ navigation }) {
         <View style={S.wrapRow}>
           {hired && bal > 0 ? <Btn small tone="green" label="+ Hire Pay" onPress={() => addHirePay(l)} /> : null}
           {!hired ? <Btn small label="+ Trip Exp" onPress={() => addTripExp(l)} /> : null}
-          <Btn small tone="ghost" label="Print" onPress={() => sharePdf(l)} />
+          <Btn small tone="ghost" label="Print" onPress={() => printLR(l)} />
           <Btn small tone="ghost" label="Edit" onPress={() => navigation.navigate('LRForm', { lrId: l.id })} />
           {!l.pod ? <Btn small tone="green" label="POD ✓" onPress={() => markPOD(l)} /> : null}
           <Btn small tone="red" label="✕" onPress={() => del(l)} />

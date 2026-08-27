@@ -2658,30 +2658,37 @@ function printDocStyle(){
   /* Brand palette, matching src/ui.js's C object exactly (this file is plain
      JS with no React Native imports, so the values are duplicated here
      rather than imported, to avoid a circular import with ui.js). */
-  return '@page{size:A4;margin:12mm}'
+  /* Compaction note: sizes/paddings here were tightened (from an earlier,
+     roomier pass) specifically to get the whole LR onto one printed page —
+     the Freight & Charges 4-column layout above did most of the work, this
+     shaves the remaining overflow off every other section proportionally
+     rather than off any one section, so nothing looks visually squeezed
+     relative to the rest. */
+  return '@page{size:A4;margin:8mm}'
     + '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-    + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:11.5px;color:#111;margin:16px;background:#ececed}'
+    + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:11px;color:#111;margin:16px;background:#ececed}'
     + '.doc{border:2px solid #2b2b2f;border-radius:10px;overflow:hidden;max-width:800px;margin:0 auto;background:#fff}'
     + '.r{text-align:right}.muted{color:#71717a;font-style:italic}'
-    + '.head{background:#2b2b2f;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;border-top:3px solid #f6d048}'
-    + '.head .brand{display:flex;gap:20px;align-items:center;flex:1.4;min-width:200px}'
-    + '.head h1{margin:0;font-size:16px;letter-spacing:.2px}.head p{margin:3px 0 0;font-size:9px;color:#d4d4d8}'
-    + '.headCol{flex:1;min-width:130px;font-size:10px;line-height:1.5}'
+    + '.head{background:#2b2b2f;color:#fff;padding:8px 16px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;border-top:3px solid #f6d048}'
+    + '.head .brand{display:flex;gap:16px;align-items:center;flex:1.4;min-width:200px}'
+    + '.head h1{margin:0;font-size:15px;letter-spacing:.2px}.head p{margin:2px 0 0;font-size:8.5px;color:#d4d4d8}'
+    + '.headCol{flex:1;min-width:130px;font-size:9.5px;line-height:1.35}'
     + '.headCol.mid{border-left:1px solid rgba(255,255,255,.25);border-right:1px solid rgba(255,255,255,.25);padding:0 14px}'
     + '.headCol.right{flex:0 0 auto;text-align:center}'
-    + '.tag{margin:0 0 4px;font-size:8.5px;letter-spacing:.5px;text-transform:uppercase;color:#f6d048;font-weight:800}'
-    + '.headCol b.big{color:#f6d048;font-size:14px}'
-    + '.num{text-align:right;font-size:11px;line-height:1.5;white-space:nowrap}.num b{color:#f6d048;font-size:15px}'
+    + '.tag{margin:0 0 3px;font-size:8px;letter-spacing:.5px;text-transform:uppercase;color:#f6d048;font-weight:800}'
+    + '.headCol b.big{color:#f6d048;font-size:13px}'
+    + '.num{text-align:right;font-size:11px;line-height:1.4;white-space:nowrap}.num b{color:#f6d048;font-size:15px}'
     + 'table{width:100%;border-collapse:collapse}'
-    + 'td,th{border:1px solid #d4d4d8;padding:6px 8px;font-size:10.8px;text-align:left;vertical-align:top}'
-    + 'th{background:#ececed;font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:#302f33}'
-    + '.sig{height:60px}'
+    + 'td,th{border:1px solid #d4d4d8;padding:4px 7px;font-size:10.2px;text-align:left;vertical-align:top}'
+    + 'th{background:#ececed;font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:#302f33}'
+    + '.sig{height:32px}'
     + '.totalsTbl td{border-color:#a1a1aa}'
-    + '.grossRow td{background:#fbe9de;font-size:13px}'
-    + '.terms{font-size:8.5px;color:#555;padding:9px 12px;border-top:1px solid #a1a1aa;background:#f7f7f7}'
-    + '.pageFooter{font-size:8.5px;color:#a1a1aa;font-style:italic;text-align:center;padding:6px 0}'
-    + '.sealBox{width:70px;height:70px;border:1px dashed #a1a1aa;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:7.5px;color:#a1a1aa;margin:6px auto 0;padding:4px}'
-    + '.sectionNote{font-size:8.5px;color:#71717a;padding:4px 8px}'
+    + '.grossRow td{background:#fbe9de;font-size:12.5px}'
+    + '.terms{font-size:7.5px;color:#555;padding:4px 12px;border-top:1px solid #a1a1aa;background:#f7f7f7}'
+    + '.pageFooter{font-size:7.5px;color:#a1a1aa;font-style:italic;text-align:center;padding:1px 0}'
+    + '.sealBox{width:44px;height:44px;border:1px dashed #a1a1aa;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:6.5px;color:#a1a1aa;margin:2px auto 0;padding:3px}'
+    + '.sectionNote{font-size:7.5px;color:#71717a;padding:3px 8px}'
+    + '.copyBadge{background:#f6d048;color:#2b2b2f;text-align:center;font-weight:800;font-size:11px;letter-spacing:1px;padding:4px;text-transform:uppercase;border-radius:8px 8px 0 0}'
     + '@media print{ body{background:#fff;margin:0} .doc{border-radius:0;max-width:none} }';
 }
 
@@ -2727,7 +2734,13 @@ export function receiptHtml(db, p, logoUri){
    (Company Settings → LR Number Prefix), not the reference sample's literal
    numbering scheme, since changing the live numbering convention wasn't
    asked for. */
-export function lrHtml(db, l, logoUri){
+/* copyLabel: optional string ("CONSIGNOR COPY", "DRIVER COPY", etc.) — when
+   given, a yellow banner prints across the top of this copy so multiple
+   copies of the same LR can be told apart at a glance (see the "N copies"
+   print picker in LRScreen.js / lrMultiCopyHtml() below). Returns just the
+   .doc's inner content, not a full <html> document — lrHtml() and
+   lrMultiCopyHtml() below both wrap this with the shared page chrome. */
+function lrDocBody(db, l, logoUri, copyLabel){
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const br = byId(db.branches || [], l.branchId) || {};
   const co = {
@@ -2756,16 +2769,26 @@ export function lrHtml(db, l, logoUri){
   /* Every fixed charge category always prints (even at 0.00) to match the
      reference's fixed ledger layout, instead of only showing nonzero lines.
      Above%/Below%/Rate are this app's own extras (not in the reference), so
-     those stay conditional — only shown when actually used on this LR. */
+     those stay conditional — only shown when actually used on this LR.
+     Laid out 2-per-row (4 columns: label, value, label, value) instead of
+     1-per-row, so the ~12-15 charge lines take half the vertical space —
+     this is what keeps the whole LR on one printed page instead of
+     spilling a mostly-empty second page. */
+  const chargeItems = [];
+  if (Number(ch.aboveCh)) chargeItems.push(['Above ' + esc(ch.abovePct || '') + '%', inr(ch.aboveCh)]);
+  if (Number(ch.belowCh)) chargeItems.push(['Below ' + esc(ch.belowPct || '') + '%', inr(ch.belowCh)]);
+  if (Number(ch.rateCh)) chargeItems.push(['Rate Charge', inr(ch.rateCh)]);
+  LR_CHG.filter(c => c[0] !== 'rateCh').forEach(c => chargeItems.push([c[1], inr(ch[c[0]] || 0)]));
   let chg = '';
-  if (Number(ch.aboveCh)) chg += '<tr><td>Above ' + esc(ch.abovePct || '') + '%</td><td class="r">' + inr(ch.aboveCh) + '</td></tr>';
-  if (Number(ch.belowCh)) chg += '<tr><td>Below ' + esc(ch.belowPct || '') + '%</td><td class="r">' + inr(ch.belowCh) + '</td></tr>';
-  if (Number(ch.rateCh)) chg += '<tr><td>Rate Charge</td><td class="r">' + inr(ch.rateCh) + '</td></tr>';
-  LR_CHG.filter(c => c[0] !== 'rateCh').forEach(c => { chg += '<tr><td>' + c[1] + '</td><td class="r">' + inr(ch[c[0]] || 0) + '</td></tr>'; });
+  for (let i = 0; i < chargeItems.length; i += 2) {
+    const a = chargeItems[i], b = chargeItems[i + 1];
+    chg += '<tr><td>' + a[0] + '</td><td class="r">' + a[1] + '</td>'
+      + (b ? ('<td>' + b[0] + '</td><td class="r">' + b[1] + '</td>') : '<td></td><td></td>')
+      + '</tr>';
+  }
   const qr = qrSvg(l.lrNo + ' | ' + co.name + (co.website ? ' | ' + co.website : ''), 56);
 
-  return '<html><head><meta charset="utf-8"><title>LR ' + esc(l.lrNo) + '</title><style>' + printDocStyle()
-    + '</style></head><body><div class="doc">'
+  return (copyLabel ? '<div class="copyBadge">' + esc(copyLabel) + '</div>' : '')
 
     /* ---- header: Head Office details / GC No. + Booking Office / At
        Owner's Risk + QR — three columns, same info as the reference's top
@@ -2809,13 +2832,16 @@ export function lrHtml(db, l, logoUri){
     + '<table><tr><th>Private Mark</th></tr><tr><td>' + esc(l.privateMark || '—') + '</td></tr></table>'
 
     /* ---- Freight & Charges — every category always shown, matching the
-       reference's fixed ledger rather than hiding zero lines ---- */
-    + '<table class="totalsTbl"><tr><th colspan="2">Freight &amp; Charges</th></tr>' + chg
-    + '<tr><td class="r"><b>Sub Total</b></td><td class="r"><b>' + inr(l.subTotal) + '</b></td></tr>'
-    + '<tr><td class="r">IGST' + (l.igstPct ? ' ' + l.igstPct + '%' : '') + '</td><td class="r">' + inr(l.igstAmt) + '</td></tr>'
-    + '<tr><td class="r">CGST' + (l.cgstPct ? ' ' + l.cgstPct + '%' : '') + '</td><td class="r">' + inr(l.cgstAmt) + '</td></tr>'
-    + '<tr><td class="r">SGST' + (l.sgstPct ? ' ' + l.sgstPct + '%' : '') + '</td><td class="r">' + inr(l.sgstAmt) + '</td></tr>'
-    + '<tr class="grossRow"><td class="r"><b>Total Amount</b></td><td class="r"><b>' + inr(l.gross) + '</b></td></tr></table>'
+       reference's fixed ledger rather than hiding zero lines. 4 columns
+       (label|value|label|value) for the line items; the Sub Total/GST/
+       Total Amount summary rows span the label side (colspan 3) so they
+       still read as full-width totals under the 4-col grid. ---- */
+    + '<table class="totalsTbl"><tr><th colspan="4">Freight &amp; Charges</th></tr>' + chg
+    + '<tr><td colspan="3" class="r"><b>Sub Total</b></td><td class="r"><b>' + inr(l.subTotal) + '</b></td></tr>'
+    + '<tr><td colspan="3" class="r">IGST' + (l.igstPct ? ' ' + l.igstPct + '%' : '') + '</td><td class="r">' + inr(l.igstAmt) + '</td></tr>'
+    + '<tr><td colspan="3" class="r">CGST' + (l.cgstPct ? ' ' + l.cgstPct + '%' : '') + '</td><td class="r">' + inr(l.cgstAmt) + '</td></tr>'
+    + '<tr><td colspan="3" class="r">SGST' + (l.sgstPct ? ' ' + l.sgstPct + '%' : '') + '</td><td class="r">' + inr(l.sgstAmt) + '</td></tr>'
+    + '<tr class="grossRow"><td colspan="3" class="r"><b>Total Amount</b></td><td class="r"><b>' + inr(l.gross) + '</b></td></tr></table>'
 
     /* ---- For, Company (blank seal placeholder — a real stamp/signature is
        applied by hand after printing, not fabricated here) + Prepared By ---- */
@@ -2838,6 +2864,32 @@ export function lrHtml(db, l, logoUri){
     + '<tr><td>' + esc(l.employee || '—') + '</td><td>' + esc(l.driverNo || '—') + '</td><td>' + esc(l.bookingBranch || '—') + '</td><td>' + esc(l.toBranch || '—') + '</td><td>' + esc(l.lorryType || '—') + '</td><td class="sig"></td></tr></table>'
 
     + '<div class="terms">Goods are transported at owner\'s risk. Delivery subject to terms &amp; conditions of carriage of ' + esc(co.name) + '. Consignment must be insured by the consignor. Subject to Vadodara jurisdiction. System-generated from BGTS-OS.</div>'
-    + '<div class="pageFooter">PAGE 1 OF 1</div>'
-    + '</div></body></html>';
+    + '<div class="pageFooter">PAGE 1 OF 1</div>';
+}
+
+/* Single-copy LR print — unchanged wrapper kept for every existing call site
+   (LRScreen.js's old direct-print path, BookingsScreen.js, LRFormScreen.js
+   preview). Output is byte-for-byte identical to before the multi-copy
+   refactor since copyLabel is omitted. */
+export function lrHtml(db, l, logoUri){
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return '<html><head><meta charset="utf-8"><title>LR ' + esc(l.lrNo) + '</title><style>' + printDocStyle()
+    + '</style></head><body><div class="doc">' + lrDocBody(db, l, logoUri, '') + '</div></body></html>';
+}
+
+/* Multi-copy LR print — the "5 copy option" picker (Consignor/Consignee/
+   Driver/Office/Duplicate Copy) from LRScreen.js. copyLabels is an array of
+   1+ label strings; each renders as its own full page (via CSS
+   page-break-before on every page after the first), all inside a single
+   print job so the browser/expo-print produces one PDF/print with N pages —
+   same idea as the reference app's own multi-copy print, just implemented
+   as repeated .doc blocks instead of a native print-count control. */
+export function lrMultiCopyHtml(db, l, logoUri, copyLabels){
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const labels = (copyLabels && copyLabels.length) ? copyLabels : [''];
+  const docs = labels.map((label, i) =>
+    '<div class="doc"' + (i > 0 ? ' style="page-break-before:always"' : '') + '>' + lrDocBody(db, l, logoUri, label) + '</div>'
+  ).join('');
+  return '<html><head><meta charset="utf-8"><title>LR ' + esc(l.lrNo) + '</title><style>' + printDocStyle()
+    + '</style></head><body>' + docs + '</body></html>';
 }
