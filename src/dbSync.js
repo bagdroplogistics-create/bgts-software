@@ -98,7 +98,7 @@ const FLAT = {
   drivers: { table: 'drivers', fields: [['name','name','s'],['phone','phone','s'],['licNo','lic_no','s'],['licExpiry','lic_expiry','d']] },
   vendors: { table: 'vendors', fields: [['name','name','s'],['phone','phone','s'],['city','city','s'],['rating','rating','s']] },
   routes: { table: 'routes', fields: [['origin','origin','s'],['destination','destination','s'],['km','km','no']] },
-  branches: { table: 'branches', fields: [['name','name','s'],['entityName','entity_name','s'],['gstin','gstin','s'],['addr','addr','s'],['lrPrefix','lr_prefix','s'],['phone','phone','s']] },
+  branches: { table: 'branches', fields: [['name','name','s'],['entityName','entity_name','s'],['gstin','gstin','s'],['panNo','pan_no','s'],['addr','addr','s'],['lrPrefix','lr_prefix','s'],['phone','phone','s']] },
   bookings: { table: 'bookings', fields: [
     ['bkNo','bk_no','s'],['date','date','s'],['branchId','branch_id','fk'],['clientId','client_id','fk'],
     ['origin','origin','s'],['destination','destination','s'],['mode','mode','s'],['vehicleType','vehicle_type','s'],
@@ -315,7 +315,7 @@ const LR_DEF = { table: 'lrs', fields: [
   ['packing','packing','s'],['lorryType','lorry_type','s'],['privateMark','private_mark','s'],['lrMode','lr_mode','s'],
   ['deliveryAddress','delivery_address','s'],['billingParty','billing_party','s'],['gstPaidBy','gst_paid_by','s'],
   ['gstSlab','gst_slab','s'],['insurance','insurance','s'],['payTerms','pay_terms','s'],['agent','agent','s'],['billedAt','billed_at','s'],
-  ['aWeight','a_weight','no'],['cWeight','c_weight','no'],['remark','remark','s'],['employee','employee','s'],['driverNo','driver_no','s'],
+  ['aWeight','a_weight','no'],['cWeight','c_weight','no'],['remark','remark','s'],['employee','employee','s'],['driverNo','driver_no','s'],['preparedBy','prepared_by','s'],
   ['igstPct','igst_pct','nr'],['cgstPct','cgst_pct','nr'],['sgstPct','sgst_pct','nr'],
   ['subTotal','sub_total','nr'],['igstAmt','igst_amt','nr'],['cgstAmt','cgst_amt','nr'],['sgstAmt','sgst_amt','nr'],['gross','gross','nr'],
   ['pod','pod','b'],['podFileUri','pod_file_uri','s'],['podReceiver','pod_receiver','s'],['podDate','pod_date','d'],['podRemarks','pod_remarks','s'],
@@ -604,7 +604,7 @@ async function syncCompany(prevCompany, nextCompany) {
   if (JSON.stringify(prevCompany) === JSON.stringify(nextCompany)) return;
   const c = nextCompany || {};
   const { error } = await supabase.from('company_settings').upsert({
-    id: 1, name: s(c.name), addr: s(c.addr), gstin: s(c.gstin), phone: s(c.phone), email: s(c.email), lr_prefix: s(c.lrPrefix)
+    id: 1, name: s(c.name), addr: s(c.addr), gstin: s(c.gstin), pan_no: s(c.panNo), phone: s(c.phone), email: s(c.email), lr_prefix: s(c.lrPrefix)
   });
   if (error) throw new Error('company_settings: ' + error.message);
 }
@@ -612,7 +612,7 @@ async function pullCompany() {
   const { data, error } = await supabase.from('company_settings').select('*').eq('id', 1).maybeSingle();
   if (error) throw new Error('company_settings: ' + error.message);
   if (!data) return null;
-  return { name: data.name, addr: data.addr, gstin: data.gstin, phone: data.phone, email: data.email, lrPrefix: data.lr_prefix };
+  return { name: data.name, addr: data.addr, gstin: data.gstin, panNo: data.pan_no || '', phone: data.phone, email: data.email, lrPrefix: data.lr_prefix };
 }
 const SEQ_KEYS = ['lr', 'inv', 'bk', 'lhc', 'inq', 'mr', 'lhcPay'];
 async function syncSeq(prevSeq, nextSeq) {

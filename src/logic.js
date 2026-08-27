@@ -68,7 +68,7 @@ export function lrTripExpTotal(l){ return sum(l.tripExpenses || [], t => t.amoun
 export function branchName(db, id){ const b = byId(db.branches || [], id); return b ? b.name : '—'; }
 export function ensureBranches(db){
   if (!db.branches || !db.branches.length){
-    db.branches = [{ id: 'br_main', name: 'VADODARA', entityName: db.company.name, gstin: db.company.gstin || '', addr: db.company.addr || '', lrPrefix: db.company.lrPrefix || '', phone: db.company.phone || '' }];
+    db.branches = [{ id: 'br_main', name: 'VADODARA', entityName: db.company.name, gstin: db.company.gstin || '', panNo: db.company.panNo || '', addr: db.company.addr || '', lrPrefix: db.company.lrPrefix || '', phone: db.company.phone || '' }];
   }
   const main = db.branches[0];
   const byNm = nm => {
@@ -161,7 +161,7 @@ export function lhcStatus(l){
 /* ---------- database ---------- */
 export function blankDB(){
   return {
-    company: { name: 'Baroda Goods Transport Service Pvt. Ltd.', addr: 'Vadodara, Gujarat, India', gstin: '', phone: '', email: '', lrPrefix: 'BRD/' },
+    company: { name: 'Baroda Goods Transport Service Pvt. Ltd.', addr: 'Vadodara, Gujarat, India', gstin: '', panNo: '', phone: '', email: '', lrPrefix: 'BRD/' },
     seq: { lr: 1, inv: 1, bk: 1, lhc: 1 },
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
@@ -1623,7 +1623,7 @@ export function blankLR(){
     consignee: { name: '', city: '', contact: '', pan: '', gst: '' },
     billingTo: { name: '', city: '', contact: '', pan: '', gst: '' },
     agent: '', billedAt: '', goods: [], aWeight: '', cWeight: '',
-    expenses: [], remark: '', employee: '', driverNo: '',
+    expenses: [], remark: '', employee: '', driverNo: '', preparedBy: '',
     charges: { abovePct: '', aboveCh: '', belowPct: '', belowCh: '', rate: '', rateCh: '', freight: '', surcharge: '', localCartage: '', lastMile: '', fov: '', loading: '', unloading: '', handling: '', gc: '', other: '', ewayCh: '', aoc: '' },
     igstPct: '', cgstPct: '', sgstPct: '',
     subTotal: 0, igstAmt: 0, cgstAmt: 0, sgstAmt: 0, gross: 0, pod: false,
@@ -1653,6 +1653,8 @@ export function migrate(db){
   if (!db.accounts) db.accounts = [];
   if (!db.lhcTrips) db.lhcTrips = [];
   if (!db.lhcPayments) db.lhcPayments = [];
+  if (db.company && db.company.panNo === undefined) db.company.panNo = '';
+  (db.branches || []).forEach(b => { if (b.panNo === undefined) b.panNo = ''; });
   db.clients.forEach(c => { if (c.creditLimit === undefined) c.creditLimit = 0; });
   ensureBillingBackup(db);
   if (!db.seq.lhc) db.seq.lhc = 1;
@@ -1968,7 +1970,7 @@ const IMP_ALIASES = {
   igst:'igstPct', igstpct:'igstPct', cgst:'cgstPct', cgstpct:'cgstPct', sgst:'sgstPct', sgstpct:'sgstPct',
   hirevendor:'hireVendor', vendor:'hireVendor', hireamount:'hireAmount', lorryhire:'hireAmount', hireadvance:'hireAdvance', advance:'hireAdvance',
   agent:'agent', tobilledat:'billedAt', billedat:'billedAt', remark:'remark', remarks:'remark',
-  employee:'employee', driverno:'driverNo', truckdriverno:'driverNo', privatemark:'privateMark',
+  employee:'employee', driverno:'driverNo', truckdriverno:'driverNo', preparedby:'preparedBy', privatemark:'privateMark',
   packing:'packing', methodofpacking:'packing', lorrytype:'lorryType', pod:'pod'
 };
 const p2 = n => { n = String(n); return n.length < 2 ? '0' + n : n; };
@@ -2049,7 +2051,7 @@ export function buildLRImportPlan(db, aoa){
       agent: o.agent || '', billedAt: o.billedAt || '',
       goods: o.cargo ? [{ desc: o.cargo, pkgType: o.pkgType || '', pcs: o.pkgs || '', aw: o.aw || '', cw: o.cw || o.aw || '', l: '', w: '', h: '' }] : [],
       aWeight: o.aw || '', cWeight: o.cw || o.aw || '',
-      remark: o.remark || '', employee: o.employee || '', driverNo: o.driverNo || '',
+      remark: o.remark || '', employee: o.employee || '', driverNo: o.driverNo || '', preparedBy: o.preparedBy || '',
       charges, igstPct: impNum(o.igstPct), cgstPct: impNum(o.cgstPct), sgstPct: impNum(o.sgstPct),
       subTotal: t.subTotal, igstAmt: t.igstAmt, cgstAmt: t.cgstAmt, sgstAmt: t.sgstAmt, gross: t.gross,
       pod: /^(y|1|t)/i.test(o.pod || ''), ownership,
@@ -2565,7 +2567,7 @@ export function receiptHtml(db, p, logoUri){
 export function lrHtml(db, l, logoUri){
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const br = byId(db.branches || [], l.branchId) || {};
-  const co = { name: br.entityName || db.company.name, addr: br.addr || db.company.addr, gstin: br.gstin || db.company.gstin, phone: br.phone || db.company.phone };
+  const co = { name: br.entityName || db.company.name, addr: br.addr || db.company.addr, gstin: br.gstin || db.company.gstin, panNo: br.panNo || db.company.panNo, phone: br.phone || db.company.phone };
   const party = p => {
     p = p || {};
     let s = '<b>' + esc(p.name || '—') + '</b>';
@@ -2588,11 +2590,11 @@ export function lrHtml(db, l, logoUri){
   if (!chg) chg = '<tr><td class="muted">No charge lines entered.</td><td class="r">—</td></tr>';
   return '<html><head><meta charset="utf-8"><title>LR ' + esc(l.lrNo) + '</title><style>' + printDocStyle()
     + '</style></head><body><div class="doc">'
-    + '<div class="head"><div class="brand">' + bgtsLogoImg(logoUri, 40) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + (co.phone ? ' · Ph: ' + esc(co.phone) : '') + '</p>'
+    + '<div class="head"><div class="brand">' + bgtsLogoImg(logoUri, 40) + '<div><h1>' + esc(co.name) + '</h1><p>' + esc(co.addr) + (co.gstin ? ' · GSTIN: ' + esc(co.gstin) : '') + (co.panNo ? ' · PAN: ' + esc(co.panNo) : '') + (co.phone ? ' · Ph: ' + esc(co.phone) : '') + '</p>'
     + '<p>CONSIGNMENT NOTE / LORRY RECEIPT — AT OWNER\'S RISK' + (l.lrType === 'DUMMY' ? ' — <b>DUMMY</b>' : '') + '</p></div></div>'
     + '<div class="num">LR No.<br><b>' + esc(l.lrNo) + '</b><br>Date: ' + fmtDate(l.date) + '<br>' + esc(l.lrType) + '</div></div>'
     + '<table><tr><th>Truck No</th><th>From</th><th>To</th><th>Booking Branch</th><th>To Branch</th><th>Lorry Type</th></tr>'
-    + '<tr><td><b>' + esc(l.truckNo) + '</b></td><td>' + esc(l.fromPlace) + '</td><td>' + esc(l.toPlace) + '</td><td>' + esc(l.bookingBranch || '—') + '</td><td>' + esc(l.toBranch || '—') + '</td><td>' + esc(l.lorryType || '—') + '</td></tr></table>'
+    + '<tr><td><b>' + esc(l.truckNo) + '</b></td><td>' + esc(l.fromPlace) + '</td><td>' + esc(l.toPlace) + '</td><td>' + esc(l.bookingBranch || '—') + (br.addr ? '<br><span class="muted">' + esc(br.addr) + '</span>' : '') + '</td><td>' + esc(l.toBranch || '—') + '</td><td>' + esc(l.lorryType || '—') + '</td></tr></table>'
     + '<table><tr><th style="width:33%">Consignor</th><th style="width:33%">Consignee</th><th>Billing To</th></tr>'
     + '<tr><td>' + party(l.consignor) + '</td><td>' + party(l.consignee) + '</td><td>' + ((l.billingTo && l.billingTo.name) ? party(l.billingTo) : esc(l.billingParty || '—')) + '</td></tr></table>'
     + '<table><tr><th>Invoice No</th><th>Inv. Amt</th><th>Inv. Date</th><th>E-Way No</th><th>E-Way Date</th><th>E-Way Expiry</th><th>P.O. Date</th></tr>'
@@ -2609,8 +2611,8 @@ export function lrHtml(db, l, logoUri){
     + (Number(l.sgstAmt) ? '<tr><td class="r">SGST ' + l.sgstPct + '%</td><td class="r">' + inr(l.sgstAmt) + '</td></tr>' : '')
     + '<tr class="grossRow"><td class="r"><b>GROSS AMOUNT</b></td><td class="r"><b>' + inr(l.gross) + '</b></td></tr></table>'
     + (l.remark ? '<table><tr><th>Remarks</th></tr><tr><td>' + esc(l.remark) + '</td></tr></table>' : '')
-    + '<table><tr><th>Employee</th><th>Truck Driver No</th><th style="width:33%">Receiver Signature &amp; Stamp (POD)</th></tr>'
-    + '<tr><td>' + esc(l.employee || '—') + '</td><td>' + esc(l.driverNo || '—') + '</td><td class="sig"></td></tr></table>'
+    + '<table><tr><th>Employee</th><th>Truck Driver No</th><th>Prepared By</th><th style="width:24%">Receiver Signature &amp; Stamp (POD)</th><th style="width:20%">For, ' + esc(co.name) + '</th></tr>'
+    + '<tr><td>' + esc(l.employee || '—') + '</td><td>' + esc(l.driverNo || '—') + '</td><td>' + esc(l.preparedBy || '—') + '</td><td class="sig"></td><td class="sig" style="text-align:center;vertical-align:bottom"><span class="muted" style="font-size:8.5px">Authorised Signatory</span></td></tr></table>'
     + '<div class="terms">Goods are transported at owner\'s risk. Delivery subject to terms &amp; conditions of carriage of ' + esc(co.name) + '. Consignment must be insured by the consignor. Subject to Vadodara jurisdiction. System-generated from BGTS-OS.</div>'
     + '</div></body></html>';
 }

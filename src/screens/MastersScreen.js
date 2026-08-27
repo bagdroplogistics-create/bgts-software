@@ -116,6 +116,7 @@ export default function MastersScreen({ navigation, route }) {
     { key: 'name', label: 'Branch Name', required: true, value: b && b.name, hint: 'e.g. VADODARA, SURAT, BDTS-VADODARA' },
     { key: 'entityName', label: 'Entity / Legal Name (optional)', value: b && b.entityName, hint: 'Prints on this branch’s LRs; blank = main company' },
     { key: 'gstin', label: 'GSTIN (optional)', value: b && b.gstin },
+    { key: 'panNo', label: 'PAN No (optional)', value: b && b.panNo },
     { key: 'addr', label: 'Address', value: b && b.addr },
     { key: 'lrPrefix', label: 'LR Prefix (optional)', value: b && b.lrPrefix },
     { key: 'phone', label: 'Phone', value: b && b.phone }

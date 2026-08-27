@@ -6,7 +6,7 @@ import { C, S, Card, Btn, confirmDo, alert } from '../ui';
 import { blankDB, migrate, todayISO } from '../logic';
 import { downloadFile, readPickedFile } from '../fileIO';
 
-const FIELDS = [['name', 'Company Name'], ['gstin', 'GSTIN'], ['addr', 'Address'], ['phone', 'Phone'], ['email', 'Email'], ['lrPrefix', 'LR Number Prefix']];
+const FIELDS = [['name', 'Company Name'], ['gstin', 'GSTIN'], ['panNo', 'PAN No'], ['addr', 'Address'], ['phone', 'Phone'], ['email', 'Email'], ['lrPrefix', 'LR Number Prefix']];
 
 export default function SettingsScreen() {
   const { db, update, replace, syncState, migrateToDatabase, usingSharedDb } = useStore();

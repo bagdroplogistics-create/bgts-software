@@ -540,6 +540,7 @@ export default function LRFormScreen({ navigation, route }) {
         <Grid min={190}>
           <Fld l="Employee" v={f.employee} set={set('employee')} />
           <Fld l="Truck Driver No" v={f.driverNo} set={set('driverNo')} />
+          <Fld l="Prepared By" v={f.preparedBy} set={set('preparedBy')} />
         </Grid>
       </Card>
 
