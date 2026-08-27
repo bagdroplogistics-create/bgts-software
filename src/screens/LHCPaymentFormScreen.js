@@ -122,11 +122,20 @@ export default function LHCPaymentFormScreen({ navigation }) {
     return [{ v: '', l: 'All Owners' }, ...names.map(n => ({ v: n, l: n }))];
   }, [trips]);
   const agentOptions = [{ v: '', l: 'All Agents' }, ...LHC_AGENTS.map(a => ({ v: a, l: a.trim() || '(blank)' }))];
+  /* Same "ALL" + one-option-per-real-LHC pattern as Owner/Agent above — a
+     select, not free text, matching ATTrans's own "ADD NEW LHC BALANCE
+     PAYMENT" form: picking one LHC No here narrows the table below to that
+     single row (see the reference screenshot: BRD/00007 selected -> only
+     that one trip's row shows). */
+  const lhcNoOptions = useMemo(() => {
+    const sorted = trips.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.lhcNo).localeCompare(String(a.lhcNo)));
+    return [{ v: '', l: 'All' }, ...sorted.map(t => ({ v: t.lhcNo, l: t.lhcNo }))];
+  }, [trips]);
 
   const visibleTrips = useMemo(() => trips
     .filter(t => !ownerFilter || (t.ownerName || '').trim() === ownerFilter)
     .filter(t => !agentFilter || t.agent === agentFilter)
-    .filter(t => !lhcFilter || String(t.lhcNo || '').toLowerCase().indexOf(lhcFilter.toLowerCase()) >= 0)
+    .filter(t => !lhcFilter || t.lhcNo === lhcFilter)
     .slice()
     .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.lhcNo).localeCompare(String(a.lhcNo)))
     .map((t, i) => ({ ...t, __srNo: i + 1 })), [trips, ownerFilter, agentFilter, lhcFilter]);
@@ -172,7 +181,7 @@ export default function LHCPaymentFormScreen({ navigation }) {
             <PickerField value={agentFilter} onChange={setAgentFilter} options={agentOptions} />
           </HeaderFld>
           <HeaderFld l="LHC No">
-            <TextFld v={lhcFilter} set={setLhcFilter} placeholder="Search LHC No…" />
+            <PickerField value={lhcFilter} onChange={setLhcFilter} options={lhcNoOptions} />
           </HeaderFld>
           <Btn small tone="ghost" label="Reset" onPress={() => { setOwnerFilter(''); setAgentFilter(''); setLhcFilter(''); }} style={{ alignSelf: 'flex-end', marginBottom: 10 }} />
         </View>
