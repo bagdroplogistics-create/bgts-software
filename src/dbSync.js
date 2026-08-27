@@ -153,6 +153,13 @@ const FLAT = {
   accounts: { table: 'accounts', fields: [
     ['srNo','sr_no','nr'],['code','code','s'],['description','description','s'],['group','group_name','s'],
     ['openingDr','opening_dr','nr'],['openingCr','opening_cr','nr'],['createdBy','created_by','s']
+  ] },
+  lhcPayments: { table: 'lhc_balance_payments', fields: [
+    ['voucherNo','voucher_no','s'],['srNo','sr_no','nr'],['lhcTripId','lhc_trip_id','fk'],['lhcNo','lhc_no','s'],['date','date','s'],
+    ['ownerName','owner_name','s'],['agentName','agent_name','s'],['payTo','pay_to','s'],['amount','amount','nr'],
+    ['otherAdd','other_add','no'],['otherLess','other_less','no'],['paymentType','payment_type','s'],
+    ['mode','mode','s'],['cashAmount','cash_amount','no'],['bankAmount','bank_amount','no'],['name','name','s'],
+    ['createdBy','created_by','s']
   ] }
 };
 
@@ -607,7 +614,7 @@ async function pullCompany() {
   if (!data) return null;
   return { name: data.name, addr: data.addr, gstin: data.gstin, phone: data.phone, email: data.email, lrPrefix: data.lr_prefix };
 }
-const SEQ_KEYS = ['lr', 'inv', 'bk', 'lhc', 'inq', 'mr'];
+const SEQ_KEYS = ['lr', 'inv', 'bk', 'lhc', 'inq', 'mr', 'lhcPay'];
 async function syncSeq(prevSeq, nextSeq) {
   const rows = [];
   SEQ_KEYS.forEach(k => { if ((prevSeq || {})[k] !== (nextSeq || {})[k]) rows.push({ name: k, value: Number(nextSeq[k]) || 0 }); });
@@ -637,18 +644,18 @@ export async function pullDb() {
   const [
     seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups, accounts, lhcTrips
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups, accounts, lhcTrips, lhcPayments
   ] = await Promise.all([
     pullSeq(), pullFlat(FLAT.clients), pullFlat(FLAT.vehicles), pullFlat(FLAT.drivers), pullFlat(FLAT.vendors),
     pullFlat(FLAT.routes), pullFlat(FLAT.branches), pullContracts(), pullFlat(FLAT.bookings), pullFlat(FLAT.expenses),
     pullFlat(FLAT.renewals), pullInvoices(), pullFlat(FLAT.payments), pullLRs(), pullLHCs(), pullFlat(FLAT.advances),
     pullFlat(FLAT.acctExp), pullFlat(FLAT.inquiries), pullFlat(FLAT.bankTxns), pullBillingBackup(), pullFlat(FLAT.truckMaster),
-    pullFlat(FLAT.lenders), pullFlat(FLAT.fixedExp), pullFlat(FLAT.auditLog), pullFlat(FLAT.vendorDirectory), pullBills(), pullFlat(FLAT.taxMaster), pullFlat(FLAT.accountGroups), pullFlat(FLAT.accounts), pullLhcTrips()
+    pullFlat(FLAT.lenders), pullFlat(FLAT.fixedExp), pullFlat(FLAT.auditLog), pullFlat(FLAT.vendorDirectory), pullBills(), pullFlat(FLAT.taxMaster), pullFlat(FLAT.accountGroups), pullFlat(FLAT.accounts), pullLhcTrips(), pullFlat(FLAT.lhcPayments)
   ]);
   return {
     company, seq, clients, vehicles, drivers, vendors, routes, branches, contracts,
     bookings, expenses, renewals, invoices, payments, lrs, lhcs, advances,
-    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups, accounts, lhcTrips, regSeeded: true, pdfRecon: '2026-08-07'
+    acctExp, inquiries, bankTxns, billingBackup, truckMaster, lenders, fixedExp, auditLog, vendorDirectory, bills, taxMaster, accountGroups, accounts, lhcTrips, lhcPayments, regSeeded: true, pdfRecon: '2026-08-07'
   };
 }
 
@@ -687,6 +694,7 @@ export async function seedIfEmpty(db) {
   await syncFlat('accountGroups', FLAT.accountGroups, [], db.accountGroups);
   await syncFlat('accounts', FLAT.accounts, [], db.accounts);
   await syncLhcTrips([], db.lhcTrips); // after lrs (lhc_trip_lines.lr_id fk)
+  await syncFlat('lhcPayments', FLAT.lhcPayments, [], db.lhcPayments); // after lhcTrips (lhc_balance_payments.lhc_trip_id fk)
   await seedBillingBackupIfEmpty(db.billingBackup);
 }
 
@@ -731,5 +739,6 @@ export async function pushDb(prevDb, nextDb) {
   await syncFlat('accountGroups', FLAT.accountGroups, prevDb.accountGroups, nextDb.accountGroups);
   await syncFlat('accounts', FLAT.accounts, prevDb.accounts, nextDb.accounts);
   await syncLhcTrips(prevDb.lhcTrips, nextDb.lhcTrips);
+  await syncFlat('lhcPayments', FLAT.lhcPayments, prevDb.lhcPayments, nextDb.lhcPayments);
   // billingBackup is intentionally not synced here — see seedBillingBackupIfEmpty.
 }

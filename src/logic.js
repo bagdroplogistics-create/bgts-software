@@ -166,7 +166,7 @@ export function blankDB(){
     clients: [], vehicles: [], drivers: [], vendors: [], routes: [],
     contracts: [], bookings: [], expenses: [], renewals: [], invoices: [], payments: [],
     lrs: [], lhcs: [], advances: [], acctExp: [], inquiries: [], bankTxns: [], billingBackup: [], truckMaster: [],
-    lenders: [], fixedExp: [], auditLog: [], vendorDirectory: [], bills: [], taxMaster: [], accountGroups: [], accounts: [], lhcTrips: []
+    lenders: [], fixedExp: [], auditLog: [], vendorDirectory: [], bills: [], taxMaster: [], accountGroups: [], accounts: [], lhcTrips: [], lhcPayments: []
   };
 }
 
@@ -1494,6 +1494,124 @@ export function importLegacyLhcTrips(db){
   return added;
 }
 
+/* ---------- LHC Balance Payment — a NEW module mirroring ATTrans's own
+   "VIEW LHC BALANCE PAYMENT DETAILS" / "ADD NEW LHC BALANCE PAYMENT"
+   screens (screenshots dated 2026-08-27). Records payments made against an
+   LHC trip (db.lhcTrips above) — its own ledger, db.lhcPayments, each row
+   pointing at one lhcTripId. The Add form lets a user page through every
+   LHC trip at once (with Owner/Agent/LHC No filters) and enter a Pending-
+   reducing "Adjust" amount per row in a single batch; each non-zero row
+   becomes one db.lhcPayments record here.
+
+   Paid / Pending formula: PAID(trip) = sum of db.lhcPayments amounts for
+   that trip; PENDING(trip) = trip.lorryHire − PAID(trip). This is a
+   straightforward running-ledger definition chosen because it's internally
+   consistent, not because it was confirmed against ATTrans's own internal
+   logic — see the FLAGGED note below on why the source data doesn't let it
+   be verified precisely.
+
+   FLAGGED, not silently fixed:
+   - The 24-row "VIEW LHC BALANCE PAYMENT DETAILS" register has several
+     literal, unexplained duplicate rows for the very same LHC (BRD/02827
+     appears 4 times, BRD/02829/02828/02826/02821/02822/02823/02820/00017
+     each appear twice) — same date, same amount, same agent, every time.
+     Transcribed as-is (not de-duplicated), on the assumption a real
+     register shouldn't be silently trimmed, but this is very likely a
+     data-entry artifact (e.g. a double-submitted form) in ATTrans itself.
+   - The imported AMOUNT values do not cleanly reconcile against each LHC
+     trip's own `advance` field: some match exactly (BRD/00016, BRD/00017,
+     BRD/02825, BRD/02823, BRD/02822, BRD/02821), some are exactly double
+     the trip's advance (BRD/02829/02828/02827/02826, each 34000 vs a
+     17000 advance), and two (BRD/02820, BRD/02819) show 950 despite an
+     advance of 0. This looks like real payments may have been split or
+     batched across multiple LHCs in a way this list view doesn't fully
+     disambiguate — rather than guess a redistribution, every row is
+     imported with its literal AMOUNT, unmodified.
+   - OWNER NAME is blank for all 24 rows in the source register — imported
+     as blank, not guessed.
+   - Where an LHC trip's own `agent` field is still blank (Bill/LHC import
+     doesn't carry an agent name), importLegacyLhcPayments() backfills it
+     from this register's AGENT NAME column — real given data, not a
+     guess — matched case-insensitively against LHC_AGENTS so the Agent
+     dropdown on that trip's Add/Edit form highlights correctly; falls
+     back to the literal source string if no LHC_AGENTS entry matches.
+   - The Add form's own header "LHC NO*: 00018" field doesn't match any real
+     "BRD/xxxxx" LHC number, so it's treated as this payment voucher's OWN
+     auto-incrementing document number (blankLhcPayment().voucherNo,
+     counter db.seq.lhcPay) — analogous to Bill's Invoice No — not a
+     reference to a specific LHC trip. The 24-row View list doesn't expose
+     this per-row, so all imported legacy rows get voucherNo: ''.
+   Row shape: [srNo, lhcNo, date(ISO), ownerName, agentName, payTo, amount,
+   createdBy]. */
+export function blankLhcPayment(){
+  return {
+    id: '', voucherNo: '', lhcTripId: '', lhcNo: '', date: todayISO(), ownerName: '', agentName: '',
+    payTo: 'AGENT', amount: '', otherAdd: '', otherLess: '', paymentType: 'ADVANCE',
+    mode: '', cashAmount: '', bankAmount: '', name: '',
+    createdBy: '', createdAt: ''
+  };
+}
+export function lhcPaymentsFor(payments, tripId){ return (payments || []).filter(p => p.lhcTripId === tripId); }
+export function lhcPaidTotal(payments, tripId){ return lhcPaymentsFor(payments, tripId).reduce((sum, p) => sum + (Number(p.amount) || 0), 0); }
+export function lhcPendingAmount(trip, payments){ return (Number(trip.lorryHire) || 0) - lhcPaidTotal(payments, trip.id); }
+
+export const LEGACY_LHC_PAYMENTS = [
+  [1, 'BRD/02829', '2026-08-14', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [2, 'BRD/02829', '2026-08-14', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [3, 'BRD/02828', '2026-08-12', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [4, 'BRD/02828', '2026-08-12', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [5, 'BRD/02827', '2026-08-10', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [6, 'BRD/02827', '2026-08-10', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [7, 'BRD/02827', '2026-08-10', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [8, 'BRD/02827', '2026-08-10', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [9, 'BRD/02826', '2026-08-08', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [10, 'BRD/02826', '2026-08-08', '', 'USMAN BHAI', 'AGENT', 34000, 'DEVELOPER'],
+  [11, 'BRD/02825', '2026-08-06', '', 'USMAN BHAI', 'AGENT', 17000, 'DEVELOPER'],
+  [12, 'BRD/02825', '2026-08-06', '', 'USMAN BHAI', 'AGENT', 17000, 'DEVELOPER'],
+  [13, 'BRD/02823', '2026-08-03', '', 'USMAN BHAI', 'AGENT', 17000, 'DEVELOPER'],
+  [14, 'BRD/02823', '2026-08-03', '', 'USMAN BHAI', 'AGENT', 17000, 'DEVELOPER'],
+  [15, 'BRD/02822', '2026-08-01', '', 'USMAN BHAI', 'AGENT', 17000, 'DEVELOPER'],
+  [16, 'BRD/02822', '2026-08-01', '', 'USMAN BHAI', 'AGENT', 17000, 'DEVELOPER'],
+  [17, 'BRD/02821', '2026-07-30', '', 'USMAN BHAI', 'AGENT', 17000, 'DEVELOPER'],
+  [18, 'BRD/02821', '2026-07-30', '', 'USMAN BHAI', 'AGENT', 17000, 'DEVELOPER'],
+  [19, 'BRD/02820', '2026-07-30', '', 'MR. MOHAN BARIA', 'AGENT', 950, 'DEVELOPER'],
+  [20, 'BRD/02820', '2026-07-30', '', 'MR. MOHAN BARIA', 'AGENT', 950, 'DEVELOPER'],
+  [21, 'BRD/02819', '2026-07-28', '', 'MR. MOHAN BARIA', 'AGENT', 950, 'DEVELOPER'],
+  [22, 'BRD/00017', '2026-07-27', '', 'USMAN BHAI', 'AGENT', 18000, 'DEVELOPER'],
+  [23, 'BRD/00017', '2026-07-27', '', 'USMAN BHAI', 'AGENT', 18000, 'DEVELOPER'],
+  [24, 'BRD/00016', '2026-07-29', '', 'AKSHAR ROADLINES', 'AGENT', 38000, 'DEVELOPER']
+];
+
+/* Dedupes by SR NO (not by content — several rows are legitimate-looking
+   duplicates in the source register, see the doc comment above). Skips a
+   row if its LHC No isn't in db.lhcTrips yet (import Masters -> the LHC
+   register first, same pattern as importLegacyBills's vendor-not-found
+   skip). */
+export function importLegacyLhcPayments(db){
+  db.lhcPayments = db.lhcPayments || [];
+  const have = {};
+  db.lhcPayments.forEach(p => { if (p.srNo != null) have[p.srNo] = true; });
+  const tripByLhcNo = {};
+  (db.lhcTrips || []).forEach(t => { tripByLhcNo[t.lhcNo] = t; });
+  const agentByLower = {};
+  LHC_AGENTS.forEach(a => { agentByLower[a.trim().toLowerCase()] = a; });
+  let added = 0, skippedNoTrip = 0;
+  LEGACY_LHC_PAYMENTS.forEach(([srNo, lhcNo, date, ownerName, agentName, payTo, amount, createdBy]) => {
+    if (have[srNo]) return;
+    const trip = tripByLhcNo[lhcNo];
+    if (!trip) { skippedNoTrip++; return; }
+    have[srNo] = true;
+    if (!trip.agent) trip.agent = agentByLower[agentName.trim().toLowerCase()] || agentName;
+    db.lhcPayments.push({
+      id: uid('lhp'), voucherNo: '', srNo, lhcTripId: trip.id, lhcNo, date, ownerName, agentName, payTo,
+      amount, otherAdd: 0, otherLess: 0, paymentType: 'ADVANCE', mode: '', cashAmount: '', bankAmount: '', name: '',
+      createdBy, createdAt: new Date().toISOString()
+    });
+    added++;
+  });
+  return { added, skippedNoTrip };
+}
+
 export function blankLR(){
   return {
     id: '', bookingId: '', lrType: 'ORIGINAL', truckNo: '', lrNo: '', date: todayISO(),
@@ -1534,11 +1652,13 @@ export function migrate(db){
   if (!db.accountGroups) db.accountGroups = [];
   if (!db.accounts) db.accounts = [];
   if (!db.lhcTrips) db.lhcTrips = [];
+  if (!db.lhcPayments) db.lhcPayments = [];
   db.clients.forEach(c => { if (c.creditLimit === undefined) c.creditLimit = 0; });
   ensureBillingBackup(db);
   if (!db.seq.lhc) db.seq.lhc = 1;
   if (!db.seq.inq) db.seq.inq = 1;
   if (!db.seq.mr) db.seq.mr = 1;
+  if (!db.seq.lhcPay) db.seq.lhcPay = 1;
   ensureNoSamples(db);
   db.payments.forEach(p => { if (!p.mrNo){ p.mrNo = 'MR-' + String(db.seq.mr).padStart(4, '0'); db.seq.mr++; } });
   ensureBGTSFleet(db);

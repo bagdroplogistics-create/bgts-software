@@ -17,6 +17,8 @@ import BillFormScreen from './src/screens/BillFormScreen';
 import BillListScreen from './src/screens/BillListScreen';
 import LHCTripFormScreen from './src/screens/LHCTripFormScreen';
 import LHCTripListScreen from './src/screens/LHCTripListScreen';
+import LHCPaymentFormScreen from './src/screens/LHCPaymentFormScreen';
+import LHCPaymentListScreen from './src/screens/LHCPaymentListScreen';
 import InquiriesScreen from './src/screens/InquiriesScreen';
 import BankingScreen from './src/screens/BankingScreen';
 import InvoiceImportScreen from './src/screens/InvoiceImportScreen';
@@ -62,6 +64,7 @@ const NAV_GROUPS = [
       ['Bookings', 'Bookings', '▣'],
       ['LR / Consignment Notes', 'LR', '▤'],
       ['LHC / Lorry Hire', 'LHCTrip', '🚚'],
+      ['LHC Balance Payment', 'LHCPayment', '💰'],
       ['POD Update', 'POD', '✓'],
       ['Bill / Invoice', 'Bill', '▦'],
     ]
@@ -107,6 +110,8 @@ const TITLES = {
   LHC: 'LHC / Truck Hire',
   LHCTrip: 'LHC / Lorry Hire',
   LHCTripList: 'LHC Details',
+  LHCPayment: 'LHC Balance Payment',
+  LHCPaymentList: 'LHC Balance Payment Details',
   Hired: 'Hired Vehicles',
   AccDash: 'Accounts Dashboard',
   Banking: 'Banking / Reconciliation',
@@ -280,6 +285,8 @@ function WebShell({ navigationRef, routeName }) {
           <Stack.Screen name="BillList" component={BillListScreen} options={{ title: 'Bill Details' }} />
           <Stack.Screen name="LHCTrip" component={LHCTripFormScreen} options={{ title: 'LHC / Lorry Hire' }} />
           <Stack.Screen name="LHCTripList" component={LHCTripListScreen} options={{ title: 'LHC Details' }} />
+          <Stack.Screen name="LHCPayment" component={LHCPaymentFormScreen} options={{ title: 'LHC Balance Payment' }} />
+          <Stack.Screen name="LHCPaymentList" component={LHCPaymentListScreen} options={{ title: 'LHC Balance Payment Details' }} />
           <Stack.Screen name="Inquiries" component={InquiriesScreen} />
           <Stack.Screen name="Banking" component={BankingScreen} options={{ title: 'Banking / Reconciliation' }} />
           <Stack.Screen name="InvoiceImport" component={InvoiceImportScreen} options={{ title: 'Import Invoices (CSV)' }} />
@@ -320,6 +327,8 @@ function MobileShell() {
       <Stack.Screen name="BillList" component={BillListScreen} options={{ title: 'Bill Details' }} />
       <Stack.Screen name="LHCTrip" component={LHCTripFormScreen} options={{ title: 'LHC / Lorry Hire' }} />
       <Stack.Screen name="LHCTripList" component={LHCTripListScreen} options={{ title: 'LHC Details' }} />
+      <Stack.Screen name="LHCPayment" component={LHCPaymentFormScreen} options={{ title: 'LHC Balance Payment' }} />
+      <Stack.Screen name="LHCPaymentList" component={LHCPaymentListScreen} options={{ title: 'LHC Balance Payment Details' }} />
       <Stack.Screen name="Inquiries" component={InquiriesScreen} />
       <Stack.Screen name="Banking" component={BankingScreen} options={{ title: 'Banking / Reconciliation' }} />
       <Stack.Screen name="InvoiceImport" component={InvoiceImportScreen} options={{ title: 'Import Invoices (CSV)' }} />
