@@ -2658,36 +2658,39 @@ function printDocStyle(){
   /* Brand palette, matching src/ui.js's C object exactly (this file is plain
      JS with no React Native imports, so the values are duplicated here
      rather than imported, to avoid a circular import with ui.js). */
-  /* Compaction note: sizes/paddings here were tightened (from an earlier,
-     roomier pass) specifically to get the whole LR onto one printed page —
-     the Freight & Charges 4-column layout above did most of the work, this
-     shaves the remaining overflow off every other section proportionally
-     rather than off any one section, so nothing looks visually squeezed
-     relative to the rest. */
-  return '@page{size:A4;margin:8mm}'
+  /* Landscape ("horizontal") orientation, matching the old reference LR's
+     wide layout rather than this app's earlier portrait design. .doc's
+     max-width is widened to use the extra landscape width (was 800px for
+     a portrait page); Freight & Charges below goes to 3 items per row
+     (6 columns) instead of 2, since landscape trades width for height and
+     that's the section with enough repeating rows to benefit. Landscape A4
+     has ~30% less usable height than portrait, so every size/padding below
+     is tightened again versus the portrait one-page pass, to still fit
+     everything on a single page. */
+  return '@page{size:A4 landscape;margin:4mm}'
     + '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-    + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:11px;color:#111;margin:16px;background:#ececed}'
-    + '.doc{border:2px solid #2b2b2f;border-radius:10px;overflow:hidden;max-width:800px;margin:0 auto;background:#fff}'
+    + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:10.5px;color:#111;margin:16px;background:#ececed}'
+    + '.doc{border:2px solid #2b2b2f;border-radius:10px;overflow:hidden;max-width:1100px;margin:0 auto;background:#fff}'
     + '.r{text-align:right}.muted{color:#71717a;font-style:italic}'
-    + '.head{background:#2b2b2f;color:#fff;padding:8px 16px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;border-top:3px solid #f6d048}'
-    + '.head .brand{display:flex;gap:16px;align-items:center;flex:1.4;min-width:200px}'
-    + '.head h1{margin:0;font-size:15px;letter-spacing:.2px}.head p{margin:2px 0 0;font-size:8.5px;color:#d4d4d8}'
-    + '.headCol{flex:1;min-width:130px;font-size:9.5px;line-height:1.35}'
+    + '.head{background:#2b2b2f;color:#fff;padding:5px 14px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;border-top:3px solid #f6d048}'
+    + '.head .brand{display:flex;gap:14px;align-items:center;flex:1.4;min-width:200px}'
+    + '.head h1{margin:0;font-size:14px;letter-spacing:.2px}.head p{margin:1px 0 0;font-size:8px;color:#d4d4d8}'
+    + '.headCol{flex:1;min-width:130px;font-size:9px;line-height:1.25}'
     + '.headCol.mid{border-left:1px solid rgba(255,255,255,.25);border-right:1px solid rgba(255,255,255,.25);padding:0 14px}'
     + '.headCol.right{flex:0 0 auto;text-align:center}'
-    + '.tag{margin:0 0 3px;font-size:8px;letter-spacing:.5px;text-transform:uppercase;color:#f6d048;font-weight:800}'
-    + '.headCol b.big{color:#f6d048;font-size:13px}'
-    + '.num{text-align:right;font-size:11px;line-height:1.4;white-space:nowrap}.num b{color:#f6d048;font-size:15px}'
+    + '.tag{margin:0 0 2px;font-size:7.5px;letter-spacing:.5px;text-transform:uppercase;color:#f6d048;font-weight:800}'
+    + '.headCol b.big{color:#f6d048;font-size:12px}'
+    + '.num{text-align:right;font-size:10.5px;line-height:1.3;white-space:nowrap}.num b{color:#f6d048;font-size:14px}'
     + 'table{width:100%;border-collapse:collapse}'
-    + 'td,th{border:1px solid #d4d4d8;padding:4px 7px;font-size:10.2px;text-align:left;vertical-align:top}'
-    + 'th{background:#ececed;font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:#302f33}'
-    + '.sig{height:32px}'
+    + 'td,th{border:1px solid #d4d4d8;padding:3px 6px;font-size:9.6px;text-align:left;vertical-align:top}'
+    + 'th{background:#ececed;font-size:8.3px;text-transform:uppercase;letter-spacing:.3px;color:#302f33}'
+    + '.sig{height:22px}'
     + '.totalsTbl td{border-color:#a1a1aa}'
-    + '.grossRow td{background:#fbe9de;font-size:12.5px}'
-    + '.terms{font-size:7.5px;color:#555;padding:4px 12px;border-top:1px solid #a1a1aa;background:#f7f7f7}'
-    + '.pageFooter{font-size:7.5px;color:#a1a1aa;font-style:italic;text-align:center;padding:1px 0}'
-    + '.sealBox{width:44px;height:44px;border:1px dashed #a1a1aa;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:6.5px;color:#a1a1aa;margin:2px auto 0;padding:3px}'
-    + '.sectionNote{font-size:7.5px;color:#71717a;padding:3px 8px}'
+    + '.grossRow td{background:#fbe9de;font-size:12px}'
+    + '.terms{font-size:7px;color:#555;padding:2px 12px;border-top:1px solid #a1a1aa;background:#f7f7f7;line-height:1.25}'
+    + '.pageFooter{color:#a1a1aa;font-style:italic}'
+    + '.sealBox{width:38px;height:38px;border:1px dashed #a1a1aa;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:6px;color:#a1a1aa;margin:1px auto 0;padding:2px}'
+    + '.sectionNote{font-size:7.2px;color:#71717a;padding:2px 8px}'
     + '.copyBadge{background:#f6d048;color:#2b2b2f;text-align:center;font-weight:800;font-size:11px;letter-spacing:1px;padding:4px;text-transform:uppercase;border-radius:8px 8px 0 0}'
     + '@media print{ body{background:#fff;margin:0} .doc{border-radius:0;max-width:none} }';
 }
@@ -2779,12 +2782,13 @@ function lrDocBody(db, l, logoUri, copyLabel){
   if (Number(ch.belowCh)) chargeItems.push(['Below ' + esc(ch.belowPct || '') + '%', inr(ch.belowCh)]);
   if (Number(ch.rateCh)) chargeItems.push(['Rate Charge', inr(ch.rateCh)]);
   LR_CHG.filter(c => c[0] !== 'rateCh').forEach(c => chargeItems.push([c[1], inr(ch[c[0]] || 0)]));
+  /* 3 items per row (6 columns) — landscape's extra width lets this pack
+     tighter than the 2-per-row portrait layout did, cutting the section to
+     ~4 rows instead of ~6. */
   let chg = '';
-  for (let i = 0; i < chargeItems.length; i += 2) {
-    const a = chargeItems[i], b = chargeItems[i + 1];
-    chg += '<tr><td>' + a[0] + '</td><td class="r">' + a[1] + '</td>'
-      + (b ? ('<td>' + b[0] + '</td><td class="r">' + b[1] + '</td>') : '<td></td><td></td>')
-      + '</tr>';
+  for (let i = 0; i < chargeItems.length; i += 3) {
+    const row = [chargeItems[i], chargeItems[i + 1], chargeItems[i + 2]];
+    chg += '<tr>' + row.map(x => x ? ('<td>' + x[0] + '</td><td class="r">' + x[1] + '</td>') : '<td></td><td></td>').join('') + '</tr>';
   }
   const qr = qrSvg(l.lrNo + ' | ' + co.name + (co.website ? ' | ' + co.website : ''), 56);
 
@@ -2832,39 +2836,40 @@ function lrDocBody(db, l, logoUri, copyLabel){
     + '<table><tr><th>Private Mark</th></tr><tr><td>' + esc(l.privateMark || '—') + '</td></tr></table>'
 
     /* ---- Freight & Charges — every category always shown, matching the
-       reference's fixed ledger rather than hiding zero lines. 4 columns
-       (label|value|label|value) for the line items; the Sub Total/GST/
-       Total Amount summary rows span the label side (colspan 3) so they
-       still read as full-width totals under the 4-col grid. ---- */
-    + '<table class="totalsTbl"><tr><th colspan="4">Freight &amp; Charges</th></tr>' + chg
-    + '<tr><td colspan="3" class="r"><b>Sub Total</b></td><td class="r"><b>' + inr(l.subTotal) + '</b></td></tr>'
-    + '<tr><td colspan="3" class="r">IGST' + (l.igstPct ? ' ' + l.igstPct + '%' : '') + '</td><td class="r">' + inr(l.igstAmt) + '</td></tr>'
-    + '<tr><td colspan="3" class="r">CGST' + (l.cgstPct ? ' ' + l.cgstPct + '%' : '') + '</td><td class="r">' + inr(l.cgstAmt) + '</td></tr>'
-    + '<tr><td colspan="3" class="r">SGST' + (l.sgstPct ? ' ' + l.sgstPct + '%' : '') + '</td><td class="r">' + inr(l.sgstAmt) + '</td></tr>'
-    + '<tr class="grossRow"><td colspan="3" class="r"><b>Total Amount</b></td><td class="r"><b>' + inr(l.gross) + '</b></td></tr></table>'
+       reference's fixed ledger rather than hiding zero lines. 6 columns
+       (label|value ×3) for the line items in this landscape layout; the
+       Sub Total/GST/Total Amount summary rows span the label side
+       (colspan 5) so they still read as full-width totals under the grid. ---- */
+    + '<table class="totalsTbl"><tr><th colspan="6">Freight &amp; Charges</th></tr>' + chg
+    + '<tr><td colspan="5" class="r"><b>Sub Total</b></td><td class="r"><b>' + inr(l.subTotal) + '</b></td></tr>'
+    + '<tr><td colspan="5" class="r">IGST' + (l.igstPct ? ' ' + l.igstPct + '%' : '') + '</td><td class="r">' + inr(l.igstAmt) + '</td></tr>'
+    + '<tr><td colspan="5" class="r">CGST' + (l.cgstPct ? ' ' + l.cgstPct + '%' : '') + '</td><td class="r">' + inr(l.cgstAmt) + '</td></tr>'
+    + '<tr><td colspan="5" class="r">SGST' + (l.sgstPct ? ' ' + l.sgstPct + '%' : '') + '</td><td class="r">' + inr(l.sgstAmt) + '</td></tr>'
+    + '<tr class="grossRow"><td colspan="5" class="r"><b>Total Amount</b></td><td class="r"><b>' + inr(l.gross) + '</b></td></tr></table>'
 
     /* ---- For, Company (blank seal placeholder — a real stamp/signature is
-       applied by hand after printing, not fabricated here) + Prepared By ---- */
-    + '<table><tr><th style="width:60%">For, ' + esc(co.name) + '</th><th>Prepared By</th></tr>'
-    + '<tr><td style="text-align:center"><div class="sealBox">Company<br>Seal</div></td><td>' + esc(l.preparedBy || '—') + '</td></tr></table>'
+       applied by hand after printing, not fabricated here) + Prepared By +
+       Insurance + GST Payable By + Payment Terms — merged into one 5-column
+       row (was 2 separate tables) to use the landscape width instead of
+       stacking, which is what buys back the row this orientation costs. ---- */
+    + '<table><tr><th style="width:26%">For, ' + esc(co.name) + '</th><th>Prepared By</th><th>Insurance</th><th>GST Payable By</th><th>Payment Terms</th></tr>'
+    + '<tr><td style="text-align:center"><div class="sealBox">Company<br>Seal</div></td><td>' + esc(l.preparedBy || '—') + '</td><td>' + esc(l.insurance || '—') + '</td><td>' + esc(l.gstPaidBy || '—') + ' <span class="muted">(' + esc(l.gstSlab || '—') + ')</span></td><td><b>' + esc(l.payTerms || '—') + '</b></td></tr></table>'
 
-    /* ---- Insurance / GST Payable By / Payment Terms ---- */
-    + '<table><tr><th>Insurance</th><th>GST Payable By</th><th>Payment Terms</th></tr>'
-    + '<tr><td>' + esc(l.insurance || '—') + '</td><td>' + esc(l.gstPaidBy || '—') + '<br><span class="muted">GST Slabs : ' + esc(l.gstSlab || '—') + '</span></td><td><b>' + esc(l.payTerms || '—') + '</b></td></tr></table>'
-
-    /* ---- Delivery At / Remarks ---- */
-    + '<table><tr><th style="width:50%">Delivery At</th><th>Remarks</th></tr>'
-    + '<tr><td>' + esc(l.lrMode || '—') + '</td><td>' + (l.remark ? esc(l.remark) : '—') + '</td></tr></table>'
-
-    /* ---- extra details this app already tracked, kept beyond the
-       reference format rather than dropped ---- */
-    + '<table><tr><th>Invoice Date</th><th>E-Way Date</th><th>E-Way Expiry</th><th>P.O. Date</th><th>Packing</th><th>Agent</th><th>To Be Billed At</th></tr>'
-    + '<tr><td>' + fmtDate(l.invoiceDate) + '</td><td>' + fmtDate(l.ewayBillDate) + '</td><td>' + fmtDate(l.ewayExDate) + '</td><td>' + fmtDate(l.poDate) + '</td><td>' + esc(l.packing || '—') + '</td><td>' + esc(l.agent || '—') + '</td><td>' + esc(l.billedAt || '—') + '</td></tr></table>'
+    /* ---- Delivery At + the extra details this app already tracked, merged
+       into one 8-column row for the same reason as above. Remarks keeps its
+       own full-width row (like Private Mark) since it's free text that
+       needs real width to stay readable rather than being squeezed into a
+       narrow shared column. ---- */
+    + '<table><tr><th>Delivery At</th><th>Invoice Date</th><th>E-Way Date</th><th>E-Way Expiry</th><th>P.O. Date</th><th>Packing</th><th>Agent</th><th>To Be Billed At</th></tr>'
+    + '<tr><td>' + esc(l.lrMode || '—') + '</td><td>' + fmtDate(l.invoiceDate) + '</td><td>' + fmtDate(l.ewayBillDate) + '</td><td>' + fmtDate(l.ewayExDate) + '</td><td>' + fmtDate(l.poDate) + '</td><td>' + esc(l.packing || '—') + '</td><td>' + esc(l.agent || '—') + '</td><td>' + esc(l.billedAt || '—') + '</td></tr></table>'
+    + '<table><tr><th>Remarks</th></tr><tr><td>' + (l.remark ? esc(l.remark) : '—') + '</td></tr></table>'
     + '<table><tr><th>Employee</th><th>Truck Driver No</th><th>Booking Branch</th><th>To Branch</th><th>Lorry Type</th><th style="width:22%">Receiver Signature &amp; Stamp (POD)</th></tr>'
     + '<tr><td>' + esc(l.employee || '—') + '</td><td>' + esc(l.driverNo || '—') + '</td><td>' + esc(l.bookingBranch || '—') + '</td><td>' + esc(l.toBranch || '—') + '</td><td>' + esc(l.lorryType || '—') + '</td><td class="sig"></td></tr></table>'
 
-    + '<div class="terms">Goods are transported at owner\'s risk. Delivery subject to terms &amp; conditions of carriage of ' + esc(co.name) + '. Consignment must be insured by the consignor. Subject to Vadodara jurisdiction. System-generated from BGTS-OS.</div>'
-    + '<div class="pageFooter">PAGE 1 OF 1</div>';
+    /* Footer's "PAGE 1 OF 1" folded onto the terms line (was its own div)
+       to claw back one more line of height in this height-constrained
+       landscape layout. */
+    + '<div class="terms">Goods are transported at owner\'s risk. Delivery subject to terms &amp; conditions of carriage of ' + esc(co.name) + '. Consignment must be insured by the consignor. Subject to Vadodara jurisdiction. System-generated from BGTS-OS. <span class="pageFooter">— PAGE 1 OF 1</span></div>';
 }
 
 /* Single-copy LR print — unchanged wrapper kept for every existing call site
