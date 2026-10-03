@@ -7,7 +7,7 @@ import { getLogoDataUri } from '../logoAsset';
 import {
   uid, inr, fmtDate, todayISO, byId, removeById, lrMultiCopyHtml, vendorName, csvString,
   lrHireBalance, lrTripExpTotal, truckToVehicleId, TRIP_EXP_CATS, sum,
-  importLegacyLRs, LEGACY_LRS
+  importLegacyLRs, LEGACY_LRS, importLegacyLRs2, LEGACY_LRS_2
 } from '../logic';
 
 /* Print-copy picker options — mirrors the reference app's own "VIEW LR
@@ -66,6 +66,16 @@ export default function LRScreen({ navigation }) {
   const doImportLegacyLRs = () => update(d => {
     const added = importLegacyLRs(d);
     setTimeout(() => alert('LR register imported', added + ' LR(s) added' + (added < LEGACY_LRS.length ? ', ' + (LEGACY_LRS.length - added) + ' already on file (skipped).' : '.')), 100);
+  });
+
+  /* Batch 2: BRD/06829 - BRD/06879, the next page of the same ATTrans
+     register (picks up right where the first import's oldest row,
+     BRD/06786, and newest row, BRD/06828, left off). Separate button/array
+     from batch 1 so re-running either one is always safe — importLegacyLRRows
+     dedupes by LR No regardless of which batch or order they're run in. */
+  const doImportLegacyLRs2 = () => update(d => {
+    const added = importLegacyLRs2(d);
+    setTimeout(() => alert('LR register imported', added + ' LR(s) added' + (added < LEGACY_LRS_2.length ? ', ' + (LEGACY_LRS_2.length - added) + ' already on file (skipped).' : '.')), 100);
   });
 
   const exportCsv = async () => {
@@ -208,6 +218,7 @@ export default function LRScreen({ navigation }) {
     <View style={S.screen}>
       <View style={{ padding: 14, paddingBottom: 6, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
         <Btn label="Import ATTrans LR Register (42)" tone="ghost" onPress={doImportLegacyLRs} />
+        <Btn label="Import ATTrans LR Register — Batch 2 (51)" tone="ghost" onPress={doImportLegacyLRs2} />
         <Btn label="Export CSV" tone="ghost" onPress={exportCsv} />
         <Btn label="⬆ Import CSV / Excel" onPress={() => navigation.navigate('LRImport')} />
         <Btn label="+ ADD NEW LR" tone="amber" onPress={() => navigation.navigate('LRForm', {})} />
